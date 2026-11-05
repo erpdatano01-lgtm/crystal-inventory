@@ -7,6 +7,8 @@ import {
   fetchProducts,
   fetchStockLots,
   updateProductStatus,
+  deleteProduct,
+  resetTestData,
 } from '@/lib/inventoryService';
 import {
   Product,
@@ -36,6 +38,7 @@ import {
   ChevronDown,
   X,
   FileSpreadsheet,
+  Trash2,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 
@@ -80,6 +83,33 @@ export default function ProductsPage() {
     }
     load();
   }, []);
+
+  const handleDeleteProduct = async (id: string, sku: string) => {
+    if (!confirm(`ยืนยันการลบสินค้า "${sku}" ออกจากสต็อก? (การลบนี้ไม่สามารถย้อนกลับได้)`)) {
+      return;
+    }
+    const ok = await deleteProduct(id);
+    if (ok) {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      if (activeModalProduct?.id === id) setActiveModalProduct(null);
+      showToast(`ลบสินค้า ${sku} สำเร็จแล้ว`);
+    } else {
+      alert('เกิดข้อผิดพลาดในการลบสินค้า');
+    }
+  };
+
+  const handleResetTestData = async () => {
+    if (!confirm('⚠️ คำเตือน: คุณต้องการ "ล้างข้อมูลสินค้าทดสอบทั้งหมด" ใช่หรือไม่? เพื่อให้สต็อกกลับมาว่างสะอาดพร้อมใส่สินค้าจริง')) {
+      return;
+    }
+    const ok = await resetTestData('products');
+    if (ok) {
+      setProducts([]);
+      showToast('ล้างข้อมูลสินค้าทดสอบเรียบร้อยแล้ว');
+    } else {
+      alert('เกิดข้อผิดพลาดในการล้างข้อมูล');
+    }
+  };
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
@@ -209,6 +239,18 @@ export default function ProductsPage() {
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Google Sheets</span>
             </button>
+
+            {/* Reset Test Products Button */}
+            {products.length > 0 && (
+              <button
+                onClick={handleResetTestData}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-700 border border-slate-200 hover:border-red-200 text-xs font-medium transition active:scale-95"
+                title="ล้างข้อมูลสินค้าทดสอบทั้งหมดเพื่อเริ่มใส่สินค้าจริง"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">ล้างข้อมูลทดสอบ</span>
+              </button>
+            )}
 
             {/* Link to Add Product */}
             <Link
@@ -473,6 +515,18 @@ export default function ProductsPage() {
                           ขายแล้ว
                         </button>
                       )}
+
+                      {/* Delete Product Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProduct(p.id, p.sku);
+                        }}
+                        className="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition"
+                        title="ลบสินค้านี้ออกจากระบบ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -580,6 +634,13 @@ export default function ProductsPage() {
                             title="ดูรายละเอียด"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(p.id, p.sku)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="ลบสินค้านี้"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -725,29 +786,40 @@ export default function ProductsPage() {
               </div>
 
               {/* Status Actions */}
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100">
                 <button
-                  onClick={() => handleQuickStatusChange(activeModalProduct, 'AVAILABLE')}
-                  className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                  onClick={() => handleDeleteProduct(activeModalProduct.id, activeModalProduct.sku)}
+                  className="px-3.5 py-2 text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1.5"
+                  title="ลบสินค้านี้"
                 >
-                  ตั้งเป็น AVAILABLE
+                  <Trash2 className="w-4 h-4" />
+                  <span>ลบชิ้นนี้</span>
                 </button>
-                <button
-                  onClick={() => handleQuickStatusChange(activeModalProduct, 'RESERVED')}
-                  className="px-3.5 py-2 text-xs font-bold rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
-                >
-                  ตั้งเป็น RESERVED
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm(`ยืนยันการขาย ${activeModalProduct.sku}?`)) {
-                      handleQuickStatusChange(activeModalProduct, 'SOLD');
-                    }
-                  }}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition"
-                >
-                  ตัดสต็อกขายแล้ว (SOLD)
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleQuickStatusChange(activeModalProduct, 'AVAILABLE')}
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                  >
+                    ตั้งเป็น AVAILABLE
+                  </button>
+                  <button
+                    onClick={() => handleQuickStatusChange(activeModalProduct, 'RESERVED')}
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                  >
+                    ตั้งเป็น RESERVED
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`ยืนยันการขาย ${activeModalProduct.sku}?`)) {
+                        handleQuickStatusChange(activeModalProduct, 'SOLD');
+                      }
+                    }}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition"
+                  >
+                    ตัดสต็อกขายแล้ว (SOLD)
+                  </button>
+                </div>
               </div>
             </div>
           </div>

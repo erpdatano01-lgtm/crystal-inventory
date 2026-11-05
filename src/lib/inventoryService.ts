@@ -301,3 +301,59 @@ export function generateSmartSku(
   const nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
   return `${prefix}${String(nextNum).padStart(3, '0')}`;
 }
+
+// Delete product
+export async function deleteProduct(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/products?id=${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      // Also clean up local storage fallback
+      const prods = getLocal<Product[]>(LS_PRODUCTS, []).filter((p) => p.id !== id);
+      setLocal(LS_PRODUCTS, prods);
+      return true;
+    }
+  } catch (err) {
+    console.error('Delete product error:', err);
+  }
+  return false;
+}
+
+// Delete expense
+export async function deleteExpense(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/expenses?id=${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      const exps = getLocal<Expense[]>(LS_EXPENSES, []).filter((e) => e.id !== id);
+      setLocal(LS_EXPENSES, exps);
+      return true;
+    }
+  } catch (err) {
+    console.error('Delete expense error:', err);
+  }
+  return false;
+}
+
+// Reset / Clear all test data
+export async function resetTestData(target: 'all' | 'products' | 'expenses' = 'all'): Promise<boolean> {
+  try {
+    const res = await fetch('/api/reset-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    });
+    if (res.ok) {
+      if (target === 'all' || target === 'products') {
+        setLocal(LS_PRODUCTS, []);
+        setLocal(LS_MOVEMENTS, []);
+      }
+      if (target === 'all' || target === 'expenses') {
+        setLocal(LS_EXPENSES, []);
+        setLocal(LS_LOTS, []);
+      }
+      return true;
+    }
+  } catch (err) {
+    console.error('Reset data error:', err);
+  }
+  return false;
+}

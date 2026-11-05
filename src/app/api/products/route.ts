@@ -144,3 +144,40 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+
+// DELETE: delete product by id
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!isSupabaseAdminConfigured || !supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin not configured' }, { status: 503 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing product ID' }, { status: 400 });
+    }
+
+    // 1. Delete associated stock_movements first
+    await supabaseAdmin
+      .from('stock_movements')
+      .delete()
+      .eq('product_id', id);
+
+    // 2. Delete product
+    const { error } = await supabaseAdmin
+      .from('products')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, deletedId: id });
+  } catch (err: any) {
+    console.error('Delete product error:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}

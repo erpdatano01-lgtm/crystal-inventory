@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Gem,
   PackageCheck,
+  ShoppingBag,
   Receipt,
   LayoutDashboard,
   PlusCircle,
@@ -26,8 +27,8 @@ export default function Navbar() {
   const navLinks = [
     { href: '/', label: 'ภาพรวม (Dashboard)', icon: LayoutDashboard },
     { href: '/products', label: 'คลังสินค้า (Products)', icon: PackageCheck },
-    { href: '/products/new', label: '+ รับหินเข้าสต็อก', icon: PlusCircle },
-    { href: '/expenses', label: 'ค่าใช้จ่าย & เปิดล็อต', icon: Receipt },
+    { href: '/orders', label: 'เปิดบิล & บัญชี (Orders)', icon: ShoppingBag },
+    { href: '/expenses', label: 'ค่าใช้จ่าย & ล็อต', icon: Receipt },
   ];
 
   // Client-safe check based on NEXT_PUBLIC_ variables

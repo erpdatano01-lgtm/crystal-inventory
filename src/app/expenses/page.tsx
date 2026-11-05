@@ -7,6 +7,8 @@ import {
   fetchExpenses,
   fetchStockLots,
   createExpenseWithOptionalLot,
+  deleteExpense,
+  resetTestData,
 } from '@/lib/inventoryService';
 import {
   Expense,
@@ -89,6 +91,33 @@ export default function ExpensesPage() {
     }
     load();
   }, []);
+
+  const handleDeleteExpense = async (id: string, title: string) => {
+    if (!confirm(`ยืนยันการลบรายการค่าใช้จ่าย "${title}"?`)) {
+      return;
+    }
+    const ok = await deleteExpense(id);
+    if (ok) {
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      alert('ลบรายการค่าใช้จ่ายเรียบร้อยแล้ว');
+    } else {
+      alert('เกิดข้อผิดพลาดในการลบรายการ');
+    }
+  };
+
+  const handleResetTestExpenses = async () => {
+    if (!confirm('⚠️ คำเตือน: คุณต้องการ "ล้างประวัติค่าใช้จ่ายและล็อตทดสอบทั้งหมด" ใช่หรือไม่?')) {
+      return;
+    }
+    const ok = await resetTestData('expenses');
+    if (ok) {
+      setExpenses([]);
+      setLots([]);
+      alert('ล้างข้อมูลค่าใช้จ่ายและล็อตทดสอบเรียบร้อยแล้ว');
+    } else {
+      alert('เกิดข้อผิดพลาดในการล้างข้อมูล');
+    }
+  };
 
   // Update suggested lot code when opening form or category changes
   useEffect(() => {
@@ -197,6 +226,18 @@ export default function ExpensesPage() {
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Google Sheets</span>
             </button>
+
+            {/* Reset Test Expenses Button */}
+            {expenses.length > 0 && (
+              <button
+                onClick={handleResetTestExpenses}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-700 border border-slate-200 hover:border-red-200 text-xs font-medium transition active:scale-95"
+                title="ล้างข้อมูลค่าใช้จ่ายทดสอบทั้งหมด"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">ล้างข้อมูลทดสอบ</span>
+              </button>
+            )}
 
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -575,6 +616,15 @@ export default function ExpensesPage() {
                             <FolderOpen className="w-4 h-4" />
                           </a>
                         )}
+
+                        {/* Delete Expense Button */}
+                        <button
+                          onClick={() => handleDeleteExpense(item.id, item.title)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                          title="ลบรายการค่าใช้จ่ายนี้"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>

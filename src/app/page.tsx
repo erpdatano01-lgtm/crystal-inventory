@@ -106,29 +106,29 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 2 Big Action Shortcut Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* 3 Big Action Shortcut Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
-            href="/expenses"
-            className="group p-5 bg-white rounded-3xl border-2 border-purple-100 hover:border-purple-400 hover:shadow-lg transition flex items-center justify-between"
+            href="/orders"
+            className="group p-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-3xl shadow-md hover:shadow-xl hover:from-emerald-700 hover:to-teal-700 transition flex items-center justify-between"
           >
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-110 transition shrink-0">
-                <Receipt className="w-7 h-7" />
+              <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center group-hover:scale-110 transition shrink-0">
+                <ShoppingBag className="w-7 h-7" />
               </div>
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-purple-700">
-                  รายจ่าย & ล็อตใหม่
+                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-200">
+                  ระบบขาย & ออกบิล
                 </span>
-                <h3 className="text-lg font-bold text-slate-900">
-                  + บันทึกบิลค่าใช้จ่าย
+                <h3 className="text-lg font-bold text-white">
+                  + เปิดบิลขาย & บัญชี
                 </h3>
-                <p className="text-xs text-slate-500">
-                  แนบสลิปผ่าน R2 และเปิดรหัส Lot นำเข้าหินอัตโนมัติ
+                <p className="text-xs text-emerald-100">
+                  ตัดสต็อกอัตโนมัติ พิมพ์ใบเสร็จ A4 คำนวณกำไร-ขาดทุน FlowAccount
                 </p>
               </div>
             </div>
-            <ArrowRight className="w-6 h-6 text-purple-400 group-hover:translate-x-1.5 transition" />
+            <ArrowRight className="w-6 h-6 text-emerald-200 group-hover:translate-x-1.5 transition" />
           </Link>
 
           <Link
@@ -152,6 +152,29 @@ export default function DashboardPage() {
               </div>
             </div>
             <ArrowRight className="w-6 h-6 text-purple-200 group-hover:translate-x-1.5 transition" />
+          </Link>
+
+          <Link
+            href="/expenses"
+            className="group p-5 bg-white rounded-3xl border-2 border-purple-100 hover:border-purple-400 hover:shadow-lg transition flex items-center justify-between"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-110 transition shrink-0">
+                <Receipt className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-purple-700">
+                  รายจ่าย & ล็อตใหม่
+                </span>
+                <h3 className="text-lg font-bold text-slate-900">
+                  + บันทึกบิลค่าใช้จ่าย
+                </h3>
+                <p className="text-xs text-slate-500">
+                  แนบสลิปผ่าน R2 และเปิดรหัส Lot นำเข้าหินอัตโนมัติ
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-6 h-6 text-purple-400 group-hover:translate-x-1.5 transition" />
           </Link>
         </div>
 

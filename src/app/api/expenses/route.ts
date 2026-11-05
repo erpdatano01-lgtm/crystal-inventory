@@ -76,3 +76,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+
+// DELETE: delete expense by id
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!isSupabaseAdminConfigured || !supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin not configured' }, { status: 503 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing expense ID' }, { status: 400 });
+    }
+
+    // 1. Check if any stock_lot is linked to this expense
+    await supabaseAdmin
+      .from('stock_lots')
+      .update({ expense_id: null })
+      .eq('expense_id', id);
+
+    // 2. Delete expense
+    const { error } = await supabaseAdmin
+      .from('expenses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, deletedId: id });
+  } catch (err: any) {
+    console.error('Delete expense error:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
