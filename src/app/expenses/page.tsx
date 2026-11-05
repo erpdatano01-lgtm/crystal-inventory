@@ -31,6 +31,8 @@ import {
   Scale,
   Trash2,
   FileSpreadsheet,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 
@@ -41,6 +43,11 @@ export default function ExpensesPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSheetsModal, setShowSheetsModal] = useState(false);
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
+
+  // Edit Expense state
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Expense>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form states
   const [expenseDate, setExpenseDate] = useState(
@@ -102,6 +109,42 @@ export default function ExpensesPage() {
       alert('ลบรายการค่าใช้จ่ายเรียบร้อยแล้ว');
     } else {
       alert('เกิดข้อผิดพลาดในการลบรายการ');
+    }
+  };
+
+  const openEditModal = (expense: Expense) => {
+    setEditingExpense(expense);
+    setEditForm({
+      expense_date: expense.expense_date,
+      category: expense.category,
+      title: expense.title,
+      vendor_name: expense.vendor_name,
+      total_amount: expense.total_amount,
+      payment_method: expense.payment_method,
+      drive_doc_url: expense.drive_doc_url,
+      notes: expense.notes,
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editingExpense) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/expenses?id=${editingExpense.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      if (!res.ok) throw new Error('Update failed');
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === editingExpense.id ? { ...e, ...editForm } as Expense : e))
+      );
+      setEditingExpense(null);
+      alert('แก้ไขรายการค่าใช้จ่ายเรียบร้อยแล้ว ✓');
+    } catch {
+      alert('เกิดข้อผิดพลาดในการแก้ไขค่าใช้จ่าย');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -605,6 +648,15 @@ export default function ExpensesPage() {
                           </a>
                         )}
 
+                        {/* Edit Expense Button */}
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition"
+                          title="แก้ไขรายการค่าใช้จ่ายนี้"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+
                         {/* Delete Expense Button */}
                         <button
                           onClick={() => handleDeleteExpense(item.id, item.title)}
@@ -621,6 +673,147 @@ export default function ExpensesPage() {
             </div>
           )}
         </div>
+
+        {/* Edit Expense Modal */}
+        {editingExpense && (
+          <div
+            onClick={() => setEditingExpense(null)}
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl cursor-default"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+                    <Pencil className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">แก้ไขรายการค่าใช้จ่าย</h3>
+                    <p className="text-xs text-slate-500">{editingExpense.title}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingExpense(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Form fields */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">วันที่จ่าย</label>
+                    <input
+                      type="date"
+                      value={editForm.expense_date || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, expense_date: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">หมวดหมู่</label>
+                    <select
+                      value={editForm.category || 'OTHER'}
+                      onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    >
+                      {Object.entries(EXPENSE_CATEGORIES_CONFIG).map(([key, config]) => (
+                        <option key={key} value={key}>
+                          {config.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ชื่อรายการค่าใช้จ่าย</label>
+                  <input
+                    type="text"
+                    value={editForm.title || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">จำนวนเงิน (฿)</label>
+                    <input
+                      type="number"
+                      value={editForm.total_amount || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, total_amount: parseFloat(e.target.value) }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 font-bold text-rose-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">ร้านค้า / ผู้ขาย</label>
+                    <input
+                      type="text"
+                      value={editForm.vendor_name || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, vendor_name: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">วิธีชำระเงิน</label>
+                  <input
+                    type="text"
+                    value={editForm.payment_method || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, payment_method: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ลิงก์เอกสาร Google Drive</label>
+                  <input
+                    type="text"
+                    value={editForm.drive_doc_url || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, drive_doc_url: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="https://drive.google.com/..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">หมายเหตุเพิ่มเติม</label>
+                  <textarea
+                    rows={2}
+                    value={editForm.notes || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => setEditingExpense(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleEditSave}
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition flex items-center gap-2 disabled:opacity-60"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Lightbox for Receipt Image */}
         {selectedReceiptUrl && (

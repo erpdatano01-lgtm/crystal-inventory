@@ -77,6 +77,56 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PATCH: update expense by id
+export async function PATCH(request: NextRequest) {
+  try {
+    if (!isSupabaseAdminConfigured || !supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin not configured' }, { status: 503 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const body = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing expense ID' }, { status: 400 });
+    }
+
+    const allowedFields = [
+      'expense_date',
+      'category',
+      'title',
+      'vendor_name',
+      'total_amount',
+      'payment_method',
+      'r2_receipt_url',
+      'drive_doc_url',
+      'notes',
+    ];
+
+    const updatePayload: Record<string, any> = {};
+    for (const key of allowedFields) {
+      if (key in body) updatePayload[key] = body[key];
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('expenses')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(updated);
+  } catch (err: any) {
+    console.error('Update expense error:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
 // DELETE: delete expense by id
 export async function DELETE(request: NextRequest) {
   try {
