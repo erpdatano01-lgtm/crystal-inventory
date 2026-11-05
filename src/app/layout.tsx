@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Crystal & Mineral Inventory System | สต็อกร้านหินและบันทึกค่าใช้จ่าย',
-  description: 'ระบบจัดการสต็อกร้านหินมงคล หินสวยงาม แร่ธรรมชาติ บันทึกค่าใช้จ่าย พร้อมอัปโหลดรูปขึ้น Cloudflare R2 บีบอัดเป็น WebP อัตโนมัติ',
+  title: 'Vivida Crystal | ระบบบริหารจัดการสต็อกหินและบัญชี',
+  description: 'ระบบจัดการสต็อกร้านหินมงคล คริสตัล แร่ธรรมชาติ Vivida Crystal บันทึกค่าใช้จ่าย เปิดบิลขาย และพิมพ์ใบเสร็จ',
 };
 
 export const viewport: Viewport = {

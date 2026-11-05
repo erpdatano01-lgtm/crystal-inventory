@@ -87,7 +87,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50">
+    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50 md:pl-64 pt-16 md:pt-0">
       <Navbar />
 
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
@@ -95,10 +95,10 @@ export default function DashboardPage() {
         <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-lg relative overflow-hidden">
           <div className="relative z-10 max-w-2xl">
             <span className="px-3 py-1 bg-white/10 backdrop-blur rounded-full text-xs font-semibold text-purple-200 border border-white/10">
-              💎 Crystal & Mineral Management System
+              💎 Vivida Crystal Management System
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold mt-2.5 tracking-tight">
-              ภาพรวมสต็อกหิน & บันทึกค่าใช้จ่าย
+              Vivida Crystal - ภาพรวมสต็อกหิน & บัญชี
             </h2>
             <p className="text-sm text-slate-300 mt-1">
               ติดตามมูลค่าสินค้าในร้าน ค่าใช้จ่ายนำเข้าล็อต และภาพรวมการขายแบบเรียลไทม์

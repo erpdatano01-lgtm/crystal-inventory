@@ -1,6 +1,8 @@
-# 💎 Crystal & Mineral Management System - System Handover & Technical Note
+# 💎 Vivida Crystal Management System - System Handover & Technical Note
 
 > **บันทึกข้อมูลระบบฉบับสมบูรณ์ (Master Project & Handover Documentation)**  
+> **ชื่อร้าน / แบรนด์:** Vivida Crystal  
+> **โครงสร้างเมนู:** Left Sidebar Layout (แถบเมนูควบคุมทางซ้ายมือ)  
 > **อัปเดตล่าสุด:** 5 พฤศจิกายน 2026 (พ.ศ. 2569)  
 > **จุดประสงค์:** ใช้เป็นคู่มือหลักในการส่งต่องาน บันทึกการตั้งค่า กุญแจ API ฐานข้อมูล โครงสร้างโค้ด และฟังก์ชันทั้งหมด เพื่อให้เจ้าของระบบ, ผู้พัฒนาใหม่ หรือ AI Assistant ตัวใดก็ตาม (รวมถึงเมื่อเปลี่ยนรหัส/สลับบัญชี Antigravity) สามารถอ่านและทำงานต่อได้ทันที 100% โดยไม่ต้องเริ่มใหม่
 

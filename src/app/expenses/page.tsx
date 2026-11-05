@@ -239,7 +239,7 @@ export default function ExpensesPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50">
+    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50 md:pl-64 pt-16 md:pt-0">
       <Navbar />
 
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">

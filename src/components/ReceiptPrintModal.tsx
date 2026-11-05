@@ -52,13 +52,13 @@ export default function ReceiptPrintModal({ order, onClose }: ReceiptPrintModalP
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  Crystal & Mineral Store
+                  Vivida Crystal
                 </h2>
                 <p className="text-xs text-slate-500">
-                  ร้านหินมงคล ผลึกแร่ธรรมชาติ และคริสตัลเกรดสะสม
+                  ร้านหินมงคล ผลึกแร่ธรรมชาติ และคริสตัลเกรดสะสม (Vivida Crystal)
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  โทร: 08x-xxx-xxxx | LINE: @crystalpro
+                  โทร: 08x-xxx-xxxx | LINE: @vividacrystal
                 </p>
               </div>
             </div>
@@ -223,7 +223,7 @@ export default function ReceiptPrintModal({ order, onClose }: ReceiptPrintModalP
                 ชำระเงินแล้ว
               </div>
               <p className="font-semibold text-slate-700">ผู้มีอำนาจลงนาม / ร้านค้า</p>
-              <p className="text-[10px] text-slate-400">Crystal & Mineral Store</p>
+              <p className="text-[10px] text-slate-400">Vivida Crystal</p>
             </div>
           </div>
         </div>

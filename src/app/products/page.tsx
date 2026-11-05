@@ -228,7 +228,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50">
+    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50 md:pl-64 pt-16 md:pt-0">
       <Navbar />
 
       {/* Floating Toast Notification */}

@@ -263,7 +263,7 @@ export default function OrdersPage() {
   }, [orders, searchQuery, selectedChannel, selectedStatus]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-20">
+    <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-12 md:pl-64 pt-16 md:pt-0">
       <Navbar />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
