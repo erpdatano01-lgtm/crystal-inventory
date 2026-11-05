@@ -227,18 +227,6 @@ export default function ExpensesPage() {
               <span>Google Sheets</span>
             </button>
 
-            {/* Reset Test Expenses Button */}
-            {expenses.length > 0 && (
-              <button
-                onClick={handleResetTestExpenses}
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-700 border border-slate-200 hover:border-red-200 text-xs font-medium transition active:scale-95"
-                title="ล้างข้อมูลค่าใช้จ่ายทดสอบทั้งหมด"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline">ล้างข้อมูลทดสอบ</span>
-              </button>
-            )}
-
             <button
               onClick={() => setShowAddForm(!showAddForm)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"

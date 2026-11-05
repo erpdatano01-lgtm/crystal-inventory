@@ -8,7 +8,6 @@ import {
   fetchStockLots,
   updateProductStatus,
   deleteProduct,
-  resetTestData,
 } from '@/lib/inventoryService';
 import {
   Product,
@@ -39,6 +38,8 @@ import {
   X,
   FileSpreadsheet,
   Trash2,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 
@@ -62,6 +63,10 @@ export default function ProductsPage() {
 
   // Detail Modal
   const [activeModalProduct, setActiveModalProduct] = useState<Product | null>(null);
+  // Edit Modal
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Product>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -98,11 +103,56 @@ export default function ProductsPage() {
     }
   };
 
+  const openEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setEditForm({
+      name: product.name,
+      stone_type: product.stone_type,
+      weight_grams: product.weight_grams,
+      dimensions: product.dimensions,
+      grade_origin: product.grade_origin,
+      cost_price: product.cost_price,
+      selling_price: product.selling_price,
+      min_price: product.min_price,
+      storage_location: product.storage_location,
+      qty_on_hand: product.qty_on_hand,
+      drive_video_url: product.drive_video_url,
+    });
+    setActiveModalProduct(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingProduct) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/products?id=${editingProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      if (!res.ok) throw new Error('Update failed');
+      const updated = await res.json();
+      setProducts((prev) =>
+        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...editForm } : p))
+      );
+      setEditingProduct(null);
+      showToast(`แก้ไขสินค้า ${editingProduct.sku} สำเร็จแล้ว ✓`);
+    } catch {
+      alert('เกิดข้อผิดพลาดในการแก้ไขสินค้า');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleResetTestData = async () => {
     if (!confirm('⚠️ คำเตือน: คุณต้องการ "ล้างข้อมูลสินค้าทดสอบทั้งหมด" ใช่หรือไม่? เพื่อให้สต็อกกลับมาว่างสะอาดพร้อมใส่สินค้าจริง')) {
       return;
     }
-    const ok = await resetTestData('products');
+    const ok = await fetch('/api/reset-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: 'products' }),
+    }).then((r) => r.ok);
     if (ok) {
       setProducts([]);
       showToast('ล้างข้อมูลสินค้าทดสอบเรียบร้อยแล้ว');
@@ -239,18 +289,6 @@ export default function ProductsPage() {
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Google Sheets</span>
             </button>
-
-            {/* Reset Test Products Button */}
-            {products.length > 0 && (
-              <button
-                onClick={handleResetTestData}
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-700 border border-slate-200 hover:border-red-200 text-xs font-medium transition active:scale-95"
-                title="ล้างข้อมูลสินค้าทดสอบทั้งหมดเพื่อเริ่มใส่สินค้าจริง"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline">ล้างข้อมูลทดสอบ</span>
-              </button>
-            )}
 
             {/* Link to Add Product */}
             <Link
@@ -516,7 +554,17 @@ export default function ProductsPage() {
                         </button>
                       )}
 
-                      {/* Delete Product Button */}
+                      {/* Edit & Delete Product Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(p);
+                        }}
+                        className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-xl transition"
+                        title="แก้ไขสินค้านี้"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -634,6 +682,13 @@ export default function ProductsPage() {
                             title="ดูรายละเอียด"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openEditModal(p)}
+                            className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                            title="แก้ไขสินค้า"
+                          >
+                            <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(p.id, p.sku)}
@@ -787,15 +842,24 @@ export default function ProductsPage() {
 
               {/* Status Actions */}
               <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100">
-                <button
-                  onClick={() => handleDeleteProduct(activeModalProduct.id, activeModalProduct.sku)}
-                  className="px-3.5 py-2 text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1.5"
-                  title="ลบสินค้านี้"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>ลบชิ้นนี้</span>
-                </button>
-
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEditModal(activeModalProduct)}
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition flex items-center gap-1.5"
+                    title="แก้ไขข้อมูลสินค้านี้"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    <span>แก้ไขข้อมูล</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProduct(activeModalProduct.id, activeModalProduct.sku)}
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1.5"
+                    title="ลบสินค้านี้"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>ลบชิ้นนี้</span>
+                  </button>
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleQuickStatusChange(activeModalProduct, 'AVAILABLE')}
@@ -820,6 +884,160 @@ export default function ProductsPage() {
                     ตัดสต็อกขายแล้ว (SOLD)
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Product Modal */}
+        {editingProduct && (
+          <div
+            onClick={() => setEditingProduct(null)}
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl cursor-default"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+                    <Pencil className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">แก้ไขข้อมูลสินค้า</h3>
+                    <p className="text-xs text-slate-500 font-mono">{editingProduct.sku}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingProduct(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Edit Form Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ชื่อสินค้า</label>
+                  <input
+                    type="text"
+                    value={editForm.name || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ชนิดหิน</label>
+                  <input
+                    type="text"
+                    value={editForm.stone_type || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, stone_type: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">น้ำหนัก (กรัม)</label>
+                  <input
+                    type="number"
+                    value={editForm.weight_grams || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, weight_grams: parseFloat(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ขนาด (เช่น 4.5 x 3.2 cm)</label>
+                  <input
+                    type="text"
+                    value={editForm.dimensions || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, dimensions: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">เกรด / แหล่งที่มา</label>
+                  <input
+                    type="text"
+                    value={editForm.grade_origin || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, grade_origin: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ที่เก็บสินค้า</label>
+                  <input
+                    type="text"
+                    value={editForm.storage_location || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, storage_location: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาทุน (฿)</label>
+                  <input
+                    type="number"
+                    value={editForm.cost_price || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, cost_price: parseFloat(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาขาย (฿)</label>
+                  <input
+                    type="number"
+                    value={editForm.selling_price || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, selling_price: parseFloat(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาต่ำสุดที่ลดได้ (฿)</label>
+                  <input
+                    type="number"
+                    value={editForm.min_price || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, min_price: parseFloat(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">จำนวนคงเหลือ</label>
+                  <input
+                    type="number"
+                    value={editForm.qty_on_hand ?? ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, qty_on_hand: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ลิงก์คลิปวิดีโอ (Google Drive)</label>
+                  <input
+                    type="text"
+                    value={editForm.drive_video_url || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, drive_video_url: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="https://drive.google.com/..."
+                  />
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => setEditingProduct(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleEditSave}
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition flex items-center gap-2 disabled:opacity-60"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                </button>
               </div>
             </div>
           </div>

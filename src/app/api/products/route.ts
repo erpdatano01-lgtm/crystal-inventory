@@ -85,14 +85,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH: update product status (e.g. to SOLD, cutting qty and recording stock movement)
+// PATCH: update product status OR full product fields (edit form)
 export async function PATCH(request: NextRequest) {
   try {
     if (!isSupabaseAdminConfigured || !supabaseAdmin) {
       return NextResponse.json({ error: 'Supabase admin not configured' }, { status: 503 });
     }
 
-    const { id, status, note } = await request.json();
+    const { searchParams } = new URL(request.url);
+    const idFromQuery = searchParams.get('id');
+    const body = await request.json();
+
+    // --- CASE 1: Edit full product fields (called with ?id=xxx and body has editable fields) ---
+    if (idFromQuery) {
+      const allowedFields = [
+        'name', 'stone_type', 'weight_grams', 'dimensions', 'grade_origin',
+        'cost_price', 'selling_price', 'min_price', 'qty_on_hand',
+        'storage_location', 'drive_video_url', 'drive_media_folder_url',
+        'r2_thumbnail_url', 'r2_gallery_urls',
+      ];
+      const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
+      for (const key of allowedFields) {
+        if (key in body) updatePayload[key] = body[key];
+      }
+
+      const { data: updated, error: updErr } = await supabaseAdmin
+        .from('products')
+        .update(updatePayload)
+        .eq('id', idFromQuery)
+        .select()
+        .single();
+
+      if (updErr) {
+        return NextResponse.json({ error: updErr.message }, { status: 400 });
+      }
+      return NextResponse.json(updated);
+    }
+
+    // --- CASE 2: Status-only change (original flow, no ?id query param) ---
+    const { id, status, note } = body;
     if (!id || !status) {
       return NextResponse.json({ error: 'id and status are required' }, { status: 400 });
     }
@@ -140,7 +171,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json(updated);
   } catch (err: any) {
-    console.error('Update status error:', err);
+    console.error('Update product error:', err);
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
