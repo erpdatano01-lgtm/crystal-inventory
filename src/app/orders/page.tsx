@@ -863,8 +863,11 @@ export default function OrdersPage() {
                     </label>
                     <ImageUploader
                       folder="receipts"
-                      maxImages={1}
-                      onImagesChange={setOrderSlipUrls}
+                      maxFiles={1}
+                      images={orderSlipUrls}
+                      onChange={setOrderSlipUrls}
+                      label="สลิปโอนเงิน (WebP อัตโนมัติ)"
+                      allowCamera={true}
                     />
                   </div>
                 </div>
