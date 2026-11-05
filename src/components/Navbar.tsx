@@ -9,12 +9,15 @@ import {
   Receipt,
   LayoutDashboard,
   PlusCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [showSheetsModal, setShowSheetsModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -82,7 +85,17 @@ export default function Navbar() {
             </nav>
 
             {/* Right Status Indicator & Quick CTA */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
+              {/* Google Sheets Live Feed CTA */}
+              <button
+                onClick={() => setShowSheetsModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/90 hover:bg-emerald-100 hover:border-emerald-300 font-semibold text-xs transition active:scale-95 shadow-xs"
+                title="เชื่อมต่อ Google Sheets ดึงข้อมูลสด"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span className="hidden sm:inline">Google Sheets</span>
+              </button>
+
               {/* Cloud Connection Badge (Hydration-safe) */}
               {mounted && (
                 <div
@@ -142,6 +155,12 @@ export default function Navbar() {
           })}
         </div>
       </nav>
+
+      {/* Google Sheets Integration Modal */}
+      <GoogleSheetsModal
+        isOpen={showSheetsModal}
+        onClose={() => setShowSheetsModal(false)}
+      />
     </>
   );
 }

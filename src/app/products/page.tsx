@@ -35,12 +35,15 @@ import {
   Layers,
   ChevronDown,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
+import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [lots, setLots] = useState<StockLot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSheetsModal, setShowSheetsModal] = useState(false);
 
   // Customer View Mode Toggle: hides cost_price & min_price
   const [isCustomerView, setIsCustomerView] = useState(false);
@@ -195,6 +198,16 @@ export default function ProductsPage() {
                   <span>โหมดเปิดให้ลูกค้าดู</span>
                 </>
               )}
+            </button>
+
+            {/* Google Sheets Live Feed Button */}
+            <button
+              onClick={() => setShowSheetsModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs sm:text-sm transition active:scale-95 shadow-xs"
+              title="ดึงข้อมูลสต็อกไปแสดงผลบน Google Sheets อัตโนมัติ"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Google Sheets</span>
             </button>
 
             {/* Link to Add Product */}
@@ -739,6 +752,13 @@ export default function ProductsPage() {
             </div>
           </div>
         )}
+
+        {/* Google Sheets Live Feed Modal */}
+        <GoogleSheetsModal
+          isOpen={showSheetsModal}
+          onClose={() => setShowSheetsModal(false)}
+          defaultTab="products"
+        />
       </main>
     </div>
   );

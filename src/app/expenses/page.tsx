@@ -28,13 +28,16 @@ import {
   DollarSign,
   Scale,
   Trash2,
+  FileSpreadsheet,
 } from 'lucide-react';
+import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [lots, setLots] = useState<StockLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showSheetsModal, setShowSheetsModal] = useState(false);
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
 
   // Form states
@@ -184,6 +187,16 @@ export default function ExpensesPage() {
                 ฿{totalExpenseSum.toLocaleString()}
               </span>
             </div>
+
+            {/* Google Sheets Live Feed Button */}
+            <button
+              onClick={() => setShowSheetsModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs sm:text-sm transition active:scale-95 shadow-xs"
+              title="ดึงข้อมูลค่าใช้จ่ายและล็อตหินไปแสดงผลบน Google Sheets อัตโนมัติ"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Google Sheets</span>
+            </button>
 
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -602,6 +615,13 @@ export default function ExpensesPage() {
             </div>
           </div>
         )}
+
+        {/* Google Sheets Live Feed Modal */}
+        <GoogleSheetsModal
+          isOpen={showSheetsModal}
+          onClose={() => setShowSheetsModal(false)}
+          defaultTab="expenses"
+        />
       </main>
     </div>
   );
