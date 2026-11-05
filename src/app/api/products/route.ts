@@ -99,6 +99,7 @@ export async function PATCH(request: NextRequest) {
     // --- CASE 1: Edit full product fields (called with ?id=xxx and body has editable fields) ---
     if (idFromQuery) {
       const allowedFields = [
+        'sku', 'lot_id', 'status', 'item_type',
         'name', 'stone_type', 'weight_grams', 'dimensions', 'grade_origin',
         'cost_price', 'selling_price', 'min_price', 'qty_on_hand',
         'storage_location', 'drive_video_url', 'drive_media_folder_url',

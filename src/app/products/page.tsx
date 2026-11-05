@@ -106,6 +106,10 @@ export default function ProductsPage() {
   const openEditModal = (product: Product) => {
     setEditingProduct(product);
     setEditForm({
+      sku: product.sku,
+      lot_id: product.lot_id,
+      status: product.status,
+      item_type: product.item_type || 'UNIQUE',
       name: product.name,
       stone_type: product.stone_type,
       weight_grams: product.weight_grams,
@@ -116,7 +120,9 @@ export default function ProductsPage() {
       min_price: product.min_price,
       storage_location: product.storage_location,
       qty_on_hand: product.qty_on_hand,
+      r2_thumbnail_url: product.r2_thumbnail_url,
       drive_video_url: product.drive_video_url,
+      drive_media_folder_url: product.drive_media_folder_url,
     });
     setActiveModalProduct(null);
   };
@@ -920,6 +926,67 @@ export default function ProductsPage() {
 
               {/* Edit Form Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    รหัส SKU <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.sku || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, sku: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold text-purple-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    สถานะสต็อก
+                  </label>
+                  <select
+                    value={editForm.status || 'AVAILABLE'}
+                    onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as ProductStatus }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white font-semibold"
+                  >
+                    <option value="AVAILABLE">🟢 พร้อมขาย (AVAILABLE)</option>
+                    <option value="RESERVED">🟠 จองแล้ว (RESERVED)</option>
+                    <option value="PREP">🟡 กำลังเตรียมของ / ถ่ายรูป (PREP)</option>
+                    <option value="IN_TRANSIT">🔵 อยู่ระหว่างขนส่ง (IN_TRANSIT)</option>
+                    <option value="SOLD">⚫ ขายแล้ว (SOLD)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    ผูกกับล็อตสินค้า (Lot)
+                  </label>
+                  <select
+                    value={editForm.lot_id || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, lot_id: e.target.value || null }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  >
+                    <option value="">-- ไม่ผูกล็อต --</option>
+                    {lots.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.lot_code} (ทุนรวม ฿{Number(l.total_cost || 0).toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    ประเภทการขาย
+                  </label>
+                  <select
+                    value={editForm.item_type || 'UNIQUE'}
+                    onChange={(e) => setEditForm((f) => ({ ...f, item_type: e.target.value as 'UNIQUE' | 'BULK' }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  >
+                    <option value="UNIQUE">ชิ้นเดี่ยว (Unique Item - 1 SKU ต่อ 1 ชิ้น)</option>
+                    <option value="BULK">เหมาล็อต / มีหลายชิ้น (Bulk Item)</option>
+                  </select>
+                </div>
+
                 <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-slate-600 block mb-1">ชื่อสินค้า</label>
                   <input
@@ -942,8 +1009,8 @@ export default function ProductsPage() {
                   <label className="text-xs font-semibold text-slate-600 block mb-1">น้ำหนัก (กรัม)</label>
                   <input
                     type="number"
-                    value={editForm.weight_grams || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, weight_grams: parseFloat(e.target.value) }))}
+                    value={editForm.weight_grams ?? ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, weight_grams: e.target.value ? parseFloat(e.target.value) : null }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
@@ -978,8 +1045,8 @@ export default function ProductsPage() {
                   <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาทุน (฿)</label>
                   <input
                     type="number"
-                    value={editForm.cost_price || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, cost_price: parseFloat(e.target.value) }))}
+                    value={editForm.cost_price ?? ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, cost_price: parseFloat(e.target.value) || 0 }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
@@ -987,18 +1054,18 @@ export default function ProductsPage() {
                   <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาขาย (฿)</label>
                   <input
                     type="number"
-                    value={editForm.selling_price || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, selling_price: parseFloat(e.target.value) }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={editForm.selling_price ?? ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, selling_price: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 font-bold text-emerald-700"
                   />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาต่ำสุดที่ลดได้ (฿)</label>
                   <input
                     type="number"
-                    value={editForm.min_price || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, min_price: parseFloat(e.target.value) }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={editForm.min_price ?? ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, min_price: e.target.value ? parseFloat(e.target.value) : null }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-amber-800"
                   />
                 </div>
                 <div>
@@ -1006,8 +1073,28 @@ export default function ProductsPage() {
                   <input
                     type="number"
                     value={editForm.qty_on_hand ?? ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, qty_on_hand: parseInt(e.target.value) }))}
+                    onChange={(e) => setEditForm((f) => ({ ...f, qty_on_hand: parseInt(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">URL รูปภาพหน้าปก (Thumbnail)</label>
+                  <input
+                    type="text"
+                    value={editForm.r2_thumbnail_url || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, r2_thumbnail_url: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="https://pub-..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">ลิงก์โฟลเดอร์ Google Drive</label>
+                  <input
+                    type="text"
+                    value={editForm.drive_media_folder_url || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, drive_media_folder_url: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="https://drive.google.com/drive/folders/..."
                   />
                 </div>
                 <div className="sm:col-span-2">

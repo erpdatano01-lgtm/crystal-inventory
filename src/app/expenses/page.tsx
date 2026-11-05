@@ -45,6 +45,7 @@ export default function ExpensesPage() {
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
 
   // Edit Expense state
+  const [activeDetailExpense, setActiveDetailExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -121,9 +122,11 @@ export default function ExpensesPage() {
       vendor_name: expense.vendor_name,
       total_amount: expense.total_amount,
       payment_method: expense.payment_method,
+      r2_receipt_url: expense.r2_receipt_url,
       drive_doc_url: expense.drive_doc_url,
       notes: expense.notes,
     });
+    setActiveDetailExpense(null);
   };
 
   const handleEditSave = async () => {
@@ -574,16 +577,17 @@ export default function ExpensesPage() {
                 return (
                   <div
                     key={item.id}
-                    className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition"
+                    onClick={() => setActiveDetailExpense(item)}
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-purple-50/40 transition cursor-pointer group"
                   >
                     <div className="flex items-start gap-3.5">
-                      <div className="p-2.5 rounded-2xl bg-purple-50 text-purple-700 mt-0.5 shrink-0">
+                      <div className="p-2.5 rounded-2xl bg-purple-50 text-purple-700 mt-0.5 shrink-0 group-hover:scale-105 transition">
                         <Receipt className="w-5 h-5" />
                       </div>
 
                       <div>
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-bold text-slate-900 text-sm sm:text-base">
+                          <span className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-purple-800 transition">
                             {item.title}
                           </span>
                           <span
@@ -624,7 +628,7 @@ export default function ExpensesPage() {
                         -฿{Number(item.total_amount).toLocaleString()}
                       </span>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                         {item.r2_receipt_url && (
                           <button
                             onClick={() => setSelectedReceiptUrl(item.r2_receipt_url!)}
@@ -673,6 +677,158 @@ export default function ExpensesPage() {
             </div>
           )}
         </div>
+
+        {/* Expense Detail Modal (View Full Information) */}
+        {activeDetailExpense && (
+          <div
+            onClick={() => setActiveDetailExpense(null)}
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 space-y-5 shadow-2xl cursor-default"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                      EXPENSE_CATEGORIES_CONFIG[activeDetailExpense.category]?.badgeClass || ''
+                    }`}
+                  >
+                    {EXPENSE_CATEGORIES_CONFIG[activeDetailExpense.category]?.label || activeDetailExpense.category}
+                  </span>
+                  {lots.find((l) => l.expense_id === activeDetailExpense.id) && (
+                    <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                      🔗 {lots.find((l) => l.expense_id === activeDetailExpense.id)?.lot_code}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setActiveDetailExpense(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Title & Amount */}
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                  {activeDetailExpense.title}
+                </h3>
+                <div className="text-2xl sm:text-3xl font-black text-rose-600 mt-1">
+                  -฿{Number(activeDetailExpense.total_amount).toLocaleString()}
+                </div>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-3.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs">
+                <div>
+                  <span className="text-slate-400 block mb-0.5">วันที่บันทึก</span>
+                  <span className="font-semibold text-slate-800 text-sm flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                    {activeDetailExpense.expense_date}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">วิธีชำระเงิน</span>
+                  <span className="font-semibold text-slate-800 text-sm">
+                    {activeDetailExpense.payment_method || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">ร้านค้า / ผู้ขาย (Vendor)</span>
+                  <span className="font-semibold text-slate-800 text-sm">
+                    {activeDetailExpense.vendor_name || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">รหัสล็อตสินค้าที่ผูก</span>
+                  <span className="font-semibold text-purple-700 text-sm font-mono">
+                    {lots.find((l) => l.expense_id === activeDetailExpense.id)?.lot_code || 'ไม่ได้เปิดล็อต'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {activeDetailExpense.notes && (
+                <div className="p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200/60 text-xs">
+                  <span className="font-bold text-amber-900 block mb-1">หมายเหตุ:</span>
+                  <p className="text-slate-700 whitespace-pre-wrap">{activeDetailExpense.notes}</p>
+                </div>
+              )}
+
+              {/* Receipt Preview */}
+              {activeDetailExpense.r2_receipt_url && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-700 block">
+                    สลิป / หลักฐานการจ่าย (Cloudflare R2 WebP)
+                  </span>
+                  <div
+                    onClick={() => setSelectedReceiptUrl(activeDetailExpense.r2_receipt_url!)}
+                    className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 max-h-56 cursor-pointer group"
+                  >
+                    <img
+                      src={activeDetailExpense.r2_receipt_url}
+                      alt="Receipt"
+                      className="w-full h-full object-contain max-h-56 group-hover:scale-105 transition"
+                    />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                      <Eye className="w-4 h-4" /> กดเพื่อดูรูปขนาดเต็ม
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* External Links */}
+              {activeDetailExpense.drive_doc_url && (
+                <div>
+                  <a
+                    href={activeDetailExpense.drive_doc_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs font-bold border border-purple-200 transition"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    <span>เปิดเอกสารใน Google Drive</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    handleDeleteExpense(activeDetailExpense.id, activeDetailExpense.title);
+                    setActiveDetailExpense(null);
+                  }}
+                  className="px-3.5 py-2 text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>ลบรายการนี้</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveDetailExpense(null)}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                  >
+                    ปิด
+                  </button>
+                  <button
+                    onClick={() => openEditModal(activeDetailExpense)}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition flex items-center gap-1.5"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    <span>แก้ไขข้อมูล</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Edit Expense Modal */}
         {editingExpense && (
@@ -780,6 +936,17 @@ export default function ExpensesPage() {
                     onChange={(e) => setEditForm((f) => ({ ...f, drive_doc_url: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                     placeholder="https://drive.google.com/..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">URL รูปสลิป / ใบเสร็จ (Cloudflare R2)</label>
+                  <input
+                    type="text"
+                    value={editForm.r2_receipt_url || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, r2_receipt_url: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="https://pub-..."
                   />
                 </div>
 
