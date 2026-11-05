@@ -1,6 +1,9 @@
 # 💎 Crystal & Mineral Inventory + Expense Management System
 
-ระบบบริหารจัดการสต็อกร้านหินสวยงาม คริสตัล แร่ธรรมชาติ และระบบบันทึกค่าใช้จ่าย พัฒนาด้วย Next.js (App Router), TypeScript, Tailwind CSS, Supabase และ Cloudflare R2 พร้อมระบบบีบอัดภาพ Client-Side เป็น `.webp` อัตโนมัติ
+ระบบบริหารจัดการสต็อกร้านหินสวยงาม คริสตัล แร่ธรรมชาติ ระบบบันทึกค่าใช้จ่าย และระบบเปิดบิลขาย/บัญชี FlowAccount พัฒนาด้วย Next.js (App Router), TypeScript, Tailwind CSS, Supabase และ Cloudflare R2 พร้อมระบบบีบอัดภาพ Client-Side เป็น `.webp` อัตโนมัติ
+
+> 📖 **คู่มือระบบและการส่งต่องานฉบับสมบูรณ์ (Master Handover Documentation):**  
+> ดูรายละเอียดการตั้งค่า กุญแจ API ฐานข้อมูล และคำแนะนำทั้งหมดได้ที่ไฟล์ [PROJECT_SYSTEM_NOTE.md](file:///Users/mookycrg/Downloads/Crystal%20/PROJECT_SYSTEM_NOTE.md)
 
 ---
 
