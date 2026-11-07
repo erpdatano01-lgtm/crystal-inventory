@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import {
   fetchProducts,
@@ -48,6 +49,7 @@ import VideoUploader from '@/components/VideoUploader';
 import { getStoneTypes } from '@/lib/settingsService';
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [lots, setLots] = useState<StockLot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,6 +230,14 @@ export default function ProductsPage() {
     } catch (err: any) {
       console.error(err);
       alert('เปลี่ยนสถานะล้มเหลว: ' + err.message);
+    }
+  };
+
+  // Duplicate Product: copy data and navigate to New Stock Entry
+  const handleDuplicateProduct = (p: Product) => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('crystal_duplicate_item', JSON.stringify(p));
+      router.push(`/products/new?duplicate=${encodeURIComponent(p.sku)}`);
     }
   };
 
@@ -576,7 +586,17 @@ export default function ProductsPage() {
                         </button>
                       )}
 
-                      {/* Edit & Delete Product Button */}
+                      {/* Duplicate, Edit & Delete Product Buttons */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateProduct(p);
+                        }}
+                        className="p-1.5 bg-slate-100 hover:bg-purple-50 text-slate-400 hover:text-purple-600 rounded-xl transition"
+                        title="ทำซ้ำรายการนี้ (คัดลอกข้อมูลไปลงสต็อกชิ้นใหม่)"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -710,6 +730,13 @@ export default function ProductsPage() {
                             title="ดูรายละเอียด"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDuplicateProduct(p)}
+                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition"
+                            title="ทำซ้ำรายการนี้ (คัดลอกข้อมูลไปลงสต็อกชิ้นใหม่)"
+                          >
+                            <Copy className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => openEditModal(p)}
@@ -882,6 +909,14 @@ export default function ProductsPage() {
               {/* Status Actions */}
               <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDuplicateProduct(activeModalProduct)}
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition flex items-center gap-1.5"
+                    title="คัดลอกทำซ้ำเพื่อรับหินชิ้นใหม่เข้าสต็อก"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>ทำซ้ำชิ้นนี้</span>
+                  </button>
                   <button
                     onClick={() => openEditModal(activeModalProduct)}
                     className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition flex items-center gap-1.5"

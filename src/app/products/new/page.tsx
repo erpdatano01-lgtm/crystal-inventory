@@ -38,6 +38,8 @@ import {
   ArrowLeft,
   Layers,
   AlertCircle,
+  Copy,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -73,8 +75,13 @@ export default function NewProductPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicateBanner, setDuplicateBanner] = useState<{
+    fromSku: string;
+    fromName: string;
+    newSku: string;
+  } | null>(null);
 
-  // Load lots, custom shapes, custom stones & existing skus
+  // Load lots, custom shapes, custom stones & existing skus (and handle Duplicate action)
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -84,18 +91,81 @@ export default function NewProductPage() {
         setShapes(loadedShapes);
         setStones(loadedStones);
 
-        const initialShape = loadedShapes[0]?.id || 'Sphere';
-        const initialStone = loadedStones[0]?.id || 'Amethyst';
-        setStoneShape(initialShape);
-        setStoneType(initialStone);
-
         const [l, p] = await Promise.all([fetchStockLots(), fetchProducts()]);
         setLots(l);
         const skus = p.map((prod) => prod.sku);
         setExistingSkus(skus);
 
-        // Generate initial SKU with custom shapes/stones
-        const initialSku = generateSmartSku(initialStone, skus, initialShape, loadedShapes, loadedStones);
+        // Check if user clicked "ทำซ้ำ (Duplicate)" from a product
+        const dupRaw =
+          typeof window !== 'undefined'
+            ? sessionStorage.getItem('crystal_duplicate_item')
+            : null;
+
+        if (dupRaw) {
+          try {
+            const dup = JSON.parse(dupRaw) as Product;
+            sessionStorage.removeItem('crystal_duplicate_item');
+
+            // Find matching shape
+            const skuPrefix = dup.sku.split('-')[0] || '';
+            const matchedShape =
+              loadedShapes.find((s) => s.code.toUpperCase() === skuPrefix.toUpperCase()) ||
+              loadedShapes.find((s) => dup.name.toLowerCase().includes(s.id.toLowerCase())) ||
+              loadedShapes[0];
+
+            const shapeToUse = matchedShape?.id || 'Sphere';
+            const stoneToUse = dup.stone_type || loadedStones[0]?.id || 'Amethyst';
+
+            setStoneShape(shapeToUse);
+            setStoneType(stoneToUse);
+
+            // Pre-fill form fields
+            if (dup.lot_id) setLotId(dup.lot_id);
+            setName(dup.name || '');
+            setItemType(dup.item_type || 'UNIQUE');
+            if (dup.grade_origin) setGradeOrigin(dup.grade_origin);
+            if (dup.storage_location) setStorageLocation(dup.storage_location);
+            if (dup.cost_price && dup.cost_price > 0) setCostPrice(String(dup.cost_price));
+            if (dup.selling_price && dup.selling_price > 0) setSellingPrice(String(dup.selling_price));
+            if (dup.min_price) setMinPrice(String(dup.min_price));
+            if (dup.dimensions) setDimensions(dup.dimensions);
+            if (dup.weight_grams) setWeightGrams(String(dup.weight_grams));
+
+            // Generate the NEXT sequential SKU for this shape + stone
+            const nextSku = generateSmartSku(
+              stoneToUse,
+              skus,
+              shapeToUse,
+              loadedShapes,
+              loadedStones
+            );
+            setSku(nextSku);
+
+            setDuplicateBanner({
+              fromSku: dup.sku,
+              fromName: dup.name,
+              newSku: nextSku,
+            });
+            return;
+          } catch (e) {
+            console.warn('Failed to parse duplicate product data:', e);
+          }
+        }
+
+        // Default initial SKU if not duplicating
+        const initialShape = loadedShapes[0]?.id || 'Sphere';
+        const initialStone = loadedStones[0]?.id || 'Amethyst';
+        setStoneShape(initialShape);
+        setStoneType(initialStone);
+
+        const initialSku = generateSmartSku(
+          initialStone,
+          skus,
+          initialShape,
+          loadedShapes,
+          loadedStones
+        );
         setSku(initialSku);
       } finally {
         setLoading(false);
@@ -197,6 +267,36 @@ export default function NewProductPage() {
             </div>
           </div>
         </div>
+
+        {/* Duplicate Banner */}
+        {duplicateBanner && (
+          <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50 to-amber-50 border-2 border-purple-300 rounded-2xl flex items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                <Copy className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-purple-950 flex flex-wrap items-center gap-2">
+                  <span>คัดลอกข้อมูลมาจาก {duplicateBanner.fromSku} ({duplicateBanner.fromName})</span>
+                  <span className="text-[10px] bg-purple-600 text-white font-mono font-black px-2 py-0.5 rounded-full shadow-2xs">
+                    เจนรหัสใหม่: {duplicateBanner.newSku}
+                  </span>
+                </div>
+                <p className="text-[11px] text-purple-700 mt-0.5">
+                  ระบบกรอก ล็อต, ทรงหิน, ชนิดหิน, ชื่อ, และที่เก็บ ให้เรียบร้อยแล้ว — เพียงแค่ถ่ายรูปใหม่ และตรวจสอบน้ำหนัก/ราคา
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDuplicateBanner(null)}
+              className="p-1 rounded-lg text-purple-400 hover:text-purple-700 hover:bg-purple-100 transition shrink-0"
+              title="ปิดการแจ้งเตือน"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Main Intake Form */}
         <form
