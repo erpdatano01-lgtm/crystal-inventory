@@ -46,7 +46,11 @@ import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 import DimensionInputs from '@/components/DimensionInputs';
 import ImageUploader from '@/components/ImageUploader';
 import VideoUploader from '@/components/VideoUploader';
-import { getStoneTypes } from '@/lib/settingsService';
+import {
+  getStoneTypes,
+  getHideCostPreference,
+  setHideCostPreference,
+} from '@/lib/settingsService';
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -55,8 +59,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [showSheetsModal, setShowSheetsModal] = useState(false);
 
-  // Customer View Mode Toggle: hides cost_price & min_price
-  const [isCustomerView, setIsCustomerView] = useState(false);
+  // Customer View Mode: hides cost_price & min_price (Defaults to TRUE)
+  const [isCustomerView, setIsCustomerView] = useState(true);
 
   // Filter & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,6 +86,7 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
+    setIsCustomerView(getHideCostPreference());
     async function load() {
       setLoading(true);
       try {
@@ -269,33 +274,30 @@ export default function ProductsPage() {
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
-            {/* Customer View Toggle */}
+            {/* Discreet Hide/Show Cost Toggle */}
             <button
               onClick={() => {
                 const next = !isCustomerView;
                 setIsCustomerView(next);
-                showToast(
-                  next
-                    ? '👁️ เปิดโหมดลูกค้า: ซ่อนราคาทุนและราคาต่ำสุดแล้ว'
-                    : '🔒 ปิดโหมดลูกค้า: แสดงราคาทุนตามปกติ'
-                );
+                setHideCostPreference(next);
+                showToast(next ? '🔒 ซ่อนราคาทุนแล้ว' : '👁️ แสดงราคาทุนแล้ว');
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition border ${
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition border ${
                 isCustomerView
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  ? 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                  : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
               }`}
-              title="ซ่อนราคาทุนและราคาต่ำสุด สำหรับถือให้ลูกค้าดูสินค้า"
+              title={isCustomerView ? 'คลิกเพื่อแสดงราคาทุน' : 'คลิกเพื่อซ่อนราคาทุน'}
             >
               {isCustomerView ? (
                 <>
-                  <EyeOff className="w-4 h-4" />
-                  <span>โหมดลูกค้า (ซ่อนทุนแล้ว)</span>
+                  <EyeOff className="w-4 h-4 text-slate-500" />
+                  <span>ซ่อนทุน</span>
                 </>
               ) : (
                 <>
                   <Eye className="w-4 h-4 text-purple-600" />
-                  <span>โหมดเปิดให้ลูกค้าดู</span>
+                  <span>แสดงทุน</span>
                 </>
               )}
             </button>
@@ -531,7 +533,7 @@ export default function ProductsPage() {
                       </div>
 
                       {/* Hidden in Customer View */}
-                      {!isCustomerView ? (
+                      {!isCustomerView && (
                         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50">
                           <span>
                             ทุน: {!p.cost_price || p.cost_price <= 0 ? (
@@ -545,10 +547,6 @@ export default function ProductsPage() {
                               ต่ำสุด: ฿{p.min_price.toLocaleString()}
                             </span>
                           ) : null}
-                        </div>
-                      ) : (
-                        <div className="text-[10px] text-amber-600 font-medium text-center">
-                          🔒 โหมดลูกค้า (ซ่อนราคาทุน)
                         </div>
                       )}
                     </div>
@@ -839,15 +837,17 @@ export default function ProductsPage() {
               </div>
 
               {/* Pricing Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-purple-50/70 border border-purple-100 rounded-2xl">
+              <div className={`p-4 bg-purple-50/70 border border-purple-100 rounded-2xl ${
+                !isCustomerView ? 'grid grid-cols-2 sm:grid-cols-3 gap-3' : 'flex items-center justify-between'
+              }`}>
                 <div>
                   <span className="text-[11px] text-slate-500 block">ราคาขายหน้าร้าน</span>
-                  <span className="text-lg font-black text-purple-800">
+                  <span className="text-xl font-black text-purple-900">
                     ฿{activeModalProduct.selling_price.toLocaleString()}
                   </span>
                 </div>
 
-                {!isCustomerView ? (
+                {!isCustomerView && (
                   <>
                     <div>
                       <span className="text-[11px] text-slate-500 block">ราคาทุน</span>
@@ -863,10 +863,6 @@ export default function ProductsPage() {
                       </span>
                     </div>
                   </>
-                ) : (
-                  <div className="col-span-2 flex items-center justify-center text-xs text-amber-700 font-semibold">
-                    🔒 ข้อมูลต้นทุนถูกซ่อนไว้ในโหมดลูกค้า
-                  </div>
                 )}
               </div>
 

@@ -48,6 +48,25 @@ export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [
 
 const LS_SHAPES_KEY = 'vivida_custom_shapes_v1';
 const LS_STONES_KEY = 'vivida_custom_stones_v1';
+const LS_HIDE_COST_KEY = 'vivida_hide_cost_v1';
+
+/**
+ * Get hide-cost preference (defaults to true for customer-facing privacy)
+ */
+export function getHideCostPreference(): boolean {
+  if (typeof window === 'undefined') return true;
+  const val = localStorage.getItem(LS_HIDE_COST_KEY);
+  if (val === null) return true; // Default: hide cost is ON
+  return val === 'true';
+}
+
+/**
+ * Save hide-cost preference
+ */
+export function setHideCostPreference(hide: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LS_HIDE_COST_KEY, String(hide));
+}
 
 /**
  * Intelligent abbreviation generator:

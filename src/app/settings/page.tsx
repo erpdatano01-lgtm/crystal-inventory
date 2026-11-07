@@ -17,6 +17,9 @@ import {
   HelpCircle,
   AlertCircle,
   Tag,
+  Eye,
+  EyeOff,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   StoneShapeItem,
@@ -28,10 +31,13 @@ import {
   saveStoneTypes,
   resetStoneTypes,
   suggestAbbreviation,
+  getHideCostPreference,
+  setHideCostPreference,
 } from '@/lib/settingsService';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'shapes' | 'stones' | 'tester'>('shapes');
+  const [activeTab, setActiveTab] = useState<'shapes' | 'stones' | 'tester' | 'privacy'>('shapes');
+  const [hideCost, setHideCost] = useState(true);
 
   // Shapes state
   const [shapes, setShapes] = useState<StoneShapeItem[]>([]);
@@ -85,6 +91,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setShapes(getStoneShapes());
     setStones(getStoneTypes());
+    setHideCost(getHideCostPreference());
   }, []);
 
   // ----------------------------------------------------
@@ -390,6 +397,23 @@ export default function SettingsPage() {
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span>ทดลองสร้าง SKU</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('privacy')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'privacy'
+                ? 'bg-white text-purple-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>ความปลอดภัย & ซ่อนทุน</span>
+            {hideCost && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                ON
+              </span>
+            )}
+          </button>
         </div>
 
         {/* ========================================================= */}
@@ -656,6 +680,133 @@ export default function SettingsPage() {
                     {String(testNumber).padStart(3, '0')}
                   </span>
                   <span className="text-[10px] text-slate-400">ลำดับชิ้น</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 4: PRIVACY & COST HIDING                              */}
+        {/* ========================================================= */}
+        {activeTab === 'privacy' && (
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                โหมดความปลอดภัย & ซ่อนราคาทุน (Cost Privacy & Storefront View)
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                กำหนดการแสดงผลราคาทุนในระบบ เพื่อความปลอดภัยเมื่อถือจอให้ลูกค้าเลือกชมสินค้าหน้าร้าน
+              </p>
+            </div>
+
+            {/* Toggle Card */}
+            <div className="p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 rounded-2xl border-2 border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-slate-900">
+                    เปิดโหมดซ่อนราคาทุนเป็นค่าเริ่มต้น
+                  </span>
+                  {hideCost ? (
+                    <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+                      เปิดใช้งานอยู่ (ปลอดภัย)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-slate-300 text-slate-700 font-bold px-2 py-0.5 rounded-full">
+                      ปิดอยู่ (แสดงทุน)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 max-w-xl">
+                  เมื่อเปิดใช้งาน ในหน้าคลังสินค้าจะแสดงเฉพาะราคาขาย โดยไม่แสดงราคาทุน และ<strong>ไม่แสดงคำว่า &quot;โหมดลูกค้า&quot; หรือข้อความแจ้งเตือนใดๆ</strong> ให้ลูกค้าทราบ
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !hideCost;
+                  setHideCost(next);
+                  setHideCostPreference(next);
+                  showToast(next ? '🔒 บันทึก: เปิดโหมดซ่อนราคาทุนแล้ว' : '👁️ บันทึก: ปิดโหมดซ่อนราคาทุนแล้ว');
+                }}
+                className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center gap-2 shadow-sm ${
+                  hideCost
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                    : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                }`}
+              >
+                {hideCost ? (
+                  <>
+                    <EyeOff className="w-4 h-4" />
+                    <span>ซ่อนราคาทุน (ON)</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    <span>แสดงราคาทุน (OFF)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Comparison Preview */}
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                เปรียบเทียบสิ่งที่แสดงบนหน้าจอ
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Customer View Preview */}
+                <div className="p-4 bg-slate-50 rounded-2xl border-2 border-emerald-300 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-800">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      มุมมองที่ลูกค้าเห็น (เมื่อเปิดซ่อนทุน)
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      เนียนตา 100%
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1">
+                    <div className="text-[11px] text-purple-700 font-bold">Azurite</div>
+                    <div className="font-bold text-slate-900">Azurite Cabochon #01</div>
+                    <div className="p-2 bg-slate-50 rounded-lg flex items-center justify-between font-black text-slate-900">
+                      <span className="text-[10px] text-slate-400 font-normal">ราคาขาย</span>
+                      <span className="text-sm">฿1,800</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    ✓ แสดงเฉพาะราคาขายปกติ ไม่มีคำว่า &quot;โหมดลูกค้า&quot; หรือข้อความใดๆ ให้ลูกค้ารู้
+                  </p>
+                </div>
+
+                {/* Owner View Preview */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                    <span className="flex items-center gap-1.5">
+                      <Eye className="w-4 h-4 text-purple-600" />
+                      มุมมองสำหรับเจ้าของร้าน (เมื่อกดแสดงทุน)
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1">
+                    <div className="text-[11px] text-purple-700 font-bold">Azurite</div>
+                    <div className="font-bold text-slate-900">Azurite Cabochon #01</div>
+                    <div className="p-2 bg-slate-50 rounded-lg space-y-1">
+                      <div className="flex items-center justify-between font-black text-slate-900">
+                        <span className="text-[10px] text-slate-400 font-normal">ราคาขาย</span>
+                        <span className="text-sm">฿1,800</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50">
+                        <span>ทุน: ฿650</span>
+                        <span className="text-amber-700 font-semibold">ต่ำสุด: ฿1,500</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    เจ้าของร้านสามารถกดปุ่มรูปตาที่หัวหน้าจอคลังสินค้า เพื่อสลับดูราคาทุนได้ตลอดเวลา
+                  </p>
                 </div>
               </div>
             </div>
