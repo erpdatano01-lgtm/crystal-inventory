@@ -218,61 +218,49 @@ export default function NewProductPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               {/* Select lot_id with reference cost */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ล็อตสินค้า (lot_id) - ดึงจากตาราง stock_lots
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ล็อตนำเข้า (Lot ID)
+                  </label>
+                  {selectedLot && (
+                    <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-1.5 py-0.5 rounded">
+                      ฿{selectedLot.total_cost.toLocaleString()}
+                    </span>
+                  )}
+                </div>
                 <select
                   value={lotId}
                   onChange={(e) => setLotId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-medium"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-medium transition"
                 >
                   <option value="">-- ไม่ระบุล็อต (หินรับเข้าเดี่ยว) --</option>
                   {lots.map((lot) => (
                     <option key={lot.id} value={lot.id}>
-                      {lot.lot_code} (ต้นทุนรวม: ฿{lot.total_cost.toLocaleString()}
-                      {lot.total_weight_grams ? ` • ${lot.total_weight_grams} g` : ''})
+                      {lot.lot_code} (ทุนรวม: ฿{lot.total_cost.toLocaleString()})
                     </option>
                   ))}
                 </select>
-
-                {selectedLot && (
-                  <p className="text-[11px] text-purple-700 mt-1.5 flex items-center gap-2">
-                    <span>
-                      ต้นทุนรวมของล็อตนี้: <strong>฿{selectedLot.total_cost.toLocaleString()}</strong>
-                    </span>
-                    {selectedLot.drive_lot_folder_url && (
-                      <a
-                        href={selectedLot.drive_lot_folder_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline flex items-center gap-0.5 text-purple-600"
-                      >
-                        โฟลเดอร์ล็อต <FolderOpen className="w-3 h-3" />
-                      </a>
-                    )}
-                  </p>
-                )}
               </div>
 
               {/* Stone Shape dropdown (triggers smart SKU) */}
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="h-6 flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
-                    รูปทรง / หมวดการเจีย (Shape) *
+                    รูปทรง (Shape) *
                   </label>
                   <Link
                     href="/settings"
                     target="_blank"
-                    className="text-[10px] text-purple-600 hover:text-purple-800 font-bold hover:underline"
+                    className="text-[10px] text-purple-600 hover:text-purple-800 font-bold hover:underline inline-flex items-center gap-1"
                     title="ไปที่หน้าตั้งค่าเพื่อเพิ่มหรือแก้ไขรูปทรง"
                   >
-                    ⚙️ จัดการทรงหิน
+                    ⚙️ จัดการทรง
                   </Link>
                 </div>
                 <select
                   value={stoneShape}
                   onChange={(e) => handleStoneShapeChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900 transition"
                 >
                   {shapes.map((sh) => (
                     <option key={sh.id} value={sh.id}>
@@ -280,30 +268,27 @@ export default function NewProductPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {shapes.find((sh) => sh.id === stoneShape)?.desc}
-                </p>
               </div>
 
               {/* Stone Type dropdown (triggers smart SKU) */}
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="h-6 flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
-                    ชนิดหิน (stone_type) *
+                    ชนิดหิน (Stone Type) *
                   </label>
                   <Link
                     href="/settings"
                     target="_blank"
-                    className="text-[10px] text-purple-600 hover:text-purple-800 font-bold hover:underline"
+                    className="text-[10px] text-purple-600 hover:text-purple-800 font-bold hover:underline inline-flex items-center gap-1"
                     title="ไปที่หน้าตั้งค่าเพื่อเพิ่มหรือแก้ไขชนิดหิน"
                   >
-                    ⚙️ จัดการชนิดหิน
+                    ⚙️ จัดการหิน
                   </Link>
                 </div>
                 <select
                   value={stoneType}
                   onChange={(e) => handleStoneTypeChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900 transition"
                 >
                   {stones.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -317,29 +302,33 @@ export default function NewProductPage() {
             {/* SKU and Stone Name */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  รหัสสินค้า (sku) *
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    รหัสสินค้า (SKU) *
+                  </label>
+                </div>
                 <input
                   type="text"
                   required
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-mono font-bold text-purple-800"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-mono font-black text-purple-900 transition"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ชื่อสินค้า / ผลึกหิน (name) *
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ชื่อสินค้า / ผลึกหิน (Product Name) *
+                  </label>
+                </div>
                 <input
                   type="text"
                   required
                   placeholder="เช่น Uruguay Amethyst Deep Purple Cluster"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold transition"
                 />
               </div>
             </div>
@@ -353,43 +342,45 @@ export default function NewProductPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ประเภทสินค้า (item_type) *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ประเภทการขาย *
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 h-11 p-1 bg-slate-100 rounded-xl border border-slate-200">
                   <button
                     type="button"
                     onClick={() => setItemType('UNIQUE')}
-                    className={`py-2 rounded-xl text-xs font-bold transition border ${
+                    className={`h-full rounded-lg text-xs font-bold transition flex items-center justify-center ${
                       itemType === 'UNIQUE'
-                        ? 'bg-purple-600 text-white border-purple-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    UNIQUE (ชิ้นเดียว)
+                    ชิ้นเดี่ยว (Unique)
                   </button>
                   <button
                     type="button"
                     onClick={() => setItemType('BULK')}
-                    className={`py-2 rounded-xl text-xs font-bold transition border ${
+                    className={`h-full rounded-lg text-xs font-bold transition flex items-center justify-center ${
                       itemType === 'BULK'
-                        ? 'bg-purple-600 text-white border-purple-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    BULK (จำนวนมาก)
+                    หลายชิ้น (Bulk)
                   </button>
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="h-6 flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                     <Scale className="w-3.5 h-3.5 text-slate-500" />
-                    น้ำหนัก (weight_grams)
+                    น้ำหนัก (Weight)
                   </label>
                   {!weightGrams && (
-                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
                       ยังไม่ระบุ
                     </span>
                   )}
@@ -397,10 +388,10 @@ export default function NewProductPage() {
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="เช่น 485.5"
+                  placeholder="เช่น 485.5 g"
                   value={weightGrams}
                   onChange={(e) => setWeightGrams(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl focus:bg-white focus:ring-2 outline-none transition ${
+                  className={`w-full h-11 px-3.5 text-sm rounded-xl focus:bg-white focus:ring-2 outline-none transition ${
                     !weightGrams
                       ? 'bg-amber-50/50 border-2 border-amber-300 focus:ring-amber-400'
                       : 'bg-slate-50 border border-slate-300 focus:ring-purple-500'
@@ -417,31 +408,35 @@ export default function NewProductPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  เกรดและแหล่งที่มา (grade_origin)
-                </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    เกรดและแหล่งที่มา (Grade & Origin)
+                  </label>
+                </div>
                 <input
                   type="text"
                   placeholder="เช่น Top Gem (เกรดอัญมณี) / บราซิล"
                   value={gradeOrigin}
                   onChange={(e) => setGradeOrigin(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  className="w-full h-11 px-3.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                  ที่เก็บ (storage_location)
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                    ตำแหน่งที่เก็บ (Storage Location)
+                  </label>
+                </div>
                 <input
                   type="text"
                   placeholder="เช่น ตู้โชว์ A-01, กล่อง B-2"
                   value={storageLocation}
                   onChange={(e) => setStorageLocation(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  className="w-full h-11 px-3.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
                 />
               </div>
             </div>
@@ -456,12 +451,12 @@ export default function NewProductPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="h-6 flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
-                    ราคาทุน (cost_price)
+                    ราคาทุน (฿)
                   </label>
                   {(!costPrice || parseFloat(costPrice) <= 0) && (
-                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 whitespace-nowrap shrink-0">
                       ยังไม่ระบุ
                     </span>
                   )}
@@ -472,7 +467,7 @@ export default function NewProductPage() {
                   placeholder="0.00"
                   value={costPrice}
                   onChange={(e) => setCostPrice(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl focus:ring-2 outline-none font-bold transition ${
+                  className={`w-full h-11 px-3.5 text-sm rounded-xl focus:ring-2 outline-none font-bold transition ${
                     !costPrice || parseFloat(costPrice) <= 0
                       ? 'bg-amber-50/50 border-2 border-amber-300 text-slate-800 focus:ring-amber-400'
                       : 'bg-white border border-slate-300 text-slate-800 focus:ring-purple-500'
@@ -481,16 +476,16 @@ export default function NewProductPage() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="h-6 flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
-                    ราคาขาย (selling_price)
+                    ราคาขาย (฿)
                   </label>
                   {!sellingPrice || parseFloat(sellingPrice) <= 0 ? (
-                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded border border-amber-300 whitespace-nowrap shrink-0">
                       🟡 รอตั้งราคา
                     </span>
                   ) : (
-                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap shrink-0">
                       ✓ ระบุแล้ว
                     </span>
                   )}
@@ -501,7 +496,7 @@ export default function NewProductPage() {
                   placeholder="0.00 (ใส่ทีหลังได้)"
                   value={sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl focus:ring-2 outline-none font-bold transition ${
+                  className={`w-full h-11 px-3.5 text-sm rounded-xl focus:ring-2 outline-none font-bold transition ${
                     !sellingPrice || parseFloat(sellingPrice) <= 0
                       ? 'bg-amber-50 border-2 border-amber-400 text-amber-900 focus:ring-amber-400 placeholder:text-amber-500'
                       : 'bg-white border border-purple-400 text-purple-800 focus:ring-purple-500'
@@ -510,30 +505,34 @@ export default function NewProductPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ราคาต่ำสุดที่ลดได้ (min_price)
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ราคาต่ำสุด (฿)
+                  </label>
+                </div>
                 <input
                   type="number"
                   step="any"
                   placeholder="0.00"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-amber-800"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-amber-800"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  จำนวน (qty_on_hand)
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    จำนวนชิ้น (Qty)
+                  </label>
+                </div>
                 <input
                   type="number"
                   min="1"
                   disabled={itemType === 'UNIQUE'}
                   value={itemType === 'UNIQUE' ? 1 : qtyOnHand}
                   onChange={(e) => setQtyOnHand(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-slate-100 font-semibold text-center"
+                  className="w-full h-11 px-3.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-bold disabled:bg-slate-100 disabled:text-slate-400"
                 />
               </div>
             </div>
