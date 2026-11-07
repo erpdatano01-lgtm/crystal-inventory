@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ImageUploader from '@/components/ImageUploader';
+import DimensionGuideButton from '@/components/DimensionGuideModal';
 import {
   fetchStockLots,
   fetchProducts,
@@ -360,13 +361,27 @@ export default function NewProductPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                  <Maximize2 className="w-3.5 h-3.5 text-slate-500" />
-                  ขนาด (dimensions)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <Maximize2 className="w-3.5 h-3.5 text-slate-500" />
+                    ขนาด (dimensions)
+                  </label>
+                  <DimensionGuideButton
+                    activeShape={stoneShape}
+                    onSelectTemplate={(tpl) => setDimensions(tpl)}
+                  />
+                </div>
                 <input
                   type="text"
-                  placeholder="เช่น 9.5 x 7.2 x 6.8 cm"
+                  placeholder={
+                    stoneShape === 'Sphere'
+                      ? 'เช่น Ø 55 mm หรือ Ø 5.5 cm'
+                      : stoneShape === 'Tower'
+                      ? 'เช่น สูง 12.5 x ฐาน 3.5 cm'
+                      : ['Palm', 'Cabochon', 'Faceted', 'Tumble'].includes(stoneShape)
+                      ? 'เช่น 25 x 18 x 8 mm'
+                      : 'เช่น 9.5 x 7.2 x 6.0 cm'
+                  }
                   value={dimensions}
                   onChange={(e) => setDimensions(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"

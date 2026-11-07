@@ -42,6 +42,7 @@ import {
   Save,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
+import DimensionGuideButton from '@/components/DimensionGuideModal';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -1015,7 +1016,12 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">ขนาด (เช่น 4.5 x 3.2 cm)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-600">ขนาด (เช่น 4.5 x 3.2 cm)</label>
+                    <DimensionGuideButton
+                      onSelectTemplate={(tpl) => setEditForm((f) => ({ ...f, dimensions: tpl }))}
+                    />
+                  </div>
                   <input
                     type="text"
                     value={editForm.dimensions || ''}
