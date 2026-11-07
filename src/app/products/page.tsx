@@ -42,7 +42,7 @@ import {
   Save,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
-import DimensionGuideButton from '@/components/DimensionGuideModal';
+import DimensionInputs from '@/components/DimensionInputs';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -1015,18 +1015,19 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-600">ขนาด (เช่น 4.5 x 3.2 cm)</label>
-                    <DimensionGuideButton
-                      onSelectTemplate={(tpl) => setEditForm((f) => ({ ...f, dimensions: tpl }))}
-                    />
-                  </div>
-                  <input
-                    type="text"
+                <div className="sm:col-span-2">
+                  <DimensionInputs
                     value={editForm.dimensions || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, dimensions: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    onChange={(val) => setEditForm((f) => ({ ...f, dimensions: val }))}
+                    stoneShape={
+                      editForm.sku?.startsWith('SPH')
+                        ? 'Sphere'
+                        : editForm.sku?.startsWith('TOW')
+                        ? 'Tower'
+                        : editForm.sku?.startsWith('PLM') || editForm.sku?.startsWith('CAB') || editForm.sku?.startsWith('FAC')
+                        ? 'Palm'
+                        : 'Raw'
+                    }
                   />
                 </div>
                 <div>
