@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ImageUploader from '@/components/ImageUploader';
+import VideoUploader from '@/components/VideoUploader';
 import DimensionInputs from '@/components/DimensionInputs';
 import {
   fetchStockLots,
@@ -60,11 +61,10 @@ export default function NewProductPage() {
   const [status, setStatus] = useState<ProductStatus>('AVAILABLE');
   const [storageLocation, setStorageLocation] = useState<string>('ตู้โชว์ A-01');
 
-  // Media
+  // Media (ไฟล์จากเครื่อง / กล้อง ไม่ต้องใช้ URL)
   const [thumbnailImages, setThumbnailImages] = useState<string[]>([]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [driveMediaFolderUrl, setDriveMediaFolderUrl] = useState<string>('');
-  const [driveVideoUrl, setDriveVideoUrl] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -141,8 +141,8 @@ export default function NewProductPage() {
         status,
         r2_thumbnail_url: thumbnailImages.length > 0 ? thumbnailImages[0] : null,
         r2_gallery_urls: galleryImages,
-        drive_media_folder_url: driveMediaFolderUrl.trim() || null,
-        drive_video_url: driveVideoUrl.trim() || null,
+        drive_media_folder_url: null,
+        drive_video_url: videoUrl || null,
         storage_location: storageLocation.trim() || null,
       });
 
@@ -524,13 +524,13 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          {/* SECTION 4: MEDIA & CLOUDFLARE R2 + GOOGLE DRIVE */}
+          {/* SECTION 4: MEDIA UPLOAD (DIRECT FROM DEVICE / CAMERA) */}
           <div className="space-y-4">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
-              4. รูปภาพหน้าปก (Cloudflare R2) & ลิงก์สื่อ (Google Drive)
+              4. รูปภาพและวิดีโอ (เลือกไฟล์จากเครื่องหรือถ่ายจากกล้องโดยตรง)
             </span>
 
-            {/* R2 Thumbnail Upload (Compressed to WebP) */}
+            {/* 4.1 Thumbnail Upload */}
             <div
               className={`p-4 rounded-2xl transition ${
                 thumbnailImages.length === 0
@@ -539,14 +539,14 @@ export default function NewProductPage() {
               }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-700">รูปหน้าปกสินค้า (r2_thumbnail_url)</span>
+                <span className="text-xs font-bold text-slate-700">รูปหน้าปกหลัก</span>
                 {thumbnailImages.length === 0 ? (
                   <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
-                    🟡 ยังไม่มีรูปภาพ (ถ่ายรูปหรืออัปโหลดทีหลังได้)
+                    🟡 ยังไม่มีรูปภาพ (ถ่ายรูปหรือเลือกจากเครื่องทีหลังได้)
                   </span>
                 ) : (
                   <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-                    ✓ อัปโหลดแล้ว
+                    ✓ ถ่าย/เลือกแล้ว
                   </span>
                 )}
               </div>
@@ -556,45 +556,30 @@ export default function NewProductPage() {
                 maxFiles={1}
                 folder="products"
                 sku={sku}
-                label="อัปโหลดรูปหน้าปก (แปลงเป็น WebP อัตโนมัติ)"
+                label="รูปหน้าปกสินค้า (ถ่ายด้วยกล้อง หรือเลือกจากเครื่อง)"
               />
             </div>
 
-            {/* Google Drive Video & Folder Links */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Video className="w-4 h-4 text-purple-600" />
-                  ลิงก์วิดีโอ Google Drive (drive_video_url)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/file/d/.../view"
-                  value={driveVideoUrl}
-                  onChange={(e) => setDriveVideoUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-mono text-xs"
-                />
-                <span className="text-[11px] text-slate-400 mt-1 block">
-                  สามารถกด Copy ส่งให้ลูกค้าดูความเงาและประกายผลึกได้ทันที
-                </span>
-              </div>
+            {/* 4.2 Additional Gallery Images */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+              <ImageUploader
+                images={galleryImages}
+                onChange={setGalleryImages}
+                maxFiles={6}
+                folder="products"
+                sku={sku}
+                label="รูปเพิ่มเติม / หลายมุมมอง (ถ่ายเพิ่มหรือเลือกจากเครื่องได้สูงสุด 6 รูป)"
+              />
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <FolderOpen className="w-4 h-4 text-indigo-600" />
-                  ลิงก์โฟลเดอร์สื่อ Google Drive (drive_media_folder_url)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/drive/folders/..."
-                  value={driveMediaFolderUrl}
-                  onChange={(e) => setDriveMediaFolderUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-mono text-xs"
-                />
-                <span className="text-[11px] text-slate-400 mt-1 block">
-                  สำหรับเก็บรูปดิบและวิดีโอความละเอียดสูง
-                </span>
-              </div>
+            {/* 4.3 Direct Video Upload from Device */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+              <VideoUploader
+                videoUrl={videoUrl}
+                onChange={setVideoUrl}
+                sku={sku}
+                label="คลิปวิดีโอส่องประกายผลึก (ถ่ายวิดีโอสดหรือเลือกไฟล์คลิปจากเครื่อง)"
+              />
             </div>
           </div>
 

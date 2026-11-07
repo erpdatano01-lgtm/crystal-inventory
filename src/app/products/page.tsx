@@ -43,6 +43,8 @@ import {
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 import DimensionInputs from '@/components/DimensionInputs';
+import ImageUploader from '@/components/ImageUploader';
+import VideoUploader from '@/components/VideoUploader';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -840,30 +842,41 @@ export default function ProductsPage() {
                 )}
               </div>
 
-              {/* Drive Links */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                {activeModalProduct.drive_video_url && (
-                  <button
-                    onClick={() => handleCopyVideoUrl(activeModalProduct)}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
-                  >
-                    <Video className="w-4 h-4" />
-                    <span>Copy ลิงก์คลิปวิดีโอ (Drive)</span>
-                  </button>
-                )}
-
-                {activeModalProduct.drive_media_folder_url && (
-                  <a
-                    href={activeModalProduct.drive_media_folder_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
-                  >
-                    <FolderOpen className="w-4 h-4" />
-                    <span>เปิดโฟลเดอร์ Google Drive</span>
-                  </a>
-                )}
-              </div>
+              {/* Video Player / Preview */}
+              {activeModalProduct.drive_video_url && (
+                <div className="space-y-2 p-3 bg-slate-900 rounded-2xl">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Video className="w-4 h-4 text-purple-400" />
+                      คลิปวิดีโอส่องประกายหิน
+                    </span>
+                    <button
+                      onClick={() => handleCopyVideoUrl(activeModalProduct)}
+                      className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>คัดลอกลิงก์</span>
+                    </button>
+                  </div>
+                  {activeModalProduct.drive_video_url.includes('drive.google.com') ? (
+                    <a
+                      href={activeModalProduct.drive_video_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block p-3 text-center bg-purple-600/30 hover:bg-purple-600/50 rounded-xl text-purple-200 text-xs font-semibold transition"
+                    >
+                      ▶️ กดเพื่อเปิดดูคลิปวิดีโอในแท็บใหม่
+                    </a>
+                  ) : (
+                    <video
+                      src={activeModalProduct.drive_video_url}
+                      controls
+                      playsInline
+                      className="w-full max-h-56 rounded-xl bg-black object-contain"
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Status Actions */}
               <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100">
@@ -1128,34 +1141,24 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 font-bold"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">URL รูปภาพหน้าปก (Thumbnail)</label>
-                  <input
-                    type="text"
-                    value={editForm.r2_thumbnail_url || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, r2_thumbnail_url: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="https://pub-..."
+                {/* Media: Image & Video from device */}
+                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <ImageUploader
+                    images={editForm.r2_thumbnail_url ? [editForm.r2_thumbnail_url] : []}
+                    onChange={(imgs) => setEditForm((f) => ({ ...f, r2_thumbnail_url: imgs[0] || null }))}
+                    maxFiles={1}
+                    folder="products"
+                    sku={editForm.sku}
+                    label="รูปหน้าปกสินค้า (ถ่ายด้วยกล้อง หรือเลือกจากเครื่อง)"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">ลิงก์โฟลเดอร์ Google Drive</label>
-                  <input
-                    type="text"
-                    value={editForm.drive_media_folder_url || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, drive_media_folder_url: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="https://drive.google.com/drive/folders/..."
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">ลิงก์คลิปวิดีโอ (Google Drive)</label>
-                  <input
-                    type="text"
-                    value={editForm.drive_video_url || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, drive_video_url: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="https://drive.google.com/..."
+
+                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <VideoUploader
+                    videoUrl={editForm.drive_video_url || null}
+                    onChange={(vUrl) => setEditForm((f) => ({ ...f, drive_video_url: vUrl }))}
+                    sku={editForm.sku}
+                    label="คลิปวิดีโอของหิน (ถ่ายคลิปสด หรือเลือกจากเครื่อง)"
                   />
                 </div>
               </div>

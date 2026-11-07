@@ -392,7 +392,7 @@ export default function ExpensesPage() {
 
             {/* Row 3: Payment method, Google Drive Doc URL */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   วิธีการชำระเงิน (payment_method)
                 </label>
@@ -402,20 +402,6 @@ export default function ExpensesPage() {
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                  <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
-                  ลิงก์เอกสารใบเสร็จใน Google Drive (drive_doc_url)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/..."
-                  value={driveDocUrl}
-                  onChange={(e) => setDriveDocUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-mono text-xs"
                 />
               </div>
             </div>
@@ -442,7 +428,7 @@ export default function ExpensesPage() {
                 </div>
 
                 {autoCreateLot && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         รหัส Lot สินค้า (lot_code) *
@@ -468,20 +454,6 @@ export default function ExpensesPage() {
                         value={totalWeightGrams}
                         onChange={(e) => setTotalWeightGrams(e.target.value)}
                         className="w-full px-3 py-2 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                        <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
-                        ลิงก์โฟลเดอร์ Google Drive ของล็อตนี้
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://drive.google.com/drive/folders/..."
-                        value={driveLotFolderUrl}
-                        onChange={(e) => setDriveLotFolderUrl(e.target.value)}
-                        className="w-full px-3 py-2 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-mono text-xs"
                       />
                     </div>
                   </div>
@@ -928,25 +900,13 @@ export default function ExpensesPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">ลิงก์เอกสาร Google Drive</label>
-                  <input
-                    type="text"
-                    value={editForm.drive_doc_url || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, drive_doc_url: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="https://drive.google.com/..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">URL รูปสลิป / ใบเสร็จ (Cloudflare R2)</label>
-                  <input
-                    type="text"
-                    value={editForm.r2_receipt_url || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, r2_receipt_url: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="https://pub-..."
+                <div className="sm:col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <ImageUploader
+                    images={editForm.r2_receipt_url ? [editForm.r2_receipt_url] : []}
+                    onChange={(imgs) => setEditForm((f) => ({ ...f, r2_receipt_url: imgs[0] || null }))}
+                    maxFiles={1}
+                    folder="receipts"
+                    label="รูปสลิป / ใบเสร็จ (ถ่ายด้วยกล้อง หรือเลือกจากเครื่อง)"
                   />
                 </div>
 
