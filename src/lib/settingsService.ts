@@ -16,33 +16,33 @@ export interface StoneTypeItem {
 }
 
 export const DEFAULT_STONE_SHAPES: StoneShapeItem[] = [
+  { id: 'Cabochon', code: 'CAB', label: 'Cabochon (หลังเบี้ย / All Shape)', desc: 'หินเจียหลังเบี้ยทุกทรง และเศษเจีย', isDefault: true },
+  { id: 'Carved', code: 'CRV', label: 'Carved (หินแกะสลัก)', desc: 'งานแกะสลักรูปทรงต่างๆ', isDefault: true },
+  { id: 'Faceted', code: 'FAC', label: 'Faceted (เจียเหลี่ยมเพชรพลอย)', desc: 'หินเจียแบบหน้าตัด เครื่องประดับ เพชรพลอย', isDefault: true },
+  { id: 'Palm', code: 'PLM', label: 'Palm / Polished (เจียทรงมน/รี/หัวใจ)', desc: 'หินเจียทรงกลมแบน รี หัวใจ มนๆ ทุกแบบ', isDefault: true },
+  { id: 'Raw', code: 'RAW', label: 'Raw / Specimen (หินดิบ)', desc: 'หินดิบ ผลึกธรรมชาติ ก้อนแร่สะสม', isDefault: true },
   { id: 'Sphere', code: 'SPH', label: 'Sphere (ทรงกลม)', desc: 'หินเจียทรงกลม ลูกแก้ว', isDefault: true },
   { id: 'Tower', code: 'TOW', label: 'Tower (แท่ง/เสา)', desc: 'หินทรงแท่งปลายแหลม ตั้งโต๊ะ', isDefault: true },
-  { id: 'Raw', code: 'RAW', label: 'Raw / Specimen (หินดิบ)', desc: 'หินดิบ ผลึกธรรมชาติ ก้อนแร่สะสม', isDefault: true },
   { id: 'Tumble', code: 'TUM', label: 'Tumble (หินก้อนขัดเงา)', desc: 'หินก้อนกลิ้งขัดมัน พกพา', isDefault: true },
-  { id: 'Palm', code: 'PLM', label: 'Palm / Polished (เจียทรงมน/รี/หัวใจ)', desc: 'หินเจียทรงกลมแบน รี หัวใจ มนๆ ทุกแบบ', isDefault: true },
-  { id: 'Cabochon', code: 'CAB', label: 'Cabochon (หลังเบี้ย / All Shape)', desc: 'หินเจียหลังเบี้ยทุกทรง และเศษเจีย', isDefault: true },
-  { id: 'Faceted', code: 'FAC', label: 'Faceted (เจียเหลี่ยมเพชรพลอย)', desc: 'หินเจียแบบหน้าตัด เครื่องประดับ เพชรพลอย', isDefault: true },
-  { id: 'Carved', code: 'CRV', label: 'Carved (หินแกะสลัก)', desc: 'งานแกะสลักรูปทรงต่างๆ', isDefault: true },
 ];
 
 export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [
   { id: 'Amethyst', code: 'AME', label: 'Amethyst (อเมทิสต์)', isDefault: true },
+  { id: 'Aquamarine', code: 'AQU', label: 'Aquamarine (อความารีน)', isDefault: true },
+  { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)', isDefault: true },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)', isDefault: true },
   { id: 'Clear Quartz', code: 'QUA', label: 'Clear Quartz (เขี้ยวหนุมาน/ควอตซ์ใส)', isDefault: true },
-  { id: 'Rose Quartz', code: 'ROQ', label: 'Rose Quartz (โรสควอตซ์)', isDefault: true },
-  { id: 'Smoky Quartz', code: 'SMQ', label: 'Smoky Quartz (สโมกกี้ควอตซ์)', isDefault: true },
-  { id: 'Rutilated Quartz', code: 'RUT', label: 'Rutilated Quartz (ไหมทอง/ไหม 5 สี)', isDefault: true },
-  { id: 'Moldavite', code: 'MOL', label: 'Moldavite (โมลดาไวต์/สะเก็ดดาวเขียว)', isDefault: true },
-  { id: 'Labradorite', code: 'LAB', label: 'Labradorite (ลาบราดอไรต์)', isDefault: true },
   { id: 'Fluorite', code: 'FLU', label: 'Fluorite (ฟลูออไรต์)', isDefault: true },
-  { id: 'Pyrite', code: 'PYR', label: 'Pyrite (ไพไรต์/แร่ดูดทรัพย์)', isDefault: true },
-  { id: 'Malachite', code: 'MAL', label: 'Malachite (มาลาไคต์)', isDefault: true },
-  { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)', isDefault: true },
-  { id: 'Moonstone', code: 'MOO', label: 'Moonstone (มูนสโตน)', isDefault: true },
-  { id: 'Aquamarine', code: 'AQU', label: 'Aquamarine (อความารีน)', isDefault: true },
+  { id: 'Labradorite', code: 'LAB', label: 'Labradorite (ลาบราดอไรต์)', isDefault: true },
   { id: 'Lapis Lazuli', code: 'LAP', label: 'Lapis Lazuli (ลาพิส ลาซูลี)', isDefault: true },
+  { id: 'Malachite', code: 'MAL', label: 'Malachite (มาลาไคต์)', isDefault: true },
+  { id: 'Moldavite', code: 'MOL', label: 'Moldavite (โมลดาไวต์/สะเก็ดดาวเขียว)', isDefault: true },
+  { id: 'Moonstone', code: 'MOO', label: 'Moonstone (มูนสโตน)', isDefault: true },
+  { id: 'Pyrite', code: 'PYR', label: 'Pyrite (ไพไรต์/แร่ดูดทรัพย์)', isDefault: true },
+  { id: 'Rose Quartz', code: 'ROQ', label: 'Rose Quartz (โรสควอตซ์)', isDefault: true },
+  { id: 'Rutilated Quartz', code: 'RUT', label: 'Rutilated Quartz (ไหมทอง/ไหม 5 สี)', isDefault: true },
   { id: 'Selenite', code: 'SEL', label: 'Selenite (เซเลไนต์)', isDefault: true },
+  { id: 'Smoky Quartz', code: 'SMQ', label: 'Smoky Quartz (สโมกกี้ควอตซ์)', isDefault: true },
   { id: 'Other', code: 'CRY', label: 'แร่/หินชนิดอื่นๆ (Other Mineral)', isDefault: true },
 ];
 
@@ -114,75 +114,93 @@ export function suggestAbbreviation(name: string): string {
 }
 
 /**
- * Get all active shapes (persisted in localStorage, fallback to defaults)
+ * Sort items alphabetically A-Z by English name / id
+ * Keeps 'Other' at the end of the list
  */
-export function getStoneShapes(): StoneShapeItem[] {
-  if (typeof window === 'undefined') return DEFAULT_STONE_SHAPES;
-  try {
-    const raw = localStorage.getItem(LS_SHAPES_KEY);
-    if (!raw) {
-      localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(DEFAULT_STONE_SHAPES));
-      return DEFAULT_STONE_SHAPES;
-    }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-  } catch (e) {
-    console.warn('Error reading shapes from localStorage:', e);
-  }
-  return DEFAULT_STONE_SHAPES;
+export function sortAlphabetically<T extends { id: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    if (a.id.toLowerCase() === 'other') return 1;
+    if (b.id.toLowerCase() === 'other') return -1;
+    return a.id.localeCompare(b.id, 'en', { sensitivity: 'base' });
+  });
 }
 
 /**
- * Save shapes to localStorage
+ * Get all active shapes (persisted in localStorage, fallback to defaults)
+ * Always sorted alphabetically A-Z
+ */
+export function getStoneShapes(): StoneShapeItem[] {
+  if (typeof window === 'undefined') return sortAlphabetically(DEFAULT_STONE_SHAPES);
+  try {
+    const raw = localStorage.getItem(LS_SHAPES_KEY);
+    if (!raw) {
+      const sorted = sortAlphabetically(DEFAULT_STONE_SHAPES);
+      localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sorted));
+      return sorted;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return sortAlphabetically(parsed);
+  } catch (e) {
+    console.warn('Error reading shapes from localStorage:', e);
+  }
+  return sortAlphabetically(DEFAULT_STONE_SHAPES);
+}
+
+/**
+ * Save shapes to localStorage (automatically sorted A-Z)
  */
 export function saveStoneShapes(shapes: StoneShapeItem[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(shapes));
+  localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sortAlphabetically(shapes)));
 }
 
 /**
  * Reset shapes to factory defaults
  */
 export function resetStoneShapes(): StoneShapeItem[] {
+  const sorted = sortAlphabetically(DEFAULT_STONE_SHAPES);
   if (typeof window !== 'undefined') {
-    localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(DEFAULT_STONE_SHAPES));
+    localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sorted));
   }
-  return DEFAULT_STONE_SHAPES;
+  return sorted;
 }
 
 /**
  * Get all active stone types (persisted in localStorage, fallback to defaults)
+ * Always sorted alphabetically A-Z (Amethyst, Aquamarine, Black Tourmaline...)
  */
 export function getStoneTypes(): StoneTypeItem[] {
-  if (typeof window === 'undefined') return DEFAULT_STONE_TYPES;
+  if (typeof window === 'undefined') return sortAlphabetically(DEFAULT_STONE_TYPES);
   try {
     const raw = localStorage.getItem(LS_STONES_KEY);
     if (!raw) {
-      localStorage.setItem(LS_STONES_KEY, JSON.stringify(DEFAULT_STONE_TYPES));
-      return DEFAULT_STONE_TYPES;
+      const sorted = sortAlphabetically(DEFAULT_STONE_TYPES);
+      localStorage.setItem(LS_STONES_KEY, JSON.stringify(sorted));
+      return sorted;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    if (Array.isArray(parsed) && parsed.length > 0) return sortAlphabetically(parsed);
   } catch (e) {
     console.warn('Error reading stone types from localStorage:', e);
   }
-  return DEFAULT_STONE_TYPES;
+  return sortAlphabetically(DEFAULT_STONE_TYPES);
 }
 
 /**
- * Save stone types to localStorage
+ * Save stone types to localStorage (automatically sorted A-Z)
  */
 export function saveStoneTypes(types: StoneTypeItem[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_STONES_KEY, JSON.stringify(types));
+  localStorage.setItem(LS_STONES_KEY, JSON.stringify(sortAlphabetically(types)));
 }
 
 /**
  * Reset stone types to factory defaults
  */
 export function resetStoneTypes(): StoneTypeItem[] {
+  const sorted = sortAlphabetically(DEFAULT_STONE_TYPES);
   if (typeof window !== 'undefined') {
-    localStorage.setItem(LS_STONES_KEY, JSON.stringify(DEFAULT_STONE_TYPES));
+    localStorage.setItem(LS_STONES_KEY, JSON.stringify(sorted));
   }
-  return DEFAULT_STONE_TYPES;
+  return sorted;
 }
