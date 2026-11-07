@@ -17,9 +17,13 @@ import {
   Product,
   ItemType,
   ProductStatus,
-  STONE_TYPES,
-  STONE_SHAPES,
 } from '@/types';
+import {
+  StoneShapeItem,
+  StoneTypeItem,
+  getStoneShapes,
+  getStoneTypes,
+} from '@/lib/settingsService';
 import {
   PlusCircle,
   Gem,
@@ -45,6 +49,8 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(true);
 
   // Form states
+  const [shapes, setShapes] = useState<StoneShapeItem[]>([]);
+  const [stones, setStones] = useState<StoneTypeItem[]>([]);
   const [lotId, setLotId] = useState<string>('');
   const [stoneShape, setStoneShape] = useState<string>('Sphere');
   const [stoneType, setStoneType] = useState<string>('Amethyst');
@@ -68,18 +74,28 @@ export default function NewProductPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load lots & existing skus
+  // Load lots, custom shapes, custom stones & existing skus
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
+        const loadedShapes = getStoneShapes();
+        const loadedStones = getStoneTypes();
+        setShapes(loadedShapes);
+        setStones(loadedStones);
+
+        const initialShape = loadedShapes[0]?.id || 'Sphere';
+        const initialStone = loadedStones[0]?.id || 'Amethyst';
+        setStoneShape(initialShape);
+        setStoneType(initialStone);
+
         const [l, p] = await Promise.all([fetchStockLots(), fetchProducts()]);
         setLots(l);
         const skus = p.map((prod) => prod.sku);
         setExistingSkus(skus);
 
-        // Generate initial SKU
-        const initialSku = generateSmartSku('Amethyst', skus, 'Sphere');
+        // Generate initial SKU with custom shapes/stones
+        const initialSku = generateSmartSku(initialStone, skus, initialShape, loadedShapes, loadedStones);
         setSku(initialSku);
       } finally {
         setLoading(false);
@@ -91,14 +107,14 @@ export default function NewProductPage() {
   // When stoneShape changes, auto-generate new SKU
   const handleStoneShapeChange = (newShape: string) => {
     setStoneShape(newShape);
-    const newSku = generateSmartSku(stoneType, existingSkus, newShape);
+    const newSku = generateSmartSku(stoneType, existingSkus, newShape, shapes, stones);
     setSku(newSku);
   };
 
   // When stoneType changes, auto-generate new SKU if not customized
   const handleStoneTypeChange = (newType: string) => {
     setStoneType(newType);
-    const newSku = generateSmartSku(newType, existingSkus, stoneShape);
+    const newSku = generateSmartSku(newType, existingSkus, stoneShape, shapes, stones);
     setSku(newSku);
 
     // Also suggest name if empty
@@ -238,38 +254,58 @@ export default function NewProductPage() {
                 )}
               </div>
 
-              {/* Stone Shape dropdown (8 Categories - triggers smart SKU) */}
+              {/* Stone Shape dropdown (triggers smart SKU) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  รูปทรง / หมวดการเจีย (Shape) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    รูปทรง / หมวดการเจีย (Shape) *
+                  </label>
+                  <Link
+                    href="/settings"
+                    target="_blank"
+                    className="text-[10px] text-purple-600 hover:text-purple-800 font-bold hover:underline"
+                    title="ไปที่หน้าตั้งค่าเพื่อเพิ่มหรือแก้ไขรูปทรง"
+                  >
+                    ⚙️ จัดการทรงหิน
+                  </Link>
+                </div>
                 <select
                   value={stoneShape}
                   onChange={(e) => handleStoneShapeChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900"
                 >
-                  {STONE_SHAPES.map((sh) => (
+                  {shapes.map((sh) => (
                     <option key={sh.id} value={sh.id}>
                       {sh.label} [{sh.code}]
                     </option>
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  {STONE_SHAPES.find((sh) => sh.id === stoneShape)?.desc}
+                  {shapes.find((sh) => sh.id === stoneShape)?.desc}
                 </p>
               </div>
 
               {/* Stone Type dropdown (triggers smart SKU) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ชนิดหิน (stone_type) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ชนิดหิน (stone_type) *
+                  </label>
+                  <Link
+                    href="/settings"
+                    target="_blank"
+                    className="text-[10px] text-purple-600 hover:text-purple-800 font-bold hover:underline"
+                    title="ไปที่หน้าตั้งค่าเพื่อเพิ่มหรือแก้ไขชนิดหิน"
+                  >
+                    ⚙️ จัดการชนิดหิน
+                  </Link>
+                </div>
                 <select
                   value={stoneType}
                   onChange={(e) => handleStoneTypeChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900"
                 >
-                  {STONE_TYPES.map((s) => (
+                  {stones.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.label} [{s.code}]
                     </option>

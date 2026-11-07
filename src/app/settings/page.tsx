@@ -1,0 +1,914 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
+import {
+  Settings,
+  Gem,
+  Plus,
+  Pencil,
+  Trash2,
+  RotateCcw,
+  Sparkles,
+  Check,
+  X,
+  Search,
+  Layers,
+  HelpCircle,
+  AlertCircle,
+  Tag,
+} from 'lucide-react';
+import {
+  StoneShapeItem,
+  StoneTypeItem,
+  getStoneShapes,
+  saveStoneShapes,
+  resetStoneShapes,
+  getStoneTypes,
+  saveStoneTypes,
+  resetStoneTypes,
+  suggestAbbreviation,
+} from '@/lib/settingsService';
+
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<'shapes' | 'stones' | 'tester'>('shapes');
+
+  // Shapes state
+  const [shapes, setShapes] = useState<StoneShapeItem[]>([]);
+  const [shapeSearch, setShapeSearch] = useState('');
+  const [editingShape, setEditingShape] = useState<StoneShapeItem | null>(null);
+  const [isAddingShape, setIsAddingShape] = useState(false);
+  const [shapeForm, setShapeForm] = useState<{
+    id: string;
+    code: string;
+    nameEn: string;
+    nameTh: string;
+    desc: string;
+  }>({
+    id: '',
+    code: '',
+    nameEn: '',
+    nameTh: '',
+    desc: '',
+  });
+
+  // Stones state
+  const [stones, setStones] = useState<StoneTypeItem[]>([]);
+  const [stoneSearch, setStoneSearch] = useState('');
+  const [editingStone, setEditingStone] = useState<StoneTypeItem | null>(null);
+  const [isAddingStone, setIsAddingStone] = useState(false);
+  const [stoneForm, setStoneForm] = useState<{
+    id: string;
+    code: string;
+    nameEn: string;
+    nameTh: string;
+  }>({
+    id: '',
+    code: '',
+    nameEn: '',
+    nameTh: '',
+  });
+
+  // SKU Tester state
+  const [testShapeId, setTestShapeId] = useState<string>('Sphere');
+  const [testStoneId, setTestStoneId] = useState<string>('Amethyst');
+  const [testNumber, setTestNumber] = useState<number>(1);
+
+  // Toast
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Load settings on mount
+  useEffect(() => {
+    setShapes(getStoneShapes());
+    setStones(getStoneTypes());
+  }, []);
+
+  // ----------------------------------------------------
+  // SHAPES HANDLERS
+  // ----------------------------------------------------
+  const handleOpenAddShape = () => {
+    setShapeForm({ id: '', code: '', nameEn: '', nameTh: '', desc: '' });
+    setIsAddingShape(true);
+    setEditingShape(null);
+  };
+
+  const handleOpenEditShape = (sh: StoneShapeItem) => {
+    // Try to extract English & Thai
+    const match = sh.label.match(/^(.*?)\s*(?:\((.*?)\))?$/);
+    const nameEn = match ? match[1].replace(/^\d+\.\s*/, '').trim() : sh.id;
+    const nameTh = match && match[2] ? match[2].trim() : '';
+
+    setShapeForm({
+      id: sh.id,
+      code: sh.code,
+      nameEn,
+      nameTh,
+      desc: sh.desc || '',
+    });
+    setEditingShape(sh);
+    setIsAddingShape(false);
+  };
+
+  const handleShapeNameEnChange = (enName: string) => {
+    const updated = { ...shapeForm, nameEn: enName, id: enName.trim() };
+    // Auto detect suggestion if user hasn't typed a custom code yet
+    if (!editingShape) {
+      updated.code = suggestAbbreviation(enName);
+    }
+    setShapeForm(updated);
+  };
+
+  const handleSaveShape = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = shapeForm.nameEn.trim() || shapeForm.id.trim();
+    const cleanCode = shapeForm.code.trim().toUpperCase();
+
+    if (!cleanId || !cleanCode) {
+      alert('กรุณากรอกชื่อทรงหิน และตัวย่อ SKU');
+      return;
+    }
+
+    const fullLabel = shapeForm.nameTh.trim()
+      ? `${cleanId} (${shapeForm.nameTh.trim()})`
+      : cleanId;
+
+    let updatedList: StoneShapeItem[];
+
+    if (editingShape) {
+      updatedList = shapes.map((sh) =>
+        sh.id === editingShape.id
+          ? {
+              ...sh,
+              id: cleanId,
+              code: cleanCode,
+              label: fullLabel,
+              desc: shapeForm.desc.trim(),
+            }
+          : sh
+      );
+      showToast(`แก้ไขทรงหิน ${cleanId} เรียบร้อย!`);
+    } else {
+      // Check duplicate
+      if (shapes.some((s) => s.id.toLowerCase() === cleanId.toLowerCase())) {
+        alert('มีรูปทรงนี้ในระบบแล้ว');
+        return;
+      }
+      const newItem: StoneShapeItem = {
+        id: cleanId,
+        code: cleanCode,
+        label: fullLabel,
+        desc: shapeForm.desc.trim(),
+        isDefault: false,
+      };
+      updatedList = [...shapes, newItem];
+      showToast(`เพิ่มทรงหิน ${cleanId} [${cleanCode}] เรียบร้อย!`);
+    }
+
+    setShapes(updatedList);
+    saveStoneShapes(updatedList);
+    setIsAddingShape(false);
+    setEditingShape(null);
+  };
+
+  const handleDeleteShape = (id: string) => {
+    if (shapes.length <= 1) {
+      alert('ต้องมีรูปทรงหินอย่างน้อย 1 รายการ');
+      return;
+    }
+    if (confirm(`คุณต้องการลบรูปทรง "${id}" ใช่หรือไม่?`)) {
+      const updated = shapes.filter((sh) => sh.id !== id);
+      setShapes(updated);
+      saveStoneShapes(updated);
+      showToast(`ลบรูปทรง ${id} เรียบร้อยแล้ว`);
+    }
+  };
+
+  const handleResetShapes = () => {
+    if (confirm('ต้องการคืนค่ารูปทรงหินทั้งหมดกลับเป็นค่าเริ่มต้น 8 ทรงมาตรฐานใช่หรือไม่?')) {
+      const defaults = resetStoneShapes();
+      setShapes(defaults);
+      showToast('คืนค่ารูปทรงเริ่มต้นเรียบร้อยแล้ว');
+    }
+  };
+
+  // ----------------------------------------------------
+  // STONES HANDLERS
+  // ----------------------------------------------------
+  const handleOpenAddStone = () => {
+    setStoneForm({ id: '', code: '', nameEn: '', nameTh: '' });
+    setIsAddingStone(true);
+    setEditingStone(null);
+  };
+
+  const handleOpenEditStone = (st: StoneTypeItem) => {
+    const match = st.label.match(/^(.*?)\s*(?:\((.*?)\))?$/);
+    const nameEn = match ? match[1].trim() : st.id;
+    const nameTh = match && match[2] ? match[2].trim() : '';
+
+    setStoneForm({
+      id: st.id,
+      code: st.code,
+      nameEn,
+      nameTh,
+    });
+    setEditingStone(st);
+    setIsAddingStone(false);
+  };
+
+  const handleStoneNameEnChange = (enName: string) => {
+    const updated = { ...stoneForm, nameEn: enName, id: enName.trim() };
+    if (!editingStone) {
+      updated.code = suggestAbbreviation(enName);
+    }
+    setStoneForm(updated);
+  };
+
+  const handleSaveStone = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = stoneForm.nameEn.trim() || stoneForm.id.trim();
+    const cleanCode = stoneForm.code.trim().toUpperCase();
+
+    if (!cleanId || !cleanCode) {
+      alert('กรุณากรอกชื่อชนิดหิน และตัวย่อ SKU');
+      return;
+    }
+
+    const fullLabel = stoneForm.nameTh.trim()
+      ? `${cleanId} (${stoneForm.nameTh.trim()})`
+      : cleanId;
+
+    let updatedList: StoneTypeItem[];
+
+    if (editingStone) {
+      updatedList = stones.map((st) =>
+        st.id === editingStone.id
+          ? {
+              ...st,
+              id: cleanId,
+              code: cleanCode,
+              label: fullLabel,
+            }
+          : st
+      );
+      showToast(`แก้ไขชนิดหิน ${cleanId} เรียบร้อย!`);
+    } else {
+      if (stones.some((s) => s.id.toLowerCase() === cleanId.toLowerCase())) {
+        alert('มีชนิดหินนี้ในระบบแล้ว');
+        return;
+      }
+      const newItem: StoneTypeItem = {
+        id: cleanId,
+        code: cleanCode,
+        label: fullLabel,
+        isDefault: false,
+      };
+      updatedList = [...stones, newItem];
+      showToast(`เพิ่มชนิดหิน ${cleanId} [${cleanCode}] เรียบร้อย!`);
+    }
+
+    setStones(updatedList);
+    saveStoneTypes(updatedList);
+    setIsAddingStone(false);
+    setEditingStone(null);
+  };
+
+  const handleDeleteStone = (id: string) => {
+    if (stones.length <= 1) {
+      alert('ต้องมีชนิดหินอย่างน้อย 1 รายการ');
+      return;
+    }
+    if (confirm(`คุณต้องการลบชนิดหิน "${id}" ใช่หรือไม่?`)) {
+      const updated = stones.filter((st) => st.id !== id);
+      setStones(updated);
+      saveStoneTypes(updated);
+      showToast(`ลบชนิดหิน ${id} เรียบร้อยแล้ว`);
+    }
+  };
+
+  const handleResetStones = () => {
+    if (confirm('ต้องการคืนค่าชนิดหินทั้งหมดกลับเป็นค่ามาตรฐาน 17 ชนิดใช่หรือไม่?')) {
+      const defaults = resetStoneTypes();
+      setStones(defaults);
+      showToast('คืนค่าชนิดหินเริ่มต้นเรียบร้อยแล้ว');
+    }
+  };
+
+  // Filtered lists
+  const filteredShapes = shapes.filter(
+    (s) =>
+      s.id.toLowerCase().includes(shapeSearch.toLowerCase()) ||
+      s.code.toLowerCase().includes(shapeSearch.toLowerCase()) ||
+      s.label.toLowerCase().includes(shapeSearch.toLowerCase())
+  );
+
+  const filteredStones = stones.filter(
+    (s) =>
+      s.id.toLowerCase().includes(stoneSearch.toLowerCase()) ||
+      s.code.toLowerCase().includes(stoneSearch.toLowerCase()) ||
+      s.label.toLowerCase().includes(stoneSearch.toLowerCase())
+  );
+
+  // Compute test SKU
+  const matchedTestShape = shapes.find((s) => s.id === testShapeId) || shapes[0];
+  const matchedTestStone = stones.find((s) => s.id === testStoneId) || stones[0];
+  const testShapeCode = matchedTestShape ? matchedTestShape.code : 'RAW';
+  const testStoneCode = matchedTestStone ? matchedTestStone.code : 'CRY';
+  const computedSku = `${testShapeCode}-${testStoneCode}-${String(testNumber).padStart(3, '0')}`;
+
+  return (
+    <div className="min-h-screen flex flex-col pb-20 md:pb-12 bg-slate-50 md:pl-64 pt-16 md:pt-0">
+      <Navbar />
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold animate-in fade-in slide-in-from-bottom duration-200 border border-slate-700">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2">
+              <Settings className="w-6 h-6 text-purple-600" />
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                ตั้งค่าระบบ & กฎการสร้าง SKU (Settings)
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              เพิ่ม ลด หรือแก้ไขรูปทรงหิน (Shapes), ชนิดหิน (Stone Types) และปรับแต่งตัวย่อ SKU ได้อิสระ
+            </p>
+          </div>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="flex items-center gap-2 p-1.5 bg-slate-200/80 rounded-2xl w-fit">
+          <button
+            onClick={() => setActiveTab('shapes')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'shapes'
+                ? 'bg-white text-purple-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-purple-600" />
+            <span>รูปทรงหิน (Shapes)</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800">
+              {shapes.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('stones')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'stones'
+                ? 'bg-white text-purple-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Gem className="w-4 h-4 text-indigo-600" />
+            <span>ชนิดหิน & แร่ (Stone Types)</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800">
+              {stones.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tester')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'tester'
+                ? 'bg-white text-purple-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>ทดลองสร้าง SKU</span>
+          </button>
+        </div>
+
+        {/* ========================================================= */}
+        {/* TAB 1: SHAPES                                             */}
+        {/* ========================================================= */}
+        {activeTab === 'shapes' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="ค้นหารูปทรง หรือตัวย่อ SKU..."
+                  value={shapeSearch}
+                  onChange={(e) => setShapeSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleResetShapes}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 transition"
+                  title="คืนค่ารูปทรงเริ่มต้น"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>คืนค่าเริ่มต้น</span>
+                </button>
+
+                <button
+                  onClick={handleOpenAddShape}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ เพิ่มรูปทรงใหม่</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Shapes Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {filteredShapes.map((sh, idx) => (
+                <div
+                  key={sh.id}
+                  className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900 border border-purple-200">
+                        {sh.code}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        #{String(idx + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900">{sh.label}</h3>
+                    {sh.desc && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{sh.desc}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      ตัวอย่าง SKU: <strong className="text-purple-700">{sh.code}-AME-001</strong>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditShape(sh)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="แก้ไขรูปทรงนี้"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteShape(sh.id)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                        title="ลบรูปทรงนี้"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 2: STONE TYPES                                        */}
+        {/* ========================================================= */}
+        {activeTab === 'stones' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อชนิดหิน แร่ หรือตัวย่อ SKU..."
+                  value={stoneSearch}
+                  onChange={(e) => setStoneSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleResetStones}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 transition"
+                  title="คืนค่าชนิดหินเริ่มต้น"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>คืนค่าเริ่มต้น</span>
+                </button>
+
+                <button
+                  onClick={handleOpenAddStone}
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 hover:from-indigo-700 hover:to-purple-700 transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ เพิ่มชนิดหินใหม่</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Stones Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {filteredStones.map((st, idx) => (
+                <div
+                  key={st.id}
+                  className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-200">
+                        {st.code}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        #{String(idx + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900">{st.label}</h3>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      ตัวอย่าง SKU: <strong className="text-indigo-700">SPH-{st.code}-001</strong>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditStone(st)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="แก้ไขชนิดหินนี้"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStone(st.id)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                        title="ลบชนิดหินนี้"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 3: SKU TESTER                                         */}
+        {/* ========================================================= */}
+        {activeTab === 'tester' && (
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-500" />
+                ทดลองสร้างรหัส Smart SKU ตามตั้งค่าปัจจุบัน
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                เลือกลองจับคู่รูปทรงและชนิดหิน เพื่อดูว่ารหัส SKU จะถูกสร้างขึ้นมาอย่างไร
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  เลือกรูปทรง (Shape)
+                </label>
+                <select
+                  value={testShapeId}
+                  onChange={(e) => setTestShapeId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 font-semibold"
+                >
+                  {shapes.map((sh) => (
+                    <option key={sh.id} value={sh.id}>
+                      [{sh.code}] {sh.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  เลือกชนิดหิน (Stone Type)
+                </label>
+                <select
+                  value={testStoneId}
+                  onChange={(e) => setTestStoneId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-semibold"
+                >
+                  {stones.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      [{st.code}] {st.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  ลำดับชิ้น (Seq Number)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={testNumber}
+                  onChange={(e) => setTestNumber(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 font-bold"
+                />
+              </div>
+            </div>
+
+            {/* Computed SKU Display */}
+            <div className="p-6 bg-gradient-to-r from-purple-50 via-indigo-50 to-amber-50 rounded-2xl border-2 border-purple-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  รหัส Smart SKU ที่ระบบจะสร้างให้อัตโนมัติ:
+                </span>
+                <div className="text-3xl sm:text-4xl font-black font-mono tracking-wider text-purple-900">
+                  {computedSku}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-slate-600 bg-white/80 backdrop-blur p-3 rounded-xl border border-purple-100">
+                <div className="text-center">
+                  <span className="font-mono font-bold text-purple-700 block text-sm">
+                    {testShapeCode}
+                  </span>
+                  <span className="text-[10px] text-slate-400">รูปทรง</span>
+                </div>
+                <span className="text-slate-300">-</span>
+                <div className="text-center">
+                  <span className="font-mono font-bold text-indigo-700 block text-sm">
+                    {testStoneCode}
+                  </span>
+                  <span className="text-[10px] text-slate-400">ชนิดหิน</span>
+                </div>
+                <span className="text-slate-300">-</span>
+                <div className="text-center">
+                  <span className="font-mono font-bold text-amber-700 block text-sm">
+                    {String(testNumber).padStart(3, '0')}
+                  </span>
+                  <span className="text-[10px] text-slate-400">ลำดับชิ้น</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: ADD / EDIT SHAPE                                   */}
+        {/* ========================================================= */}
+        {(isAddingShape || editingShape) && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-purple-600" />
+                  {editingShape ? 'แก้ไขรูปทรงหิน' : 'เพิ่มรูปทรงหินใหม่'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsAddingShape(false);
+                    setEditingShape(null);
+                  }}
+                  className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveShape} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ชื่อรูปทรง (อังกฤษ) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น Heart, Pyramid, Moon, Bracelet"
+                    value={shapeForm.nameEn}
+                    onChange={(e) => handleShapeNameEnChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-medium"
+                  />
+                  <span className="text-[11px] text-slate-400 mt-0.5 block">
+                    ใช้เป็น ID อ้างอิง และระบบจะตรวจจับตัวย่อให้อัตโนมัติ
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ชื่อภาษาไทย (ถ้ามี)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ทรงหัวใจ, ทรงปิรามิด, พระจันทร์เสี้ยว"
+                    value={shapeForm.nameTh}
+                    onChange={(e) => setShapeForm({ ...shapeForm, nameTh: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+
+                {/* SKU Code (Auto or Custom) */}
+                <div className="p-3.5 bg-purple-50/80 border border-purple-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-purple-600" />
+                      ตัวย่อสำหรับทำ SKU (2-4 ตัวอักษร) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShapeForm({
+                          ...shapeForm,
+                          code: suggestAbbreviation(shapeForm.nameEn),
+                        })
+                      }
+                      className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-white px-2 py-0.5 rounded-md border border-purple-300 shadow-2xs transition flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      ตรวจจับอัตโนมัติ
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    placeholder="เช่น HRT, PYR, MON, BRC"
+                    value={shapeForm.code}
+                    onChange={(e) =>
+                      setShapeForm({ ...shapeForm, code: e.target.value.toUpperCase() })
+                    }
+                    className="w-full px-3.5 py-2.5 text-base bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-mono font-black text-purple-900 uppercase"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-purple-700 font-medium pt-1">
+                    <span>ตัวอย่าง SKU ที่ได้:</span>
+                    <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-purple-200">
+                      {shapeForm.code || '???'} - AME - 001
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    คำอธิบาย / วิธีวัดขนาด (ไม่บังคับ)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="เช่น หินเจียรูปหัวใจ ขนาดกว้าง x ยาว x หนา..."
+                    value={shapeForm.desc}
+                    onChange={(e) => setShapeForm({ ...shapeForm, desc: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingShape(false);
+                      setEditingShape(null);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 transition"
+                  >
+                    {editingShape ? 'บันทึกการแก้ไข' : 'เพิ่มรูปทรง'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: ADD / EDIT STONE                                   */}
+        {/* ========================================================= */}
+        {(isAddingStone || editingStone) && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Gem className="w-5 h-5 text-indigo-600" />
+                  {editingStone ? 'แก้ไขชนิดหิน & แร่' : 'เพิ่มชนิดหินใหม่'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsAddingStone(false);
+                    setEditingStone(null);
+                  }}
+                  className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveStone} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ชื่อชนิดหิน (อังกฤษ) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น Larimar, Super Seven, Danburite, Kyanite"
+                    value={stoneForm.nameEn}
+                    onChange={(e) => handleStoneNameEnChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                  />
+                  <span className="text-[11px] text-slate-400 mt-0.5 block">
+                    ระบบจะตรวจจับตัวย่อ 3 ตัวอักษรให้อัตโนมัติ หรือจะพิมพ์เองก็ได้
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ชื่อภาษาไทย (ถ้ามี)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ลาริมาร์, ซุปเปอร์เซเว่น, แดนบูไรต์"
+                    value={stoneForm.nameTh}
+                    onChange={(e) => setStoneForm({ ...stoneForm, nameTh: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                {/* SKU Code (Auto or Custom) */}
+                <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                      ตัวย่อชนิดหินสำหรับ SKU (2-4 ตัวอักษร) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setStoneForm({
+                          ...stoneForm,
+                          code: suggestAbbreviation(stoneForm.nameEn),
+                        })
+                      }
+                      className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white px-2 py-0.5 rounded-md border border-indigo-300 shadow-2xs transition flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      ตรวจจับอัตโนมัติ
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    placeholder="เช่น LAR, SP7, DAN, KYA"
+                    value={stoneForm.code}
+                    onChange={(e) =>
+                      setStoneForm({ ...stoneForm, code: e.target.value.toUpperCase() })
+                    }
+                    className="w-full px-3.5 py-2.5 text-base bg-white border border-indigo-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono font-black text-indigo-900 uppercase"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-indigo-700 font-medium pt-1">
+                    <span>ตัวอย่าง SKU ที่ได้:</span>
+                    <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-indigo-200">
+                      SPH - {stoneForm.code || '???'} - 001
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingStone(false);
+                      setEditingStone(null);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold shadow-md shadow-indigo-600/20 hover:from-indigo-700 hover:to-purple-700 transition"
+                  >
+                    {editingStone ? 'บันทึกการแก้ไข' : 'เพิ่มชนิดหิน'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

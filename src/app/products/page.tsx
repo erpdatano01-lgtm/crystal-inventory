@@ -45,6 +45,7 @@ import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 import DimensionInputs from '@/components/DimensionInputs';
 import ImageUploader from '@/components/ImageUploader';
 import VideoUploader from '@/components/VideoUploader';
+import { getStoneTypes } from '@/lib/settingsService';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -1032,10 +1033,19 @@ export default function ProductsPage() {
                   <label className="text-xs font-semibold text-slate-600 block mb-1">ชนิดหิน</label>
                   <input
                     type="text"
+                    list="stone-types-list"
                     value={editForm.stone_type || ''}
                     onChange={(e) => setEditForm((f) => ({ ...f, stone_type: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="พิมพ์ชื่อหิน หรือเลือกจากรายการ"
                   />
+                  <datalist id="stone-types-list">
+                    {getStoneTypes().map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label} [{st.code}]
+                      </option>
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">น้ำหนัก (กรัม)</label>

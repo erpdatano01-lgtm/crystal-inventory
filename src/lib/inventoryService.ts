@@ -8,6 +8,13 @@ import {
   STONE_TYPES,
   STONE_SHAPES,
 } from '@/types';
+import {
+  StoneShapeItem,
+  StoneTypeItem,
+  getStoneShapes,
+  getStoneTypes,
+  suggestAbbreviation,
+} from './settingsService';
 
 const LS_EXPENSES = 'crystal_expenses_v2';
 const LS_LOTS = 'crystal_stock_lots_v2';
@@ -285,15 +292,20 @@ export async function updateProductStatus(
 export function generateSmartSku(
   stoneType: string,
   existingSkus: string[],
-  shapeId: string = 'Raw'
+  shapeId: string = 'Raw',
+  customShapes?: StoneShapeItem[],
+  customStones?: StoneTypeItem[]
 ): string {
-  const matchedStone = STONE_TYPES.find((s) => s.id === stoneType);
-  const stoneCode = matchedStone ? matchedStone.code : 'CRY';
+  const shapesList = customShapes && customShapes.length > 0 ? customShapes : getStoneShapes();
+  const stonesList = customStones && customStones.length > 0 ? customStones : getStoneTypes();
 
-  const matchedShape = STONE_SHAPES.find((sh) => sh.id === shapeId);
-  const shapeCode = matchedShape ? matchedShape.code : 'RAW';
+  const matchedStone = stonesList.find((s) => s.id === stoneType || s.label.includes(stoneType));
+  const stoneCode = matchedStone ? matchedStone.code : suggestAbbreviation(stoneType) || 'CRY';
 
-  const prefix = `${shapeCode}-${stoneCode}-`;
+  const matchedShape = shapesList.find((sh) => sh.id === shapeId || sh.label.includes(shapeId));
+  const shapeCode = matchedShape ? matchedShape.code : suggestAbbreviation(shapeId) || 'RAW';
+
+  const prefix = `${shapeCode.toUpperCase()}-${stoneCode.toUpperCase()}-`;
 
   const numbers = existingSkus
     .filter((s) => s.startsWith(prefix))

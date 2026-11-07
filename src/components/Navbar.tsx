@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Sparkles,
+  Settings,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -63,6 +64,12 @@ export default function Navbar() {
       label: 'ค่าใช้จ่าย & ล็อต',
       sublabel: 'Expenses & Lots',
       icon: Receipt,
+    },
+    {
+      href: '/settings',
+      label: 'ตั้งค่าระบบ',
+      sublabel: 'SKU, ทรง & ชนิดหิน',
+      icon: Settings,
     },
   ];
 
