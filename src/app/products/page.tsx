@@ -506,20 +506,32 @@ export default function ProductsPage() {
                     <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400">ราคาขาย</span>
-                        <span className="text-base font-black text-slate-900">
-                          ฿{p.selling_price.toLocaleString()}
-                        </span>
+                        {!p.selling_price || p.selling_price <= 0 ? (
+                          <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg">
+                            🟡 รอตั้งราคา
+                          </span>
+                        ) : (
+                          <span className="text-base font-black text-slate-900">
+                            ฿{p.selling_price.toLocaleString()}
+                          </span>
+                        )}
                       </div>
 
                       {/* Hidden in Customer View */}
                       {!isCustomerView ? (
                         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50">
-                          <span>ทุน: ฿{p.cost_price.toLocaleString()}</span>
-                          {p.min_price && (
+                          <span>
+                            ทุน: {!p.cost_price || p.cost_price <= 0 ? (
+                              <span className="text-amber-700 font-semibold">ยังไม่ระบุ</span>
+                            ) : (
+                              `฿${p.cost_price.toLocaleString()}`
+                            )}
+                          </span>
+                          {p.min_price ? (
                             <span className="text-amber-700 font-semibold">
                               ต่ำสุด: ฿{p.min_price.toLocaleString()}
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       ) : (
                         <div className="text-[10px] text-amber-600 font-medium text-center">
@@ -650,7 +662,13 @@ export default function ProductsPage() {
                       )}
 
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        ฿{p.selling_price.toLocaleString()}
+                        {!p.selling_price || p.selling_price <= 0 ? (
+                          <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg inline-block">
+                            🟡 รอตั้งราคา
+                          </span>
+                        ) : (
+                          `฿${p.selling_price.toLocaleString()}`
+                        )}
                       </td>
 
                       {!isCustomerView && (
@@ -1049,21 +1067,47 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาทุน (฿)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-600">ราคาทุน (฿)</label>
+                    {(!editForm.cost_price || editForm.cost_price <= 0) && (
+                      <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                        ยังไม่ระบุ
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={editForm.cost_price ?? ''}
                     onChange={(e) => setEditForm((f) => ({ ...f, cost_price: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                      !editForm.cost_price || editForm.cost_price <= 0
+                        ? 'bg-amber-50/50 border-2 border-amber-300 focus:ring-amber-400'
+                        : 'border border-slate-200 focus:ring-blue-400'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">ราคาขาย (฿)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-600">ราคาขาย (฿)</label>
+                    {(!editForm.selling_price || editForm.selling_price <= 0) ? (
+                      <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                        🟡 รอตั้งราคา
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        ✓ ระบุแล้ว
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={editForm.selling_price ?? ''}
                     onChange={(e) => setEditForm((f) => ({ ...f, selling_price: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 font-bold text-emerald-700"
+                    className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 font-bold ${
+                      !editForm.selling_price || editForm.selling_price <= 0
+                        ? 'bg-amber-50 border-2 border-amber-400 text-amber-900 focus:ring-amber-400'
+                        : 'border border-slate-200 text-emerald-700 focus:ring-blue-400'
+                    }`}
                   />
                 </div>
                 <div>

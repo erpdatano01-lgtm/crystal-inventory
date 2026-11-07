@@ -32,6 +32,7 @@ import {
   Sparkles,
   ArrowLeft,
   Layers,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -346,17 +347,28 @@ export default function NewProductPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                  <Scale className="w-3.5 h-3.5 text-slate-500" />
-                  น้ำหนัก (weight_grams)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <Scale className="w-3.5 h-3.5 text-slate-500" />
+                    น้ำหนัก (weight_grams)
+                  </label>
+                  {!weightGrams && (
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                      ยังไม่ระบุ
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   step="0.01"
                   placeholder="เช่น 485.5"
                   value={weightGrams}
                   onChange={(e) => setWeightGrams(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl focus:bg-white focus:ring-2 outline-none transition ${
+                    !weightGrams
+                      ? 'bg-amber-50/50 border-2 border-amber-300 focus:ring-amber-400'
+                      : 'bg-slate-50 border border-slate-300 focus:ring-purple-500'
+                  }`}
                 />
               </div>
 
@@ -408,32 +420,56 @@ export default function NewProductPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ราคาทุน (cost_price) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ราคาทุน (cost_price)
+                  </label>
+                  {(!costPrice || parseFloat(costPrice) <= 0) && (
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                      ยังไม่ระบุ
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   step="any"
-                  required
                   placeholder="0.00"
                   value={costPrice}
                   onChange={(e) => setCostPrice(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-bold text-slate-800"
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl focus:ring-2 outline-none font-bold transition ${
+                    !costPrice || parseFloat(costPrice) <= 0
+                      ? 'bg-amber-50/50 border-2 border-amber-300 text-slate-800 focus:ring-amber-400'
+                      : 'bg-white border border-slate-300 text-slate-800 focus:ring-purple-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ราคาขาย (selling_price) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    ราคาขาย (selling_price)
+                  </label>
+                  {!sellingPrice || parseFloat(sellingPrice) <= 0 ? (
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                      🟡 รอตั้งราคา
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                      ✓ ระบุแล้ว
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   step="any"
-                  required
-                  placeholder="0.00"
+                  placeholder="0.00 (ใส่ทีหลังได้)"
                   value={sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-400 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-bold text-purple-800"
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl focus:ring-2 outline-none font-bold transition ${
+                    !sellingPrice || parseFloat(sellingPrice) <= 0
+                      ? 'bg-amber-50 border-2 border-amber-400 text-amber-900 focus:ring-amber-400 placeholder:text-amber-500'
+                      : 'bg-white border border-purple-400 text-purple-800 focus:ring-purple-500'
+                  }`}
                 />
               </div>
 
@@ -470,12 +506,20 @@ export default function NewProductPage() {
             <div className="flex items-center justify-between text-xs font-medium bg-white p-3 rounded-2xl border border-slate-200">
               <span className="text-slate-500">กำไรต่อชิ้นคาดการณ์:</span>
               <div className="flex items-center gap-2">
-                <span className={`font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  ฿{profit.toLocaleString()}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
-                  {marginPct}% Margin
-                </span>
+                {numSelling > 0 ? (
+                  <>
+                    <span className={`font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      ฿{profit.toLocaleString()}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                      {marginPct}% Margin
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-amber-700 font-bold bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-300 text-xs">
+                    🟡 รอตั้งราคาขาย (ยังไม่คำนวณกำไร)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -487,14 +531,32 @@ export default function NewProductPage() {
             </span>
 
             {/* R2 Thumbnail Upload (Compressed to WebP) */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+            <div
+              className={`p-4 rounded-2xl transition ${
+                thumbnailImages.length === 0
+                  ? 'border-2 border-dashed border-amber-300 bg-amber-50/40'
+                  : 'border border-slate-200 bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-700">รูปหน้าปกสินค้า (r2_thumbnail_url)</span>
+                {thumbnailImages.length === 0 ? (
+                  <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                    🟡 ยังไม่มีรูปภาพ (ถ่ายรูปหรืออัปโหลดทีหลังได้)
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                    ✓ อัปโหลดแล้ว
+                  </span>
+                )}
+              </div>
               <ImageUploader
                 images={thumbnailImages}
                 onChange={setThumbnailImages}
                 maxFiles={1}
                 folder="products"
                 sku={sku}
-                label="รูปหน้าปกสินค้า (r2_thumbnail_url) - อัปโหลดเข้า products/[SKU]/... เป็น WebP อัตโนมัติ"
+                label="อัปโหลดรูปหน้าปก (แปลงเป็น WebP อัตโนมัติ)"
               />
             </div>
 
@@ -535,6 +597,17 @@ export default function NewProductPage() {
               </div>
             </div>
           </div>
+
+          {/* Notice when saving without selling price */}
+          {(!sellingPrice || parseFloat(sellingPrice) <= 0) && (
+            <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl flex items-center gap-2.5 text-xs text-amber-900 shadow-sm animate-in fade-in">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div>
+                <span className="font-bold">โหมดบันทึกเตรียมของ (บันทึกโดยไม่ใส่ราคาขาย):</span>{' '}
+                สินค้าจะถูกบันทึกเข้าสต็อกเป็น <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-300">🟡 รอตั้งราคา</span> คุณสามารถเข้ามาแก้ไขและระบุราคาขายจริงในภายหลังได้ตลอดเวลา
+              </div>
+            </div>
+          )}
 
           {/* Submit Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
