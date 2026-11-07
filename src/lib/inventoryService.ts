@@ -6,6 +6,7 @@ import {
   StockMovement,
   ProductStatus,
   STONE_TYPES,
+  STONE_SHAPES,
 } from '@/types';
 
 const LS_EXPENSES = 'crystal_expenses_v2';
@@ -280,14 +281,19 @@ export async function updateProductStatus(
   return null;
 }
 
-// Smart SKU Generator
+// Smart SKU Generator: [SHAPE_CODE]-[STONE_CODE]-[001] (e.g., SPH-AME-001)
 export function generateSmartSku(
   stoneType: string,
-  existingSkus: string[]
+  existingSkus: string[],
+  shapeId: string = 'Raw'
 ): string {
-  const matched = STONE_TYPES.find((s) => s.id === stoneType);
-  const code = matched ? matched.code : 'CRY';
-  const prefix = `CRYS-${code}-`;
+  const matchedStone = STONE_TYPES.find((s) => s.id === stoneType);
+  const stoneCode = matchedStone ? matchedStone.code : 'CRY';
+
+  const matchedShape = STONE_SHAPES.find((sh) => sh.id === shapeId);
+  const shapeCode = matchedShape ? matchedShape.code : 'RAW';
+
+  const prefix = `${shapeCode}-${stoneCode}-`;
 
   const numbers = existingSkus
     .filter((s) => s.startsWith(prefix))

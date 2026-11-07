@@ -16,6 +16,7 @@ import {
   ItemType,
   ProductStatus,
   STONE_TYPES,
+  STONE_SHAPES,
 } from '@/types';
 import {
   PlusCircle,
@@ -42,6 +43,7 @@ export default function NewProductPage() {
 
   // Form states
   const [lotId, setLotId] = useState<string>('');
+  const [stoneShape, setStoneShape] = useState<string>('Sphere');
   const [stoneType, setStoneType] = useState<string>('Amethyst');
   const [sku, setSku] = useState<string>('');
   const [name, setName] = useState<string>('');
@@ -75,7 +77,7 @@ export default function NewProductPage() {
         setExistingSkus(skus);
 
         // Generate initial SKU
-        const initialSku = generateSmartSku('Amethyst', skus);
+        const initialSku = generateSmartSku('Amethyst', skus, 'Sphere');
         setSku(initialSku);
       } finally {
         setLoading(false);
@@ -84,15 +86,22 @@ export default function NewProductPage() {
     load();
   }, []);
 
+  // When stoneShape changes, auto-generate new SKU
+  const handleStoneShapeChange = (newShape: string) => {
+    setStoneShape(newShape);
+    const newSku = generateSmartSku(stoneType, existingSkus, newShape);
+    setSku(newSku);
+  };
+
   // When stoneType changes, auto-generate new SKU if not customized
   const handleStoneTypeChange = (newType: string) => {
     setStoneType(newType);
-    const newSku = generateSmartSku(newType, existingSkus);
+    const newSku = generateSmartSku(newType, existingSkus, stoneShape);
     setSku(newSku);
 
     // Also suggest name if empty
-    if (!name || name.includes('Cluster') || name.includes('Point')) {
-      setName(`${newType} Natural Specimen`);
+    if (!name || name.includes('Cluster') || name.includes('Point') || name.includes('Sphere')) {
+      setName(`${newType} ${stoneShape}`);
     }
   };
 
@@ -190,7 +199,7 @@ export default function NewProductPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               {/* Select lot_id with reference cost */}
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   ล็อตสินค้า (lot_id) - ดึงจากตาราง stock_lots
                 </label>
@@ -227,6 +236,27 @@ export default function NewProductPage() {
                 )}
               </div>
 
+              {/* Stone Shape dropdown (8 Categories - triggers smart SKU) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  รูปทรง / หมวดการเจีย (Shape) *
+                </label>
+                <select
+                  value={stoneShape}
+                  onChange={(e) => handleStoneShapeChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900"
+                >
+                  {STONE_SHAPES.map((sh) => (
+                    <option key={sh.id} value={sh.id}>
+                      {sh.label} [{sh.code}]
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {STONE_SHAPES.find((sh) => sh.id === stoneShape)?.desc}
+                </p>
+              </div>
+
               {/* Stone Type dropdown (triggers smart SKU) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -239,7 +269,7 @@ export default function NewProductPage() {
                 >
                   {STONE_TYPES.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.label}
+                      {s.label} [{s.code}]
                     </option>
                   ))}
                 </select>

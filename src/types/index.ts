@@ -157,6 +157,17 @@ export const ORDER_STATUS_CONFIG: Record<
 };
 
 // Master metadata helpers
+export const STONE_SHAPES = [
+  { id: 'Sphere', code: 'SPH', label: '1. Sphere (ทรงกลม)', desc: 'หินเจียทรงกลม ลูกแก้ว' },
+  { id: 'Tower', code: 'TOW', label: '2. Tower (แท่ง/เสา)', desc: 'หินทรงแท่งปลายแหลม ตั้งโต๊ะ' },
+  { id: 'Raw', code: 'RAW', label: '3. Raw / Specimen (หินดิบ)', desc: 'หินดิบ ผลึกธรรมชาติ ก้อนแร่สะสม' },
+  { id: 'Tumble', code: 'TUM', label: '4. Tumble (หินก้อนขัดเงา)', desc: 'หินก้อนกลิ้งขัดมัน พกพา' },
+  { id: 'Palm', code: 'PLM', label: '5. Palm / Polished (เจียทรงมน/รี/หัวใจ)', desc: 'หินเจียทรงกลมแบน รี หัวใจ มนๆ ทุกแบบ' },
+  { id: 'Cabochon', code: 'CAB', label: '6. Cabochon (หลังเบี้ย / All Shape)', desc: 'หินเจียหลังเบี้ยทุกทรง และเศษเจีย' },
+  { id: 'Faceted', code: 'FAC', label: '7. Faceted (เจียเหลี่ยมเพชรพลอย)', desc: 'หินเจียแบบหน้าตัด เครื่องประดับ เพชรพลอย' },
+  { id: 'Carved', code: 'CRV', label: '8. Carved (หินแกะสลัก)', desc: 'งานแกะสลักรูปทรงต่างๆ' },
+] as const;
+
 export const STONE_TYPES = [
   { id: 'Amethyst', code: 'AME', label: 'Amethyst (อเมทิสต์)' },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)' },
