@@ -202,10 +202,23 @@ export default function NewProductPage() {
   const profit = numSelling - numCost;
   const marginPct = numSelling > 0 ? Math.round((profit / numSelling) * 100) : 0;
 
+  // Duplicate SKU check
+  const isDuplicateSku = Boolean(
+    sku.trim() &&
+      existingSkus.some(
+        (existing) => existing.trim().toUpperCase() === sku.trim().toUpperCase()
+      )
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sku.trim() || !name.trim()) {
       alert('กรุณากรอกรหัส SKU และชื่อสินค้า');
+      return;
+    }
+    if (isDuplicateSku) {
+      const suggested = generateSmartSku(stoneType, existingSkus, stoneShape, shapes, stones);
+      alert(`รหัส SKU "${sku.trim()}" มีอยู่ในคลังแล้ว กรุณาใช้รหัสอื่น (เช่น ${suggested})`);
       return;
     }
 
@@ -406,14 +419,42 @@ export default function NewProductPage() {
                   <label className="text-xs font-semibold text-slate-700">
                     รหัสสินค้า (SKU) *
                   </label>
+                  {isDuplicateSku && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSku(
+                          generateSmartSku(
+                            stoneType,
+                            existingSkus,
+                            stoneShape,
+                            shapes,
+                            stones
+                          )
+                        )
+                      }
+                      className="text-[10px] font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 px-1.5 py-0.5 rounded border border-rose-300 transition"
+                    >
+                      ✨ เจนรหัสใหม่ไม่ซ้ำ
+                    </button>
+                  )}
                 </div>
                 <input
                   type="text"
                   required
                   value={sku}
-                  onChange={(e) => setSku(e.target.value)}
-                  className="w-full h-11 px-3.5 text-base sm:text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-mono font-black text-purple-900 transition"
+                  onChange={(e) => setSku(e.target.value.toUpperCase())}
+                  className={`w-full h-11 px-3.5 text-base sm:text-sm bg-white rounded-xl outline-none font-mono font-black transition ${
+                    isDuplicateSku
+                      ? 'border-2 border-rose-500 text-rose-900 focus:ring-2 focus:ring-rose-500 bg-rose-50/40'
+                      : 'border border-purple-300 text-purple-900 focus:ring-2 focus:ring-purple-500'
+                  }`}
                 />
+                {isDuplicateSku && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">
+                    ⚠️ รหัส SKU นี้ซ้ำกับสินค้าที่มีในคลังแล้ว
+                  </p>
+                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -739,8 +780,8 @@ export default function NewProductPage() {
             </Link>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-7 py-3.5 sm:py-2.5 min-h-[48px] rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md shadow-purple-600/25 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={isSubmitting || isDuplicateSku}
+              className="px-7 py-3.5 sm:py-2.5 min-h-[48px] rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md shadow-purple-600/25 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>

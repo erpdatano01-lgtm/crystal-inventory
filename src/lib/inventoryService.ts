@@ -194,6 +194,7 @@ export async function fetchProducts(): Promise<Product[]> {
 export async function createProduct(
   productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Product> {
+  let validationError: Error | null = null;
   try {
     const res = await fetch('/api/products', {
       method: 'POST',
@@ -205,8 +206,15 @@ export async function createProduct(
       const data = await res.json();
       return data as Product;
     }
+    if (res.status === 400 || res.status === 409) {
+      const errBody = await res.json().catch(() => ({}));
+      validationError = new Error(errBody.error || 'ไม่สามารถบันทึกสินค้าได้ (รหัส SKU อาจซ้ำ)');
+    }
   } catch (apiErr) {
     console.warn('API /api/products POST error, fallback:', apiErr);
+  }
+  if (validationError) {
+    throw validationError;
   }
 
   // Fallback to local
@@ -306,8 +314,10 @@ export function generateSmartSku(
   const shapeCode = matchedShape ? matchedShape.code : suggestAbbreviation(shapeId) || 'RAW';
 
   const prefix = `${shapeCode.toUpperCase()}-${stoneCode.toUpperCase()}-`;
+  const upperSet = new Set(existingSkus.map((s) => s.trim().toUpperCase()));
 
   const numbers = existingSkus
+    .map((s) => s.trim().toUpperCase())
     .filter((s) => s.startsWith(prefix))
     .map((s) => {
       const parts = s.split('-');
@@ -316,8 +326,13 @@ export function generateSmartSku(
     })
     .filter((n) => !isNaN(n));
 
-  const nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-  return `${prefix}${String(nextNum).padStart(3, '0')}`;
+  let nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+  let candidate = `${prefix}${String(nextNum).padStart(3, '0')}`;
+  while (upperSet.has(candidate.toUpperCase())) {
+    nextNum += 1;
+    candidate = `${prefix}${String(nextNum).padStart(3, '0')}`;
+  }
+  return candidate;
 }
 
 // Delete product

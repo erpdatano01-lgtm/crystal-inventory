@@ -30,8 +30,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const cleanSku = String(body.sku || '').trim();
+    if (!cleanSku) {
+      return NextResponse.json({ error: 'กรุณาระบุรหัส SKU' }, { status: 400 });
+    }
+
+    // Check duplicate SKU (case-insensitive)
+    const { data: existingSkuRows } = await supabaseAdmin
+      .from('products')
+      .select('id, sku, name')
+      .ilike('sku', cleanSku)
+      .limit(1);
+
+    if (existingSkuRows && existingSkuRows.length > 0) {
+      return NextResponse.json(
+        {
+          error: `รหัส SKU "${cleanSku}" ซ้ำกับสินค้า "${existingSkuRows[0].name}" ที่มีอยู่ในคลังแล้ว กรุณาใช้รหัสอื่น`,
+        },
+        { status: 400 }
+      );
+    }
+
     const productPayload = {
-      sku: body.sku,
+      sku: cleanSku,
       lot_id: body.lot_id || null,
       name: body.name,
       stone_type: body.stone_type,
@@ -98,6 +119,26 @@ export async function PATCH(request: NextRequest) {
 
     // --- CASE 1: Edit full product fields (called with ?id=xxx and body has editable fields) ---
     if (idFromQuery) {
+      if (body.sku) {
+        const cleanSku = String(body.sku).trim();
+        const { data: dupRows } = await supabaseAdmin
+          .from('products')
+          .select('id, sku, name')
+          .ilike('sku', cleanSku)
+          .neq('id', idFromQuery)
+          .limit(1);
+
+        if (dupRows && dupRows.length > 0) {
+          return NextResponse.json(
+            {
+              error: `รหัส SKU "${cleanSku}" ซ้ำกับสินค้า "${dupRows[0].name}" ที่มีอยู่ในคลังแล้ว`,
+            },
+            { status: 400 }
+          );
+        }
+        body.sku = cleanSku;
+      }
+
       const allowedFields = [
         'sku', 'lot_id', 'status', 'item_type',
         'name', 'stone_type', 'weight_grams', 'dimensions', 'grade_origin',

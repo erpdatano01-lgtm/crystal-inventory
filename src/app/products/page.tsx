@@ -138,24 +138,47 @@ export default function ProductsPage() {
     setActiveModalProduct(null);
   };
 
+  const conflictingEditSkuProduct = editingProduct
+    ? products.find(
+        (p) =>
+          p.id !== editingProduct.id &&
+          p.sku.trim().toUpperCase() === (editForm.sku || '').trim().toUpperCase()
+      )
+    : undefined;
+
   const handleEditSave = async () => {
     if (!editingProduct) return;
+    const cleanSku = (editForm.sku || '').trim().toUpperCase();
+    if (!cleanSku) {
+      alert('กรุณากรอกรหัส SKU');
+      return;
+    }
+    if (conflictingEditSkuProduct) {
+      alert(
+        `รหัส SKU "${cleanSku}" ซ้ำกับสินค้า "${conflictingEditSkuProduct.name}" ที่มีอยู่ในคลังแล้ว กรุณาใช้รหัสอื่น`
+      );
+      return;
+    }
     setIsSaving(true);
     try {
+      const payload = { ...editForm, sku: cleanSku };
       const res = await fetch(`/api/products?id=${editingProduct.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Update failed');
-      const updated = await res.json();
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Update failed');
+      }
+      await res.json();
       setProducts((prev) =>
-        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...editForm } : p))
+        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...payload } : p))
       );
       setEditingProduct(null);
-      showToast(`แก้ไขสินค้า ${editingProduct.sku} สำเร็จแล้ว ✓`);
-    } catch {
-      alert('เกิดข้อผิดพลาดในการแก้ไขสินค้า');
+      showToast(`แก้ไขสินค้า ${cleanSku} สำเร็จแล้ว ✓`);
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการแก้ไขสินค้า');
     } finally {
       setIsSaving(false);
     }
@@ -995,8 +1018,8 @@ export default function ProductsPage() {
                   <button
                     type="button"
                     onClick={handleEditSave}
-                    disabled={isSaving}
-                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition flex items-center gap-1.5 disabled:opacity-60 shadow-sm"
+                    disabled={isSaving || Boolean(conflictingEditSkuProduct)}
+                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition flex items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none shadow-sm"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</span>
@@ -1022,9 +1045,18 @@ export default function ProductsPage() {
                     <input
                       type="text"
                       value={editForm.sku || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, sku: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm font-mono font-bold text-purple-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      onChange={(e) => setEditForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
+                      className={`w-full px-3.5 py-2.5 rounded-xl text-base sm:text-sm font-mono font-bold focus:outline-none focus:ring-2 ${
+                        conflictingEditSkuProduct
+                          ? 'border-2 border-rose-500 bg-rose-50 text-rose-900 focus:ring-rose-500'
+                          : 'border border-slate-200 text-purple-800 focus:ring-blue-400'
+                      }`}
                     />
+                    {conflictingEditSkuProduct && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">
+                        ⚠️ รหัส SKU นี้ซ้ำกับ &quot;{conflictingEditSkuProduct.name}&quot;
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1246,8 +1278,8 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={handleEditSave}
-                  disabled={isSaving}
-                  className="flex-[2] sm:flex-initial px-6 py-3 sm:py-2.5 min-h-[46px] text-sm font-bold rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-600/25 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                  disabled={isSaving || Boolean(conflictingEditSkuProduct)}
+                  className="flex-[2] sm:flex-initial px-6 py-3 sm:py-2.5 min-h-[46px] text-sm font-bold rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-600/25 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSaving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}</span>

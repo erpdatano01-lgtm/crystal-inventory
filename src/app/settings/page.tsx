@@ -122,11 +122,54 @@ export default function SettingsPage() {
 
   const handleShapeNameEnChange = (enName: string) => {
     const updated = { ...shapeForm, nameEn: enName, id: enName.trim() };
-    // Auto detect suggestion if user hasn't typed a custom code yet
+    // Auto detect unique suggestion (never collides with existing shape codes)
     if (!editingShape) {
-      updated.code = suggestAbbreviation(enName);
+      const existingCodes = shapes.map((s) => s.code);
+      updated.code = suggestAbbreviation(enName, existingCodes);
     }
     setShapeForm(updated);
+  };
+
+  // Real-time duplicate checks for Shape Modal
+  const otherShapes = shapes.filter((s) => s.id !== editingShape?.id);
+  const conflictingShapeByName = shapeForm.nameEn.trim()
+    ? otherShapes.find(
+        (s) => s.id.toLowerCase() === shapeForm.nameEn.trim().toLowerCase()
+      )
+    : undefined;
+  const conflictingShapeByCode = shapeForm.code.trim()
+    ? otherShapes.find(
+        (s) => s.code.toUpperCase() === shapeForm.code.trim().toUpperCase()
+      )
+    : undefined;
+  const suggestedUniqueShapeCode = suggestAbbreviation(
+    shapeForm.nameEn || 'SHAPE',
+    otherShapes.map((s) => s.code)
+  );
+
+  // Check if saved shapes list already has any duplicate codes (from prior localStorage)
+  const duplicateShapeCodes = shapes.filter(
+    (sh, idx) =>
+      shapes.findIndex(
+        (other) => other.code.toUpperCase() === sh.code.toUpperCase()
+      ) !== idx
+  );
+
+  const handleFixDuplicateShapeCodes = () => {
+    const used: string[] = [];
+    const fixed = shapes.map((sh) => {
+      const upper = sh.code.toUpperCase();
+      if (!used.includes(upper)) {
+        used.push(upper);
+        return sh;
+      }
+      const nextCode = suggestAbbreviation(sh.id, used);
+      used.push(nextCode.toUpperCase());
+      return { ...sh, code: nextCode };
+    });
+    setShapes(fixed);
+    saveStoneShapes(fixed);
+    showToast('ปรับแก้ตัวย่อรูปทรงที่ซ้ำกันให้ไม่ซ้ำเรียบร้อยแล้ว!');
   };
 
   const handleSaveShape = (e: React.FormEvent) => {
@@ -136,6 +179,24 @@ export default function SettingsPage() {
 
     if (!cleanId || !cleanCode) {
       alert('กรุณากรอกชื่อทรงหิน และตัวย่อ SKU');
+      return;
+    }
+
+    const dupName = otherShapes.find(
+      (s) => s.id.toLowerCase() === cleanId.toLowerCase()
+    );
+    if (dupName) {
+      alert(`มีรูปทรง "${dupName.label}" อยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`);
+      return;
+    }
+
+    const dupCode = otherShapes.find(
+      (s) => s.code.toUpperCase() === cleanCode
+    );
+    if (dupCode) {
+      alert(
+        `ตัวย่อ SKU "${cleanCode}" ถูกใช้ไปแล้วโดย "${dupCode.label}"\nไม่สามารถใช้ตัวย่อซ้ำกันได้เพราะจะทำให้รหัส SKU ชนกัน (แนะนำให้ใช้ "${suggestedUniqueShapeCode}")`
+      );
       return;
     }
 
@@ -157,13 +218,8 @@ export default function SettingsPage() {
             }
           : sh
       );
-      showToast(`แก้ไขทรงหิน ${cleanId} เรียบร้อย!`);
+      showToast(`แก้ไขทรงหิน ${cleanId} [${cleanCode}] เรียบร้อย!`);
     } else {
-      // Check duplicate
-      if (shapes.some((s) => s.id.toLowerCase() === cleanId.toLowerCase())) {
-        alert('มีรูปทรงนี้ในระบบแล้ว');
-        return;
-      }
       const newItem: StoneShapeItem = {
         id: cleanId,
         code: cleanCode,
@@ -229,9 +285,52 @@ export default function SettingsPage() {
   const handleStoneNameEnChange = (enName: string) => {
     const updated = { ...stoneForm, nameEn: enName, id: enName.trim() };
     if (!editingStone) {
-      updated.code = suggestAbbreviation(enName);
+      const existingCodes = stones.map((s) => s.code);
+      updated.code = suggestAbbreviation(enName, existingCodes);
     }
     setStoneForm(updated);
+  };
+
+  // Real-time duplicate checks for Stone Modal
+  const otherStones = stones.filter((s) => s.id !== editingStone?.id);
+  const conflictingStoneByName = stoneForm.nameEn.trim()
+    ? otherStones.find(
+        (s) => s.id.toLowerCase() === stoneForm.nameEn.trim().toLowerCase()
+      )
+    : undefined;
+  const conflictingStoneByCode = stoneForm.code.trim()
+    ? otherStones.find(
+        (s) => s.code.toUpperCase() === stoneForm.code.trim().toUpperCase()
+      )
+    : undefined;
+  const suggestedUniqueStoneCode = suggestAbbreviation(
+    stoneForm.nameEn || 'STONE',
+    otherStones.map((s) => s.code)
+  );
+
+  // Check if saved stones list already has any duplicate codes (from prior localStorage)
+  const duplicateStoneCodes = stones.filter(
+    (st, idx) =>
+      stones.findIndex(
+        (other) => other.code.toUpperCase() === st.code.toUpperCase()
+      ) !== idx
+  );
+
+  const handleFixDuplicateStoneCodes = () => {
+    const used: string[] = [];
+    const fixed = stones.map((st) => {
+      const upper = st.code.toUpperCase();
+      if (!used.includes(upper)) {
+        used.push(upper);
+        return st;
+      }
+      const nextCode = suggestAbbreviation(st.id, used);
+      used.push(nextCode.toUpperCase());
+      return { ...st, code: nextCode };
+    });
+    setStones(fixed);
+    saveStoneTypes(fixed);
+    showToast('ปรับแก้ตัวย่อชนิดหินที่ซ้ำกันให้ไม่ซ้ำเรียบร้อยแล้ว!');
   };
 
   const handleSaveStone = (e: React.FormEvent) => {
@@ -241,6 +340,24 @@ export default function SettingsPage() {
 
     if (!cleanId || !cleanCode) {
       alert('กรุณากรอกชื่อชนิดหิน และตัวย่อ SKU');
+      return;
+    }
+
+    const dupName = otherStones.find(
+      (s) => s.id.toLowerCase() === cleanId.toLowerCase()
+    );
+    if (dupName) {
+      alert(`มีชนิดหิน "${dupName.label}" อยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`);
+      return;
+    }
+
+    const dupCode = otherStones.find(
+      (s) => s.code.toUpperCase() === cleanCode
+    );
+    if (dupCode) {
+      alert(
+        `ตัวย่อ SKU "${cleanCode}" ถูกใช้ไปแล้วโดย "${dupCode.label}"\nไม่สามารถใช้ตัวย่อซ้ำกันได้เพราะจะทำให้รหัส SKU ชนกัน (แนะนำให้ใช้ "${suggestedUniqueStoneCode}")`
+      );
       return;
     }
 
@@ -261,12 +378,8 @@ export default function SettingsPage() {
             }
           : st
       );
-      showToast(`แก้ไขชนิดหิน ${cleanId} เรียบร้อย!`);
+      showToast(`แก้ไขชนิดหิน ${cleanId} [${cleanCode}] เรียบร้อย!`);
     } else {
-      if (stones.some((s) => s.id.toLowerCase() === cleanId.toLowerCase())) {
-        alert('มีชนิดหินนี้ในระบบแล้ว');
-        return;
-      }
       const newItem: StoneTypeItem = {
         id: cleanId,
         code: cleanCode,
@@ -453,18 +566,63 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {duplicateShapeCodes.length > 0 && (
+              <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5 text-xs text-rose-900">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-sm">
+                      พบตัวย่อรูปทรงซ้ำกัน ({duplicateShapeCodes.map((d) => d.code).join(', ')})
+                    </p>
+                    <p className="text-rose-700 mt-0.5">
+                      ตัวย่อที่ซ้ำกันจะทำให้รหัส SKU ชนกัน กดปุ่มด้านขวาเพื่อแยกตัวย่อให้อัตโนมัติ หรือกดแก้ไขที่การ์ดโดยตรง
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFixDuplicateShapeCodes}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition shrink-0"
+                >
+                  ✨ แยกตัวย่อที่ซ้ำอัตโนมัติ
+                </button>
+              </div>
+            )}
+
             {/* Shapes Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {filteredShapes.map((sh, idx) => (
+              {filteredShapes.map((sh, idx) => {
+                const dupPartners = shapes.filter(
+                  (other) =>
+                    other.id !== sh.id &&
+                    other.code.toUpperCase() === sh.code.toUpperCase()
+                );
+                const isDupCode = dupPartners.length > 0;
+                return (
                 <div
                   key={sh.id}
-                  className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3"
+                  className={`p-4 bg-white rounded-2xl border shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 ${
+                    isDupCode ? 'border-2 border-rose-400 bg-rose-50/20' : 'border-slate-200/80'
+                  }`}
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900 border border-purple-200">
-                        {sh.code}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`font-mono text-xs font-black px-2.5 py-1 rounded-lg border ${
+                            isDupCode
+                              ? 'bg-rose-100 text-rose-900 border-rose-300'
+                              : 'bg-purple-100 text-purple-900 border-purple-200'
+                          }`}
+                        >
+                          {sh.code}
+                        </span>
+                        {isDupCode && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                            ⚠️ ซ้ำกับ {dupPartners[0].id}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-400 font-mono">
                         #{String(idx + 1).padStart(2, '0')}
                       </span>
@@ -497,7 +655,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -539,18 +698,63 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {duplicateStoneCodes.length > 0 && (
+              <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5 text-xs text-rose-900">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-sm">
+                      พบตัวย่อชนิดหินซ้ำกัน ({duplicateStoneCodes.map((d) => d.code).join(', ')})
+                    </p>
+                    <p className="text-rose-700 mt-0.5">
+                      ตัวย่อที่ซ้ำกันจะทำให้รหัส SKU ชนกัน กดปุ่มด้านขวาเพื่อแยกตัวย่อให้อัตโนมัติ หรือกดแก้ไขที่การ์ดโดยตรง
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFixDuplicateStoneCodes}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition shrink-0"
+                >
+                  ✨ แยกตัวย่อที่ซ้ำอัตโนมัติ
+                </button>
+              </div>
+            )}
+
             {/* Stones Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {filteredStones.map((st, idx) => (
+              {filteredStones.map((st, idx) => {
+                const dupPartners = stones.filter(
+                  (other) =>
+                    other.id !== st.id &&
+                    other.code.toUpperCase() === st.code.toUpperCase()
+                );
+                const isDupCode = dupPartners.length > 0;
+                return (
                 <div
                   key={st.id}
-                  className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3"
+                  className={`p-4 bg-white rounded-2xl border shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 ${
+                    isDupCode ? 'border-2 border-rose-400 bg-rose-50/20' : 'border-slate-200/80'
+                  }`}
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-200">
-                        {st.code}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`font-mono text-xs font-black px-2.5 py-1 rounded-lg border ${
+                            isDupCode
+                              ? 'bg-rose-100 text-rose-900 border-rose-300'
+                              : 'bg-indigo-100 text-indigo-900 border-indigo-200'
+                          }`}
+                        >
+                          {st.code}
+                        </span>
+                        {isDupCode && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                            ⚠️ ซ้ำกับ {dupPartners[0].id}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-400 font-mono">
                         #{String(idx + 1).padStart(2, '0')}
                       </span>
@@ -580,7 +784,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -829,7 +1034,8 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     form="shape-modal-form"
-                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 active:scale-95 transition shadow-sm"
+                    disabled={Boolean(conflictingShapeByName || conflictingShapeByCode)}
+                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 active:scale-95 transition shadow-sm disabled:opacity-40 disabled:pointer-events-none"
                   >
                     บันทึก
                   </button>
@@ -858,11 +1064,21 @@ export default function SettingsPage() {
                       placeholder="เช่น Heart, Pyramid, Moon, Bracelet"
                       value={shapeForm.nameEn}
                       onChange={(e) => handleShapeNameEnChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-medium"
+                      className={`w-full px-3.5 py-2.5 text-base sm:text-sm rounded-xl outline-none font-medium ${
+                        conflictingShapeByName
+                          ? 'bg-rose-50 border-2 border-rose-400 text-rose-900 focus:ring-2 focus:ring-rose-500'
+                          : 'bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-purple-500'
+                      }`}
                     />
-                    <span className="text-[11px] text-slate-400 mt-0.5 block">
-                      ใช้เป็น ID อ้างอิง และระบบจะตรวจจับตัวย่อให้อัตโนมัติ
-                    </span>
+                    {conflictingShapeByName ? (
+                      <span className="text-xs text-rose-600 font-bold mt-1 block">
+                        ⚠️ มีรูปทรง &quot;{conflictingShapeByName.label}&quot; อยู่ในระบบแล้ว
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 mt-0.5 block">
+                        ใช้เป็น ID อ้างอิง และระบบจะตรวจจับตัวย่อที่ไม่ซ้ำให้อัตโนมัติ
+                      </span>
+                    )}
                   </div>
 
                   <div>
@@ -879,24 +1095,30 @@ export default function SettingsPage() {
                   </div>
 
                   {/* SKU Code (Auto or Custom) */}
-                  <div className="p-3.5 bg-purple-50/80 border border-purple-200 rounded-2xl space-y-2">
+                  <div
+                    className={`p-3.5 rounded-2xl space-y-2 border ${
+                      conflictingShapeByCode
+                        ? 'bg-rose-50/90 border-2 border-rose-300'
+                        : 'bg-purple-50/80 border-purple-200'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
                         <Tag className="w-3.5 h-3.5 text-purple-600" />
-                        ตัวย่อสำหรับทำ SKU (2-4 ตัวอักษร) *
+                        ตัวย่อสำหรับทำ SKU (ห้ามซ้ำกัน) *
                       </label>
                       <button
                         type="button"
                         onClick={() =>
                           setShapeForm({
                             ...shapeForm,
-                            code: suggestAbbreviation(shapeForm.nameEn),
+                            code: suggestedUniqueShapeCode,
                           })
                         }
                         className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-white px-2 py-0.5 rounded-md border border-purple-300 shadow-2xs transition flex items-center gap-1"
                       >
                         <Sparkles className="w-3 h-3 text-amber-500" />
-                        ตรวจจับอัตโนมัติ
+                        สุ่มตัวย่อไม่ซ้ำ ({suggestedUniqueShapeCode})
                       </button>
                     </div>
 
@@ -909,14 +1131,43 @@ export default function SettingsPage() {
                       onChange={(e) =>
                         setShapeForm({ ...shapeForm, code: e.target.value.toUpperCase() })
                       }
-                      className="w-full px-3.5 py-2.5 text-base bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-mono font-black text-purple-900 uppercase"
+                      className={`w-full px-3.5 py-2.5 text-base bg-white rounded-xl outline-none font-mono font-black uppercase ${
+                        conflictingShapeByCode
+                          ? 'border-2 border-rose-500 text-rose-900 focus:ring-2 focus:ring-rose-500'
+                          : 'border border-purple-300 text-purple-900 focus:ring-2 focus:ring-purple-500'
+                      }`}
                     />
-                    <div className="flex items-center justify-between text-[11px] text-purple-700 font-medium pt-1">
-                      <span>ตัวอย่าง SKU ที่ได้:</span>
-                      <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-purple-200">
-                        {shapeForm.code || '???'} - AME - 001
-                      </span>
-                    </div>
+                    {conflictingShapeByCode ? (
+                      <div className="p-2.5 rounded-xl bg-rose-100/90 border border-rose-300 text-xs text-rose-900 space-y-1.5">
+                        <p className="font-bold flex items-center gap-1.5">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>
+                            ตัวย่อ &quot;{shapeForm.code.trim().toUpperCase()}&quot; ซ้ำกับ &quot;{conflictingShapeByCode.label}&quot;!
+                          </span>
+                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-rose-700">
+                            หากใช้ตัวย่อซ้ำ รหัส SKU จะชนกัน
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShapeForm({ ...shapeForm, code: suggestedUniqueShapeCode })
+                            }
+                            className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shrink-0"
+                          >
+                            ใช้ &quot;{suggestedUniqueShapeCode}&quot; แทน
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-[11px] text-purple-700 font-medium pt-1">
+                        <span>ตัวอย่าง SKU ที่ได้ (ไม่ซ้ำแน่นอน):</span>
+                        <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-purple-200">
+                          {shapeForm.code || '???'} - AME - 001
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -947,7 +1198,8 @@ export default function SettingsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-[2] sm:flex-initial px-5 py-3 sm:py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+                    disabled={Boolean(conflictingShapeByName || conflictingShapeByCode)}
+                    className="flex-[2] sm:flex-initial px-5 py-3 sm:py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none"
                   >
                     {editingShape ? 'บันทึกการแก้ไข' : 'เพิ่มรูปทรง'}
                   </button>
@@ -973,7 +1225,8 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     form="stone-modal-form"
-                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition shadow-sm"
+                    disabled={Boolean(conflictingStoneByName || conflictingStoneByCode)}
+                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition shadow-sm disabled:opacity-40 disabled:pointer-events-none"
                   >
                     บันทึก
                   </button>
@@ -1002,11 +1255,21 @@ export default function SettingsPage() {
                       placeholder="เช่น Larimar, Super Seven, Danburite, Kyanite"
                       value={stoneForm.nameEn}
                       onChange={(e) => handleStoneNameEnChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                      className={`w-full px-3.5 py-2.5 text-base sm:text-sm rounded-xl outline-none font-medium ${
+                        conflictingStoneByName
+                          ? 'bg-rose-50 border-2 border-rose-400 text-rose-900 focus:ring-2 focus:ring-rose-500'
+                          : 'bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-indigo-500'
+                      }`}
                     />
-                    <span className="text-[11px] text-slate-400 mt-0.5 block">
-                      ระบบจะตรวจจับตัวย่อ 3 ตัวอักษรให้อัตโนมัติ หรือจะพิมพ์เองก็ได้
-                    </span>
+                    {conflictingStoneByName ? (
+                      <span className="text-xs text-rose-600 font-bold mt-1 block">
+                        ⚠️ มีชนิดหิน &quot;{conflictingStoneByName.label}&quot; อยู่ในระบบแล้ว
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 mt-0.5 block">
+                        ระบบจะตรวจจับตัวย่อที่ไม่ซ้ำกับหินอื่นให้อัตโนมัติ หรือจะพิมพ์เองก็ได้
+                      </span>
+                    )}
                   </div>
 
                   <div>
@@ -1023,24 +1286,30 @@ export default function SettingsPage() {
                   </div>
 
                   {/* SKU Code (Auto or Custom) */}
-                  <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-2xl space-y-2">
+                  <div
+                    className={`p-3.5 rounded-2xl space-y-2 border ${
+                      conflictingStoneByCode
+                        ? 'bg-rose-50/90 border-2 border-rose-300'
+                        : 'bg-indigo-50/80 border-indigo-200'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                         <Tag className="w-3.5 h-3.5 text-indigo-600" />
-                        ตัวย่อชนิดหินสำหรับ SKU (2-4 ตัวอักษร) *
+                        ตัวย่อชนิดหินสำหรับ SKU (ห้ามซ้ำกัน) *
                       </label>
                       <button
                         type="button"
                         onClick={() =>
                           setStoneForm({
                             ...stoneForm,
-                            code: suggestAbbreviation(stoneForm.nameEn),
+                            code: suggestedUniqueStoneCode,
                           })
                         }
                         className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white px-2 py-0.5 rounded-md border border-indigo-300 shadow-2xs transition flex items-center gap-1"
                       >
                         <Sparkles className="w-3 h-3 text-amber-500" />
-                        ตรวจจับอัตโนมัติ
+                        สุ่มตัวย่อไม่ซ้ำ ({suggestedUniqueStoneCode})
                       </button>
                     </div>
 
@@ -1053,14 +1322,43 @@ export default function SettingsPage() {
                       onChange={(e) =>
                         setStoneForm({ ...stoneForm, code: e.target.value.toUpperCase() })
                       }
-                      className="w-full px-3.5 py-2.5 text-base bg-white border border-indigo-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono font-black text-indigo-900 uppercase"
+                      className={`w-full px-3.5 py-2.5 text-base bg-white rounded-xl outline-none font-mono font-black uppercase ${
+                        conflictingStoneByCode
+                          ? 'border-2 border-rose-500 text-rose-900 focus:ring-2 focus:ring-rose-500'
+                          : 'border border-indigo-300 text-indigo-900 focus:ring-2 focus:ring-indigo-500'
+                      }`}
                     />
-                    <div className="flex items-center justify-between text-[11px] text-indigo-700 font-medium pt-1">
-                      <span>ตัวอย่าง SKU ที่ได้:</span>
-                      <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-indigo-200">
-                        SPH - {stoneForm.code || '???'} - 001
-                      </span>
-                    </div>
+                    {conflictingStoneByCode ? (
+                      <div className="p-2.5 rounded-xl bg-rose-100/90 border border-rose-300 text-xs text-rose-900 space-y-1.5">
+                        <p className="font-bold flex items-center gap-1.5">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>
+                            ตัวย่อ &quot;{stoneForm.code.trim().toUpperCase()}&quot; ซ้ำกับ &quot;{conflictingStoneByCode.label}&quot;!
+                          </span>
+                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-rose-700">
+                            หากใช้ตัวย่อซ้ำ รหัส SKU จะชนกัน
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setStoneForm({ ...stoneForm, code: suggestedUniqueStoneCode })
+                            }
+                            className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shrink-0"
+                          >
+                            ใช้ &quot;{suggestedUniqueStoneCode}&quot; แทน
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-[11px] text-indigo-700 font-medium pt-1">
+                        <span>ตัวอย่าง SKU ที่ได้ (ไม่ซ้ำแน่นอน):</span>
+                        <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-indigo-200">
+                          SPH - {stoneForm.code || '???'} - 001
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1078,7 +1376,8 @@ export default function SettingsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-[2] sm:flex-initial px-5 py-3 sm:py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold shadow-md shadow-indigo-600/20 hover:from-indigo-700 hover:to-purple-700 active:scale-95 transition"
+                    disabled={Boolean(conflictingStoneByName || conflictingStoneByCode)}
+                    className="flex-[2] sm:flex-initial px-5 py-3 sm:py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold shadow-md shadow-indigo-600/20 hover:from-indigo-700 hover:to-purple-700 active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none"
                   >
                     {editingStone ? 'บันทึกการแก้ไข' : 'เพิ่มชนิดหิน'}
                   </button>
