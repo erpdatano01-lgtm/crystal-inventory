@@ -23,6 +23,7 @@ import {
   StoneTypeItem,
   getStoneShapes,
   getStoneTypes,
+  fetchCloudSettings,
 } from '@/lib/settingsService';
 import {
   PlusCircle,
@@ -86,12 +87,26 @@ export default function NewProductPage() {
     async function load() {
       setLoading(true);
       try {
-        const loadedShapes = getStoneShapes();
-        const loadedStones = getStoneTypes();
+        let loadedShapes = getStoneShapes();
+        let loadedStones = getStoneTypes();
         setShapes(loadedShapes);
         setStones(loadedStones);
 
-        const [l, p] = await Promise.all([fetchStockLots(), fetchProducts()]);
+        const [l, p, cloud] = await Promise.all([
+          fetchStockLots(),
+          fetchProducts(),
+          fetchCloudSettings(),
+        ]);
+        if (cloud) {
+          if (cloud.shapes && cloud.shapes.length > 0) {
+            loadedShapes = cloud.shapes;
+            setShapes(cloud.shapes);
+          }
+          if (cloud.stones && cloud.stones.length > 0) {
+            loadedStones = cloud.stones;
+            setStones(cloud.stones);
+          }
+        }
         setLots(l);
         const skus = p.map((prod) => prod.sku);
         setExistingSkus(skus);

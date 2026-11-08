@@ -50,6 +50,7 @@ import {
   getStoneTypes,
   getHideCostPreference,
   setHideCostPreference,
+  fetchCloudSettings,
 } from '@/lib/settingsService';
 
 export default function ProductsPage() {
@@ -87,6 +88,11 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setIsCustomerView(getHideCostPreference());
+    fetchCloudSettings().then((cloud) => {
+      if (cloud && typeof cloud.hideCost === 'boolean') {
+        setIsCustomerView(cloud.hideCost);
+      }
+    });
     async function load() {
       setLoading(true);
       try {

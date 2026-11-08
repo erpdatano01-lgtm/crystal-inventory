@@ -4,7 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 const accountId = process.env.R2_ACCOUNT_ID || '';
 const accessKeyId = process.env.R2_ACCESS_KEY_ID || '';
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || '';
-const bucketName = process.env.R2_BUCKET_NAME || 'crystal-assets';
+export const bucketName = process.env.R2_BUCKET_NAME || 'crystal-assets';
 const publicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
 const endpoint = process.env.R2_ENDPOINT || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : '');
 

@@ -27,29 +27,102 @@ export const DEFAULT_STONE_SHAPES: StoneShapeItem[] = [
 ];
 
 export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [
+  { id: 'Amazonite', code: 'AMA', label: 'Amazonite (แอมะซอไนต์)', isDefault: true },
   { id: 'Amethyst', code: 'AME', label: 'Amethyst (อเมทิสต์)', isDefault: true },
   { id: 'Aquamarine', code: 'AQU', label: 'Aquamarine (อความารีน)', isDefault: true },
+  { id: 'Azurite', code: 'AZU', label: 'Azurite (อะซูไรต์)', isDefault: true },
   { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)', isDefault: true },
-  { id: 'Chinese Writing Stone', code: 'CWS', label: 'Chinese Writing Stone', isDefault: true },
+  { id: 'Blue Lace Agate', code: 'BLA', label: 'Blue Lace Agate (บลูเลซอาเกต)', isDefault: true },
+  { id: 'Chinese Writing Stone', code: 'CWS', label: 'Chinese Writing Stone (หินอักษรจีน / หินตัวหนังสือจีน)', isDefault: true },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)', isDefault: true },
   { id: 'Clear Quartz', code: 'QUA', label: 'Clear Quartz (เขี้ยวหนุมาน/ควอตซ์ใส)', isDefault: true },
+  { id: 'Crazy Lace Agate', code: 'CLA', label: 'Crazy Lace Agate (เครซี่เลซอาเกต)', isDefault: true },
   { id: 'Fluorite', code: 'FLU', label: 'Fluorite (ฟลูออไรต์)', isDefault: true },
+  { id: 'Green Tourmaline', code: 'GRT', label: 'Green Tourmaline (ทัวร์มาลีนเขียว)', isDefault: true },
+  { id: 'Green Zebra Jasper', code: 'GZJ', label: 'Green Zebra Jasper (แจสเปอร์ลายม้าลายเขียว)', isDefault: true },
+  { id: 'Jasper', code: 'JAS', label: 'Jasper (แจสเปอร์)', isDefault: true },
   { id: 'Labradorite', code: 'LAB', label: 'Labradorite (ลาบราดอไรต์)', isDefault: true },
   { id: 'Lapis Lazuli', code: 'LAP', label: 'Lapis Lazuli (ลาพิส ลาซูลี)', isDefault: true },
   { id: 'Malachite', code: 'MAL', label: 'Malachite (มาลาไคต์)', isDefault: true },
   { id: 'Moldavite', code: 'MOL', label: 'Moldavite (โมลดาไวต์/สะเก็ดดาวเขียว)', isDefault: true },
   { id: 'Moonstone', code: 'MOO', label: 'Moonstone (มูนสโตน)', isDefault: true },
+  { id: 'Ocean Jasper', code: 'OCJ', label: 'Ocean Jasper (โอเชียนแจสเปอร์)', isDefault: true },
+  { id: 'Picture Jasper', code: 'PIJ', label: 'Picture Jasper (พิคเจอร์แจสเปอร์)', isDefault: true },
   { id: 'Pyrite', code: 'PYR', label: 'Pyrite (ไพไรต์/แร่ดูดทรัพย์)', isDefault: true },
+  { id: 'Red Jasper', code: 'REJ', label: 'Red Jasper (เรดแจสเปอร์)', isDefault: true },
   { id: 'Rose Quartz', code: 'ROQ', label: 'Rose Quartz (โรสควอตซ์)', isDefault: true },
   { id: 'Rutilated Quartz', code: 'RUT', label: 'Rutilated Quartz (ไหมทอง/ไหม 5 สี)', isDefault: true },
   { id: 'Selenite', code: 'SEL', label: 'Selenite (เซเลไนต์)', isDefault: true },
   { id: 'Smoky Quartz', code: 'SMQ', label: 'Smoky Quartz (สโมกกี้ควอตซ์)', isDefault: true },
+  { id: 'Snowflake Obsidian', code: 'SNO', label: 'Snowflake Obsidian (สโนว์เฟล็กออบซิเดียน)', isDefault: true },
   { id: 'Other', code: 'CRY', label: 'แร่/หินชนิดอื่นๆ (Other Mineral)', isDefault: true },
 ];
 
 const LS_SHAPES_KEY = 'vivida_custom_shapes_v1';
 const LS_STONES_KEY = 'vivida_custom_stones_v1';
 const LS_HIDE_COST_KEY = 'vivida_hide_cost_v1';
+
+/**
+ * Sync active settings to Cloudflare R2 via API
+ */
+export async function syncSettingsToCloud(
+  customShapes?: StoneShapeItem[],
+  customStones?: StoneTypeItem[],
+  customHideCost?: boolean
+): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  const shapes = customShapes || getStoneShapes();
+  const stones = customStones || getStoneTypes();
+  const hideCost = typeof customHideCost === 'boolean' ? customHideCost : getHideCostPreference();
+
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shapes, stones, hideCost }),
+    });
+  } catch (err) {
+    console.warn('Background sync to cloud settings failed:', err);
+  }
+}
+
+/**
+ * Fetch latest settings from Cloudflare R2 and update local cache
+ */
+export async function fetchCloudSettings(): Promise<{
+  shapes: StoneShapeItem[];
+  stones: StoneTypeItem[];
+  hideCost: boolean;
+} | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch('/api/settings', {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.success) {
+      if (Array.isArray(data.shapes) && data.shapes.length > 0) {
+        localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sortAlphabetically(data.shapes)));
+      }
+      if (Array.isArray(data.stones) && data.stones.length > 0) {
+        localStorage.setItem(LS_STONES_KEY, JSON.stringify(sortAlphabetically(data.stones)));
+      }
+      if (typeof data.hideCost === 'boolean') {
+        localStorage.setItem(LS_HIDE_COST_KEY, String(data.hideCost));
+      }
+      return {
+        shapes: getStoneShapes(),
+        stones: getStoneTypes(),
+        hideCost: getHideCostPreference(),
+      };
+    }
+  } catch (err) {
+    console.warn('Could not fetch settings from cloud, using local cache:', err);
+  }
+  return null;
+}
 
 /**
  * Get hide-cost preference (defaults to true for customer-facing privacy)
@@ -67,6 +140,7 @@ export function getHideCostPreference(): boolean {
 export function setHideCostPreference(hide: boolean): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(LS_HIDE_COST_KEY, String(hide));
+  syncSettingsToCloud(undefined, undefined, hide);
 }
 
 /**
@@ -340,27 +414,30 @@ export function getStoneShapes(): StoneShapeItem[] {
 }
 
 /**
- * Save shapes to localStorage (automatically sorted A-Z)
+ * Save shapes to localStorage (automatically sorted A-Z) and sync to cloud
  */
 export function saveStoneShapes(shapes: StoneShapeItem[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sortAlphabetically(shapes)));
+  const sorted = sortAlphabetically(shapes);
+  localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sorted));
+  syncSettingsToCloud(sorted, undefined, undefined);
 }
 
 /**
- * Reset shapes to factory defaults
+ * Reset shapes to factory defaults and sync to cloud
  */
 export function resetStoneShapes(): StoneShapeItem[] {
   const sorted = sortAlphabetically(DEFAULT_STONE_SHAPES);
   if (typeof window !== 'undefined') {
     localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sorted));
+    syncSettingsToCloud(sorted, undefined, undefined);
   }
   return sorted;
 }
 
 /**
  * Get all active stone types (persisted in localStorage, fallback to defaults)
- * Always sorted alphabetically A-Z (Amethyst, Aquamarine, Black Tourmaline...)
+ * Always sorted alphabetically A-Z (Amazonite, Amethyst, Aquamarine...)
  */
 export function getStoneTypes(): StoneTypeItem[] {
   if (typeof window === 'undefined') return sortAlphabetically(DEFAULT_STONE_TYPES);
@@ -378,13 +455,14 @@ export function getStoneTypes(): StoneTypeItem[] {
       const updated = parsed.map((item: StoneTypeItem) => {
         if (
           item.id.toLowerCase() === 'chinese alphabet stone' ||
+          item.code === 'CAS' ||
           item.label.toLowerCase().includes('chinese alphabet stone')
         ) {
           migrated = true;
           return {
             ...item,
             id: 'Chinese Writing Stone',
-            code: item.code === 'CAS' ? 'CWS' : item.code || 'CWS',
+            code: 'CWS',
             label: item.label.replace(/Chinese Alphabet Stone/gi, 'Chinese Writing Stone'),
           };
         }
@@ -402,20 +480,23 @@ export function getStoneTypes(): StoneTypeItem[] {
 }
 
 /**
- * Save stone types to localStorage (automatically sorted A-Z)
+ * Save stone types to localStorage (automatically sorted A-Z) and sync to cloud
  */
 export function saveStoneTypes(types: StoneTypeItem[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_STONES_KEY, JSON.stringify(sortAlphabetically(types)));
+  const sorted = sortAlphabetically(types);
+  localStorage.setItem(LS_STONES_KEY, JSON.stringify(sorted));
+  syncSettingsToCloud(undefined, sorted, undefined);
 }
 
 /**
- * Reset stone types to factory defaults
+ * Reset stone types to factory defaults and sync to cloud
  */
 export function resetStoneTypes(): StoneTypeItem[] {
   const sorted = sortAlphabetically(DEFAULT_STONE_TYPES);
   if (typeof window !== 'undefined') {
     localStorage.setItem(LS_STONES_KEY, JSON.stringify(sorted));
+    syncSettingsToCloud(undefined, sorted, undefined);
   }
   return sorted;
 }

@@ -33,6 +33,7 @@ import {
   suggestAbbreviation,
   getHideCostPreference,
   setHideCostPreference,
+  fetchCloudSettings,
 } from '@/lib/settingsService';
 
 export default function SettingsPage() {
@@ -87,11 +88,19 @@ export default function SettingsPage() {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  // Load settings on mount
+  // Load settings on mount (cache first, then live cloud sync)
   useEffect(() => {
     setShapes(getStoneShapes());
     setStones(getStoneTypes());
     setHideCost(getHideCostPreference());
+
+    fetchCloudSettings().then((cloud) => {
+      if (cloud) {
+        if (cloud.shapes && cloud.shapes.length > 0) setShapes(cloud.shapes);
+        if (cloud.stones && cloud.stones.length > 0) setStones(cloud.stones);
+        if (typeof cloud.hideCost === 'boolean') setHideCost(cloud.hideCost);
+      }
+    });
   }, []);
 
   // ----------------------------------------------------
