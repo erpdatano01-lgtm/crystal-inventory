@@ -30,6 +30,7 @@ export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [
   { id: 'Amethyst', code: 'AME', label: 'Amethyst (อเมทิสต์)', isDefault: true },
   { id: 'Aquamarine', code: 'AQU', label: 'Aquamarine (อความารีน)', isDefault: true },
   { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)', isDefault: true },
+  { id: 'Chinese Writing Stone', code: 'CWS', label: 'Chinese Writing Stone', isDefault: true },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)', isDefault: true },
   { id: 'Clear Quartz', code: 'QUA', label: 'Clear Quartz (เขี้ยวหนุมาน/ควอตซ์ใส)', isDefault: true },
   { id: 'Fluorite', code: 'FLU', label: 'Fluorite (ฟลูออไรต์)', isDefault: true },
@@ -150,6 +151,8 @@ export function suggestAbbreviation(
       CELESTITE: ['CEL', 'CLS', 'CELS'],
       CHALCEDONY: ['CHD', 'CHL', 'CHAL'],
       CHAROITE: ['CHA', 'CHR', 'CHAR'],
+      'CHINESE WRITING STONE': ['CWS', 'CHW', 'CWST'],
+      'CHINESE ALPHABET STONE': ['CWS', 'CAS', 'CHW'],
       CHRYSOCOLLA: ['CHC', 'CRS', 'CHRY'],
       CHRYSOPRASE: ['CHP', 'CRP', 'CHPR'],
       CITRINE: ['CIT', 'CTR', 'CITR'],
@@ -369,7 +372,29 @@ export function getStoneTypes(): StoneTypeItem[] {
       return sorted;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return sortAlphabetically(parsed);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Auto-migrate any Chinese Alphabet Stone to Chinese Writing Stone
+      let migrated = false;
+      const updated = parsed.map((item: StoneTypeItem) => {
+        if (
+          item.id.toLowerCase() === 'chinese alphabet stone' ||
+          item.label.toLowerCase().includes('chinese alphabet stone')
+        ) {
+          migrated = true;
+          return {
+            ...item,
+            id: 'Chinese Writing Stone',
+            code: item.code === 'CAS' ? 'CWS' : item.code || 'CWS',
+            label: item.label.replace(/Chinese Alphabet Stone/gi, 'Chinese Writing Stone'),
+          };
+        }
+        return item;
+      });
+      if (migrated) {
+        localStorage.setItem(LS_STONES_KEY, JSON.stringify(sortAlphabetically(updated)));
+      }
+      return sortAlphabetically(updated);
+    }
   } catch (e) {
     console.warn('Error reading stone types from localStorage:', e);
   }

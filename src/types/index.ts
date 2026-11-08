@@ -172,6 +172,7 @@ export const STONE_TYPES = [
   { id: 'Amethyst', code: 'AME', label: 'Amethyst (อเมทิสต์)' },
   { id: 'Aquamarine', code: 'AQU', label: 'Aquamarine (อความารีน)' },
   { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)' },
+  { id: 'Chinese Writing Stone', code: 'CWS', label: 'Chinese Writing Stone' },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)' },
   { id: 'Clear Quartz', code: 'QUA', label: 'Clear Quartz (เขี้ยวหนุมาน/ควอตซ์ใส)' },
   { id: 'Fluorite', code: 'FLU', label: 'Fluorite (ฟลูออไรต์)' },
