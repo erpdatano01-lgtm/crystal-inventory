@@ -7,8 +7,9 @@ import {
   StoneShapeItem,
   StoneTypeItem,
   sortAlphabetically,
-} from '@/lib/settingsService';
+} from '@/lib/stoneConstants';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -42,6 +43,7 @@ function sanitizeStones(stones: StoneTypeItem[]): StoneTypeItem[] {
 
 export async function GET() {
   const headers = {
+    'Content-Type': 'application/json',
     'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
     Pragma: 'no-cache',
     Expires: '0',
@@ -85,7 +87,6 @@ export async function GET() {
           );
         }
       } catch (err: unknown) {
-        // If file not found on R2 yet, we will seed or fallback
         const isNotFound =
           err && typeof err === 'object' && ('name' in err || 'Code' in err)
             ? (err as { name?: string; Code?: string }).name === 'NoSuchKey' ||
@@ -118,12 +119,13 @@ export async function GET() {
     console.error('Failed to load settings:', error);
     return NextResponse.json(
       {
-        success: false,
+        success: true,
+        source: 'error-fallback',
         shapes: sortAlphabetically(DEFAULT_STONE_SHAPES),
         stones: sortAlphabetically(DEFAULT_STONE_TYPES),
         hideCost: true,
       },
-      { status: 500, headers }
+      { status: 200, headers }
     );
   }
 }
@@ -156,13 +158,17 @@ export async function POST(request: Request) {
 
     // Persist to Cloudflare R2
     if (isR2Configured && r2Client) {
-      const cmd = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: SETTINGS_KEY,
-        Body: JSON.stringify(payload, null, 2),
-        ContentType: 'application/json',
-      });
-      await r2Client.send(cmd);
+      try {
+        const cmd = new PutObjectCommand({
+          Bucket: bucketName,
+          Key: SETTINGS_KEY,
+          Body: JSON.stringify(payload, null, 2),
+          ContentType: 'application/json',
+        });
+        await r2Client.send(cmd);
+      } catch (r2Err) {
+        console.warn('Failed to write settings to R2:', r2Err);
+      }
     }
 
     return NextResponse.json({
