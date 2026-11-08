@@ -42,7 +42,7 @@ export default function DimensionGuideButton({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 space-y-6 shadow-2xl cursor-default border border-purple-100"
+            className="bg-white rounded-3xl max-w-3xl w-full max-h-[88dvh] overflow-y-auto overscroll-contain p-5 sm:p-7 space-y-6 shadow-2xl cursor-default border border-purple-100"
           >
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">

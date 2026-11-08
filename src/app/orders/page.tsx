@@ -263,7 +263,7 @@ export default function OrdersPage() {
   }, [orders, searchQuery, selectedChannel, selectedStatus]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-12 md:pl-64 pt-16 md:pt-0">
+    <div className="min-h-screen bg-slate-50 flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
@@ -395,7 +395,7 @@ export default function OrdersPage() {
                 placeholder="ค้นหาเลขที่บิล, ชื่อลูกค้า, หรือรหัส SKU..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-2xl text-xs sm:text-sm border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-2xl text-base sm:text-sm border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
               />
             </div>
 
@@ -576,27 +576,40 @@ export default function OrdersPage() {
 
         {/* Modal: Create New Order / Invoice */}
         {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="p-6 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <ShoppingBag className="w-6 h-6" />
-                    <span>เปิดบิลขายใหม่ (New Sales Invoice)</span>
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90dvh]">
+              <div className="shrink-0 px-5 py-4 sm:p-6 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                    <span className="truncate">เปิดบิลขายใหม่ (New Sales Invoice)</span>
                   </h3>
-                  <p className="text-xs text-purple-200 mt-0.5">
+                  <p className="text-xs text-purple-200 mt-0.5 truncate">
                     เลือกหินที่ขาย ระบบจะตัดสต็อกเป็น SOLD อัตโนมัติและออกใบเสร็จรับเงิน
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="p-2 rounded-full hover:bg-white/10 text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="submit"
+                    form="create-order-form"
+                    disabled={isSubmitting || selectedItems.length === 0}
+                    className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-white/20 hover:bg-white/30 text-white active:scale-95 transition disabled:opacity-40"
+                  >
+                    {isSubmitting ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="p-2 rounded-full hover:bg-white/10 text-white shrink-0"
+                    aria-label="ปิดหน้าต่าง"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
-              <form onSubmit={handleCreateOrder} className="p-6 overflow-y-auto space-y-6">
+              <form id="create-order-form" onSubmit={handleCreateOrder} className="flex flex-col flex-1 min-h-0">
+                <div className="p-5 sm:p-6 overflow-y-auto overscroll-contain space-y-6 flex-1">
                 {/* 1. Customer Information */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
@@ -612,7 +625,7 @@ export default function OrdersPage() {
                         placeholder="เช่น คุณกมลวรรณ / ลูกค้าหน้าร้าน"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
 
@@ -623,7 +636,7 @@ export default function OrdersPage() {
                         placeholder="08x-xxx-xxxx"
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
                   </div>
@@ -634,7 +647,7 @@ export default function OrdersPage() {
                       <select
                         value={channel}
                         onChange={(e) => setChannel(e.target.value as SalesChannel)}
-                        className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       >
                         {Object.entries(SALES_CHANNELS_CONFIG).map(([k, v]) => (
                           <option key={k} value={k}>
@@ -653,7 +666,7 @@ export default function OrdersPage() {
                         placeholder="เช่น TH012345678 / Flash / Kerry"
                         value={trackingNo}
                         onChange={(e) => setTrackingNo(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
                   </div>
@@ -665,7 +678,7 @@ export default function OrdersPage() {
                       placeholder="บ้านเลขที่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์..."
                       value={customerAddress}
                       onChange={(e) => setCustomerAddress(e.target.value)}
-                      className="w-full px-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
                 </div>
@@ -792,7 +805,7 @@ export default function OrdersPage() {
                         type="text"
                         disabled
                         value={`฿${subtotal.toLocaleString()}`}
-                        className="w-full px-3 py-2 text-xs font-bold bg-slate-100 text-slate-700 rounded-xl"
+                        className="w-full px-3 py-2 text-base sm:text-xs font-bold bg-slate-100 text-slate-700 rounded-xl"
                       />
                     </div>
 
@@ -803,7 +816,7 @@ export default function OrdersPage() {
                         min="0"
                         value={discount}
                         onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                        className="w-full px-3 py-2 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
                       />
                     </div>
 
@@ -814,7 +827,7 @@ export default function OrdersPage() {
                         min="0"
                         value={shippingFee}
                         onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                        className="w-full px-3 py-2 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
                       />
                     </div>
 
@@ -824,7 +837,7 @@ export default function OrdersPage() {
                         type="text"
                         disabled
                         value={`฿${orderTotalAmount.toLocaleString()}`}
-                        className="w-full px-3 py-2 text-sm font-black bg-purple-100 text-purple-950 rounded-xl"
+                        className="w-full px-3 py-2 text-base sm:text-sm font-black bg-purple-100 text-purple-950 rounded-xl"
                       />
                     </div>
                   </div>
@@ -835,7 +848,7 @@ export default function OrdersPage() {
                       <select
                         value={paymentMethod}
                         onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white"
                       >
                         <option value="โอนเงิน (Mobile Banking)">โอนเงิน (Mobile Banking / QR)</option>
                         <option value="เงินสด (Cash)">เงินสด (Cash หน้าร้าน)</option>
@@ -851,7 +864,7 @@ export default function OrdersPage() {
                         placeholder="เช่น ลูกค้าสั่งพิเศษ, นัดรับหน้าร้าน..."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white"
                       />
                     </div>
                   </div>
@@ -871,24 +884,25 @@ export default function OrdersPage() {
                     />
                   </div>
                 </div>
+                </div>
 
-                {/* Submit Action */}
-                <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                  <div className="text-xs text-slate-500">
+                {/* Pinned Submit Action Footer */}
+                <div className="shrink-0 px-5 sm:px-6 pt-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="text-[11px] sm:text-xs text-slate-500">
                     * เมื่อกดยืนยัน หินทั้ง {selectedItems.length} ชิ้นจะถูกปรับเป็นสถานะ SOLD ทันที
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <button
                       type="button"
                       onClick={() => setShowCreateModal(false)}
-                      className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      className="flex-1 sm:flex-initial px-4 py-3 sm:py-2.5 min-h-[46px] rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 active:scale-95 transition"
                     >
                       ยกเลิก
                     </button>
                     <button
                       type="submit"
                       disabled={isSubmitting || selectedItems.length === 0}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs shadow-md hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50"
+                      className="flex-[2] sm:flex-initial px-6 py-3 sm:py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm shadow-md hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition disabled:opacity-50"
                     >
                       {isSubmitting ? 'กำลังบันทึกบิล...' : 'บันทึกเปิดบิล & พิมพ์ใบเสร็จ'}
                     </button>
@@ -913,7 +927,7 @@ export default function OrdersPage() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl p-4 max-w-lg w-full max-h-[85vh] flex flex-col relative"
+              className="bg-white rounded-3xl p-4 max-w-lg w-full max-h-[85dvh] flex flex-col relative"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h4 className="font-bold text-slate-900 text-sm">

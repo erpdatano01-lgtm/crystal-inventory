@@ -18,7 +18,7 @@ export default function ReceiptPrintModal({ order, onClose }: ReceiptPrintModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[95vh]">
+      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh]">
         {/* Modal Controls (Hidden when printing) */}
         <div className="print:hidden p-4 bg-slate-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">

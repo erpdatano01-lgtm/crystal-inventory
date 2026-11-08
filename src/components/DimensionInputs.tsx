@@ -140,7 +140,7 @@ export default function DimensionInputs({
               placeholder="เช่น 5.5"
               value={val1}
               onChange={(e) => handleBoxChange(e.target.value, val2, val3)}
-              className="w-full h-11 pl-9 pr-12 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
+              className="w-full h-11 pl-9 pr-12 text-base sm:text-sm placeholder:text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
             />
             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
               cm
@@ -156,7 +156,7 @@ export default function DimensionInputs({
                 placeholder={ph1}
                 value={val1}
                 onChange={(e) => handleBoxChange(e.target.value, val2, val3)}
-                className="w-full h-11 px-2 text-center text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
+                className="w-full h-11 px-2 text-center text-base sm:text-sm placeholder:text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
               />
             </div>
             <span className="font-bold text-purple-400 text-xs shrink-0">x</span>
@@ -167,7 +167,7 @@ export default function DimensionInputs({
                 placeholder={ph2}
                 value={val2}
                 onChange={(e) => handleBoxChange(val1, e.target.value, val3)}
-                className="w-full h-11 px-2 text-center text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
+                className="w-full h-11 px-2 text-center text-base sm:text-sm placeholder:text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
               />
             </div>
             <span className="font-bold text-purple-400 text-xs shrink-0">x</span>
@@ -178,7 +178,7 @@ export default function DimensionInputs({
                 placeholder={ph3}
                 value={val3}
                 onChange={(e) => handleBoxChange(val1, val2, e.target.value)}
-                className="w-full h-11 px-2 text-center text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
+                className="w-full h-11 px-2 text-center text-base sm:text-sm placeholder:text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 font-bold text-slate-800 outline-none transition"
               />
             </div>
           </div>
@@ -190,7 +190,7 @@ export default function DimensionInputs({
           placeholder="เช่น Ø 5.5 cm หรือ 12.5 x 3.5 x 3.0 cm"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-11 px-3.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-medium text-slate-800 transition"
+          className="w-full h-11 px-3.5 text-base sm:text-sm placeholder:text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-medium text-slate-800 transition"
         />
       )}
     </div>

@@ -38,36 +38,42 @@ export default function Navbar() {
     {
       href: '/',
       label: 'ภาพรวม',
+      mobileLabel: 'ภาพรวม',
       sublabel: 'Dashboard',
       icon: LayoutDashboard,
     },
     {
       href: '/products',
       label: 'คลังสินค้า',
+      mobileLabel: 'คลังหิน',
       sublabel: 'Products & Stones',
       icon: PackageCheck,
     },
     {
       href: '/products/new',
       label: 'รับหินเข้าสต็อก',
+      mobileLabel: 'เพิ่มหิน',
       sublabel: 'New Stock Entry',
       icon: PlusCircle,
     },
     {
       href: '/orders',
       label: 'เปิดบิล & บัญชี',
+      mobileLabel: 'เปิดบิล',
       sublabel: 'FlowAccount Orders',
       icon: ShoppingBag,
     },
     {
       href: '/expenses',
       label: 'ค่าใช้จ่าย & ล็อต',
+      mobileLabel: 'รายจ่าย',
       sublabel: 'Expenses & Lots',
       icon: Receipt,
     },
     {
       href: '/settings',
       label: 'ตั้งค่าระบบ',
+      mobileLabel: 'ตั้งค่า',
       sublabel: 'SKU, ทรง & ชนิดหิน',
       icon: Settings,
     },
@@ -209,7 +215,7 @@ export default function Navbar() {
       {/* ========================================================= */}
       {/* 2. MOBILE TOP BAR (md:hidden)                             */}
       {/* ========================================================= */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur border-b border-slate-200 z-40 px-4 flex items-center justify-between">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/95 backdrop-blur border-b border-slate-200 z-40 px-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-amber-400 p-0.5 shadow-sm">
             <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
@@ -317,7 +323,7 @@ export default function Navbar() {
       {/* 4. MOBILE BOTTOM NAVIGATION (md:hidden)                   */}
       {/* ========================================================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 pb-safe">
-        <div className="grid grid-cols-5 h-16">
+        <div className="grid grid-cols-6 h-16 px-1">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -325,15 +331,15 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex flex-col items-center justify-center gap-1 transition ${
+                className={`flex flex-col items-center justify-center gap-1 min-w-0 px-0.5 transition ${
                   isActive
                     ? 'text-purple-600 font-bold'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[9px] leading-tight text-center truncate max-w-[56px]">
-                  {link.label.replace(' (Dashboard)', '').replace(' (Products)', '')}
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="text-[10px] leading-tight text-center truncate w-full">
+                  {link.mobileLabel}
                 </span>
               </Link>
             );
