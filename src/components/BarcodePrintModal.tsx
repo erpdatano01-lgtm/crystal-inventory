@@ -547,7 +547,8 @@ export default function BarcodePrintModal({
       const pxPerCm = 236.22;
       const canvasW = Math.round(config.widthCm * pxPerCm);
       const canvasH = Math.round(config.heightCm * pxPerCm);
-      const padPx = Math.round(metrics.paddingCm * pxPerCm);
+      const isTiny = config.heightCm <= 1.8 || config.widthCm <= 2.8;
+      const padPx = Math.round((isTiny ? 0.1 : 0.14) * pxPerCm);
 
       const canvas = document.createElement('canvas');
       canvas.width = canvasW;
@@ -566,20 +567,56 @@ export default function BarcodePrintModal({
       // Convert pt to canvas px (1 pt = 0.0352778 cm)
       const ptToPx = (pt: number) => Math.round(pt * 0.0352778 * pxPerCm);
 
+      const storeFontPx = config.showStoreName ? ptToPx(metrics.storeFontPt) : 0;
+      const skuFontPx = config.showSkuText ? ptToPx(metrics.skuFontPt) : 0;
+      const nameFontPx = config.showStoneName ? ptToPx(metrics.nameFontPt) : 0;
+
+      const weightText = targetProduct.weight_grams ? `${targetProduct.weight_grams}g` : '';
+      const dimText = targetProduct.dimensions || '';
+      const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
+      const priceText =
+        targetProduct.selling_price && targetProduct.selling_price > 0
+          ? `฿${targetProduct.selling_price.toLocaleString()}`
+          : '';
+
+      const priceFontPx = config.showPrice && priceText ? ptToPx(metrics.priceFontPt) : 0;
+      const metaFontPx = config.showWeightAndDim && specsLine ? ptToPx(metrics.metaFontPt) : 0;
+      const bottomRowFontPx = Math.max(priceFontPx, metaFontPx);
+      const hasBottomLine = Boolean(bottomRowFontPx > 0);
+
+      // Safe bottom margin (8.5% = ~2.5mm on a 30mm label) ensures the bottom line prints flush
+      // against the physical bottom edge without sensor cutoff
+      const bottomMarginPx = Math.max(16, Math.round(Math.min(0.255, config.heightCm * 0.085) * pxPerCm));
+      const printableBottomPx = canvasH - bottomMarginPx;
+      const bottomY = printableBottomPx - bottomRowFontPx;
+      const dividerGap = Math.max(4, Math.round(0.035 * pxPerCm));
+      const dividerY = bottomY - dividerGap;
+
+      const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
+      const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
+      const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
+      const barcodeGap = Math.max(4, Math.round(0.04 * pxPerCm));
+
+      const totalTextH = storeLineH + skuLineH + nameLineH;
+      const maxAvailableBarcodeH = hasBottomLine
+        ? dividerY - dividerGap - padPx - totalTextH - barcodeGap
+        : printableBottomPx - padPx - totalTextH - barcodeGap;
+
+      const targetBarcodeH = Math.round(metrics.barcodeHeightCm * pxPerCm);
+      const barcodeH = Math.max(30, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+
       let currentY = padPx;
       const innerW = canvasW - padPx * 2;
 
       // 1. Store Name
       if (config.showStoreName) {
-        const fontPx = ptToPx(metrics.storeFontPt);
-        ctx.font = `800 ${fontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.font = `800 ${storeFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         ctx.fillText('VIVIDA CRYSTAL', canvasW / 2, currentY, innerW);
-        currentY += Math.round(fontPx * 1.2);
+        currentY += storeLineH;
       }
 
       // 2. Barcode Bars (Crisp integer pixel coordinates)
       const encoded = encodeCode128B(targetProduct.sku);
-      const barcodeH = Math.round(metrics.barcodeHeightCm * pxPerCm);
       const barcodeW = Math.round(innerW * 0.96);
       const moduleW = barcodeW / encoded.totalModules;
       const barcodeStartX = Math.round((canvasW - barcodeW) / 2);
@@ -590,44 +627,30 @@ export default function BarcodePrintModal({
         const x2 = Math.round(barcodeStartX + (bar.x + bar.width) * moduleW);
         ctx.fillRect(x1, currentY, Math.max(1, x2 - x1), barcodeH);
       });
-      currentY += barcodeH + Math.round(0.05 * pxPerCm);
+      currentY += barcodeH + barcodeGap;
 
       // 3. SKU Line
       if (config.showSkuText) {
-        const fontPx = ptToPx(metrics.skuFontPt);
-        ctx.font = `900 ${fontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.font = `900 ${skuFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillText(targetProduct.sku, canvasW / 2, currentY, innerW);
-        currentY += Math.round(fontPx * 1.18);
+        currentY += skuLineH;
       }
 
-      // 4. Stone Name
+      // 4. Stone Name (Guaranteed clean gap before divider line)
       if (config.showStoneName) {
-        const fontPx = ptToPx(metrics.nameFontPt);
-        ctx.font = `700 ${fontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.font = `700 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, currentY, innerW);
-        currentY += Math.round(fontPx * 1.2);
+        currentY += nameLineH;
       }
 
       // 5. Bottom Meta & Price Line
-      const weightText = targetProduct.weight_grams ? `${targetProduct.weight_grams}g` : '';
-      const dimText = targetProduct.dimensions || '';
-      const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
-      const priceText =
-        targetProduct.selling_price && targetProduct.selling_price > 0
-          ? `฿${targetProduct.selling_price.toLocaleString()}`
-          : '';
-
-      if ((config.showWeightAndDim && specsLine) || (config.showPrice && priceText)) {
-        const priceFontPx = ptToPx(metrics.priceFontPt);
-        const metaFontPx = ptToPx(metrics.metaFontPt);
-        const bottomY = canvasH - padPx - Math.max(priceFontPx, metaFontPx);
-
+      if (hasBottomLine) {
         // Divider line
         ctx.strokeStyle = '#cbd5e1';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padPx, bottomY - Math.round(0.04 * pxPerCm));
-        ctx.lineTo(canvasW - padPx, bottomY - Math.round(0.04 * pxPerCm));
+        ctx.moveTo(padPx, dividerY);
+        ctx.lineTo(canvasW - padPx, dividerY);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
