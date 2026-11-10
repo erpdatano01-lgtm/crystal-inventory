@@ -1,24 +1,34 @@
 // Direct Web Bluetooth & Web Serial printing for NIIMBOT B2 Pro (and compatible NIIMBOT thermal printers)
 // Allows 1-click printing directly from the browser without downloading files or opening the NIIMBOT app.
+// Protocol reverse-engineered directly from NIIMBOT macOS SDK (libjcPrinterSdk.dylib: JCBleControl, cPrinterV5, cPrinterV6, packageOneColorData).
 
 import { Product } from '@/types';
 import { BarcodeLabelConfig, encodeCode128B } from './barcodeGenerator';
 
-// BLE UUIDs extracted from NIIMBOT macOS SDK (libjcPrinterSdk.dylib)
+// BLE Service UUIDs in exact priority order from JCBleControl (libjcPrinterSdk.dylib)
 const NIIMBOT_BLE_SERVICES = [
     'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
     '0000e0ff-3c17-d293-8e48-14fe2e4da212',
     '49535343-fe7d-4ae5-8fa9-9fafd205e455',
     '0000ff00-0000-1000-8000-00805f9b34fb',
     '0000ffe0-0000-1000-8000-00805f9b34fb',
+    '0000ae30-0000-1000-8000-00805f9b34fb',
+];
+
+// Combined Write+Notify Characteristic UUIDs prioritized by JCBleControl
+const NIIMBOT_COMBINED_CHAR_UUIDS = [
+    'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+    '0000ffe1-0000-1000-8000-00805f9b34fb',
+    '49535343-8841-43f4-a8d4-ecbe34729bb3',
 ];
 
 const NIIMBOT_WRITE_CHARACTERISTICS = [
     'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
     '0000ffe1-0000-1000-8000-00805f9b34fb',
-    '0000ffe2-0000-1000-8000-00805f9b34fb',
     '49535343-8841-43f4-a8d4-ecbe34729bb3',
+    '0000ffe2-0000-1000-8000-00805f9b34fb',
     '0000ff02-0000-1000-8000-00805f9b34fb',
+    '0000ae01-0000-1000-8000-00805f9b34fb',
 ];
 
 export type NiimbotTransportType = 'bluetooth' | 'serial';
@@ -35,6 +45,11 @@ export interface NiimbotPrintQueueItem {
     copies: number;
 }
 
+interface ParsedNiimbotPacket {
+    cmd: number;
+    data: Uint8Array;
+}
+
 interface ActiveBleConnection {
     device: any;
     server: any;
@@ -45,6 +60,7 @@ interface ActiveBleConnection {
 interface ActiveSerialConnection {
     port: any;
     writer: any;
+    reader?: any;
 }
 
 let activeBle: ActiveBleConnection | null = null;
@@ -53,7 +69,97 @@ let currentDeviceName = '';
 let currentTransport: NiimbotTransportType | null = null;
 let currentDpi: 203 | 300 = 300; // NIIMBOT B2 Pro is native 300 DPI (paccuracyName: "300" in devices.json)
 
+// Incoming packet buffer and resolvers for BLE / Serial notifications
+let rxBuffer: number[] = [];
+let packetListeners: Array<(pkt: ParsedNiimbotPacket) => void> = [];
+let lastReceivedPackets = new Map<number, ParsedNiimbotPacket>();
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Feed incoming raw bytes from BLE Notification or Web Serial into the NIIMBOT frame parser
+ */
+function handleIncomingBytes(bytes: Uint8Array) {
+    for (let i = 0; i < bytes.length; i++) {
+        rxBuffer.push(bytes[i] & 0xff);
+    }
+
+    // Parse all complete [0x55, 0x55, cmd, len, ...data, chk, 0xAA, 0xAA] packets
+    while (rxBuffer.length >= 7) {
+        // Find 0x55 0x55 header
+        let startIdx = -1;
+        for (let i = 0; i <= rxBuffer.length - 2; i++) {
+            if (rxBuffer[i] === 0x55 && rxBuffer[i + 1] === 0x55) {
+                startIdx = i;
+                break;
+            }
+        }
+
+        if (startIdx === -1) {
+            rxBuffer = rxBuffer.slice(-1);
+            break;
+        }
+        if (startIdx > 0) {
+            rxBuffer.splice(0, startIdx);
+        }
+        if (rxBuffer.length < 7) break;
+
+        const cmd = rxBuffer[2];
+        const len = rxBuffer[3];
+        const totalLen = len + 7;
+
+        if (rxBuffer.length < totalLen) {
+            break; // Wait for more bytes
+        }
+
+        if (rxBuffer[totalLen - 2] === 0xaa && rxBuffer[totalLen - 1] === 0xaa) {
+            const data = new Uint8Array(rxBuffer.slice(4, 4 + len));
+            rxBuffer.splice(0, totalLen);
+
+            const pkt: ParsedNiimbotPacket = { cmd, data };
+            lastReceivedPackets.set(cmd, pkt);
+            const listeners = [...packetListeners];
+            for (const fn of listeners) {
+                try {
+                    fn(pkt);
+                } catch {
+                    // ignore listener error
+                }
+            }
+        } else {
+            // Invalid tail, advance past first 0x55
+            rxBuffer.splice(0, 1);
+        }
+    }
+
+    if (rxBuffer.length > 2048) {
+        rxBuffer = rxBuffer.slice(-256);
+    }
+}
+
+function waitForPacket(expectedCmd: number | number[], timeoutMs: number): Promise<ParsedNiimbotPacket | null> {
+    const cmdSet = new Set(Array.isArray(expectedCmd) ? expectedCmd : [expectedCmd]);
+    return new Promise((resolve) => {
+        let settled = false;
+        const onPacket = (pkt: ParsedNiimbotPacket) => {
+            if (cmdSet.has(pkt.cmd) && !settled) {
+                settled = true;
+                packetListeners = packetListeners.filter((l) => l !== onPacket);
+                clearTimeout(timer);
+                resolve(pkt);
+            }
+        };
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                packetListeners = packetListeners.filter((l) => l !== onPacket);
+                resolve(null);
+            }
+        }, timeoutMs);
+
+        packetListeners.push(onPacket);
+    });
+}
 
 /**
  * Build a framed NIIMBOT command packet:
@@ -133,6 +239,7 @@ export function setNiimbotDpi(dpi: 203 | 300) {
 
 /**
  * Connect to NIIMBOT B2 Pro via Web Bluetooth (BLE)
+ * Uses exact service & characteristic discovery logic from JCBleControl in libjcPrinterSdk.dylib
  */
 export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> {
     const nav = navigator as any;
@@ -166,48 +273,70 @@ export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> 
     });
 
     const server = await device.gatt.connect();
-    const services = await server.getPrimaryServices();
+    const discoveredServices = await server.getPrimaryServices();
+
+    // Sort discovered services according to JCBleControl priority order
+    const sortedServices = [...discoveredServices].sort((a, b) => {
+        const idxA = NIIMBOT_BLE_SERVICES.indexOf(String(a.uuid).toLowerCase());
+        const idxB = NIIMBOT_BLE_SERVICES.indexOf(String(b.uuid).toLowerCase());
+        const prioA = idxA === -1 ? 999 : idxA;
+        const prioB = idxB === -1 ? 999 : idxB;
+        return prioA - prioB;
+    });
 
     let foundWriteChar: any = null;
     let foundNotifyChar: any = null;
+    const allNotifyChars: any[] = [];
 
-    // 1. Try known NIIMBOT write characteristics first
-    for (const service of services) {
+    // 1. Scan services in priority order following JCBleControl's didDiscoverCharacteristicsForService
+    for (const service of sortedServices) {
         try {
             const chars = await service.getCharacteristics();
+            let serviceWrite: any = null;
+            let serviceNotify: any = null;
+
+            // Check combined Write+Notify UUIDs first (bef8d6c9..., ffe1, 49535343-8841...)
             for (const c of chars) {
                 const uuid = String(c.uuid).toLowerCase();
                 const props = c.properties;
-                if (
-                    NIIMBOT_WRITE_CHARACTERISTICS.includes(uuid) &&
-                    (props.write || props.writeWithoutResponse)
-                ) {
-                    foundWriteChar = c;
+                if (props.notify || props.indicate) {
+                    allNotifyChars.push(c);
                 }
-                if (props.notify && !foundNotifyChar) {
-                    foundNotifyChar = c;
-                }
-            }
-        } catch {
-            // Continue scanning services
-        }
-    }
-
-    // 2. Fallback: pick any writable characteristic in the discovered services
-    if (!foundWriteChar) {
-        for (const service of services) {
-            try {
-                const chars = await service.getCharacteristics();
-                for (const c of chars) {
-                    if (c.properties.write || c.properties.writeWithoutResponse) {
-                        foundWriteChar = c;
-                        break;
+                if (NIIMBOT_COMBINED_CHAR_UUIDS.some((u) => uuid === u || uuid.includes(u.slice(4, 8)))) {
+                    if (props.write || props.writeWithoutResponse) {
+                        serviceWrite = c;
+                    }
+                    if (props.notify || props.indicate) {
+                        serviceNotify = c;
                     }
                 }
-                if (foundWriteChar) break;
-            } catch {
-                // ignore
             }
+
+            // Otherwise inspect all characteristics in this service for notify & write
+            for (const c of chars) {
+                const uuid = String(c.uuid).toLowerCase();
+                const props = c.properties;
+                if (!serviceNotify && (props.notify || props.indicate)) {
+                    serviceNotify = c;
+                }
+                if (!serviceWrite && (props.writeWithoutResponse || props.write)) {
+                    if (NIIMBOT_WRITE_CHARACTERISTICS.includes(uuid) || !foundWriteChar) {
+                        serviceWrite = c;
+                    }
+                }
+            }
+
+            if (serviceWrite && !foundWriteChar) {
+                foundWriteChar = serviceWrite;
+                if (serviceNotify) {
+                    foundNotifyChar = serviceNotify;
+                }
+            }
+            if (serviceNotify && !foundNotifyChar) {
+                foundNotifyChar = serviceNotify;
+            }
+        } catch {
+            // Continue scanning remaining services
         }
     }
 
@@ -217,11 +346,22 @@ export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> 
         );
     }
 
-    if (foundNotifyChar) {
+    rxBuffer = [];
+    lastReceivedPackets.clear();
+
+    // Subscribe to BLE notifications on all notify characteristics so we never miss printer ACKs
+    const notifyTargets = Array.from(new Set([foundNotifyChar, ...allNotifyChars].filter(Boolean)));
+    for (const nChar of notifyTargets) {
         try {
-            await foundNotifyChar.startNotifications();
+            nChar.addEventListener('characteristicvaluechanged', (event: any) => {
+                const val = event?.target?.value;
+                if (val && val.buffer) {
+                    handleIncomingBytes(new Uint8Array(val.buffer, val.byteOffset, val.byteLength));
+                }
+            });
+            await nChar.startNotifications();
         } catch {
-            // Notifications are optional
+            // Ignore if a secondary notify characteristic fails
         }
     }
 
@@ -244,9 +384,11 @@ export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> 
         currentDpi = 300;
     }
 
-    // Send Connect handshake packet (0xC1, [0x01])
-    await sendRawPacket(buildNiimbotPacket(0xc1, [0x01]));
-    await sleep(80);
+    // Handshake sequence from cPrinterControl::connectBluetoothPrinter:
+    // 1. openConnect (0xC1 [0x01]) -> expects 0xC2 (printer beeps!)
+    await sendCommandWaitAck(0xc1, [0x01], 0xc2, 450);
+    // 2. Request printer info / protocol support (0x40 [0x01])
+    await sendCommandWaitAck(0x40, [0x01], 0x41, 250);
 
     return getNiimbotConnectionInfo();
 }
@@ -266,15 +408,39 @@ export async function connectNiimbotSerial(): Promise<NiimbotConnectionInfo> {
     await port.open({ baudRate: 115200 });
 
     const writer = port.writable.getWriter();
+    rxBuffer = [];
+    lastReceivedPackets.clear();
 
-    activeSerial = { port, writer };
+    // Start background reader for serial ACKs
+    let reader: any = null;
+    if (port.readable) {
+        try {
+            reader = port.readable.getReader();
+            (async () => {
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                            handleIncomingBytes(value);
+                        }
+                    }
+                } catch {
+                    // Serial port closed
+                }
+            })();
+        } catch {
+            // ignore reader error
+        }
+    }
+
+    activeSerial = { port, writer, reader };
     currentDeviceName = 'NIIMBOT B2 Pro (USB)';
     currentTransport = 'serial';
     currentDpi = 300;
 
     // Send Connect handshake packet (0xC1, [0x01])
-    await sendRawPacket(buildNiimbotPacket(0xc1, [0x01]));
-    await sleep(60);
+    await sendCommandWaitAck(0xc1, [0x01], 0xc2, 350);
 
     return getNiimbotConnectionInfo();
 }
@@ -286,6 +452,14 @@ export async function disconnectNiimbot(): Promise<void> {
     try {
         if (activeBle?.device?.gatt?.connected) {
             activeBle.device.gatt.disconnect();
+        }
+    } catch {
+        // ignore
+    }
+    try {
+        if (activeSerial?.reader) {
+            await activeSerial.reader.cancel();
+            activeSerial.reader.releaseLock();
         }
     } catch {
         // ignore
@@ -314,7 +488,8 @@ async function sendRawPacket(packet: Uint8Array): Promise<void> {
 
     if (currentTransport === 'bluetooth' && activeBle?.writeChar) {
         const char = activeBle.writeChar;
-        const maxChunk = 128;
+        // JCBleControl sends packets up to MTU (typically 180 bytes on macOS BLE)
+        const maxChunk = 150;
         for (let offset = 0; offset < packet.length; offset += maxChunk) {
             const slice = packet.subarray(offset, Math.min(offset + maxChunk, packet.length));
             if (char.properties.writeWithoutResponse && char.writeValueWithoutResponse) {
@@ -323,13 +498,27 @@ async function sendRawPacket(packet: Uint8Array): Promise<void> {
                 await char.writeValue(slice);
             }
             if (packet.length > maxChunk) {
-                await sleep(6);
+                await sleep(5);
             }
         }
         return;
     }
 
     throw new Error('ยังไม่ได้เชื่อมต่อเครื่องปริ้น NIIMBOT B2 Pro');
+}
+
+/**
+ * Send a command packet and wait for expected ACK command from printer (or timeout gracefully)
+ */
+async function sendCommandWaitAck(
+    cmd: number,
+    data: number[] | Uint8Array,
+    expectedAckCmd: number | number[],
+    timeoutMs = 350
+): Promise<ParsedNiimbotPacket | null> {
+    const waitPromise = waitForPacket(expectedAckCmd, timeoutMs);
+    await sendRawPacket(buildNiimbotPacket(cmd, data));
+    return waitPromise;
 }
 
 /**
@@ -509,7 +698,43 @@ function encodeProductLabelToNiimbotRows(
 }
 
 /**
+ * Send StartPrint / jcSetPrintAllTime (0x01) with automatic protocol adaptation (V5 -> V6 -> V4 -> V3)
+ * In libjcPrinterSdk.dylib:
+ * - cPrinterV5::jcSetPrintAllTime sends 8 bytes: [pages_hi, pages_lo, 0, 0, 0, 0, pageColor(0), quality(0)]
+ * - cPrinterV6::jcSetPrintAllTime sends 9 bytes: [pages_hi, pages_lo, 0, 0, 0, 0, pageColor(0), quality(0), flag(0)]
+ * - cPrinterV4::jcSetPrintAllTime sends 7 bytes: [pages_hi, pages_lo, 0, 0, 0, 0, 0]
+ * - cPrinterV3::jcSetPrintAllTime sends 1 byte:  [0x01]
+ */
+async function startNiimbotPrintJob(totalPages: number): Promise<void> {
+    const hi = (totalPages >> 8) & 0xff;
+    const lo = totalPages & 0xff;
+
+    const candidatePayloads: number[][] = [
+        // 1. cPrinterV5 (8 bytes) - primary protocol for NIIMBOT B2 Pro
+        [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        // 2. cPrinterV6 (9 bytes) - newer firmware variant
+        [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        // 3. cPrinterV4 (7 bytes)
+        [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00],
+        // 4. cPrinterV3 (1 byte)
+        [0x01],
+    ];
+
+    for (const payload of candidatePayloads) {
+        const ack = await sendCommandWaitAck(0x01, payload, 0x02, 350);
+        if (ack && ack.data.length > 0 && ack.data[0] !== 0) {
+            return; // Printer accepted StartPrint!
+        }
+    }
+
+    // If notifications were not received (e.g. write-only characteristic), send V5 8-byte payload and wait briefly
+    await sendRawPacket(buildNiimbotPacket(0x01, candidatePayloads[0]));
+    await sleep(100);
+}
+
+/**
  * Stream a single encoded page to the NIIMBOT B2 Pro printer
+ * Matches cPrinterV5::commitJob + packageOneColorData + cPrinterV5::sendPrintData
  */
 async function sendNiimbotPage(
     encoded: {
@@ -521,30 +746,68 @@ async function sendNiimbotPage(
     quantity: number
 ): Promise<void> {
     const { widthDots, heightDots, bytesPerRow, rows } = encoded;
-
-    // 1. PageStart (0x03, [0x01])
-    await sendRawPacket(buildNiimbotPacket(0x03, [0x01]));
-    await sleep(35);
-
-    // 2. SetPageSize / jcSetPageInfo (0x13, [height_hi, height_lo, width_hi, width_lo, count_hi, count_lo])
     const copies = Math.max(1, quantity);
-    await sendRawPacket(
-        buildNiimbotPacket(0x13, [
+
+    // 1. PageStart / jcSetPagePrint (0x03, [0x01]) -> expects 0x04
+    await sendCommandWaitAck(0x03, [0x01], 0x04, 300);
+
+    // 2. SetPageSize / jcSetPageInfo (0x13, [rows_hi, rows_lo, cols_hi, cols_lo, copies_hi, copies_lo]) -> expects 0x14
+    const pageInfoAck = await sendCommandWaitAck(
+        0x13,
+        [
             (heightDots >> 8) & 0xff,
             heightDots & 0xff,
             (widthDots >> 8) & 0xff,
             widthDots & 0xff,
             (copies >> 8) & 0xff,
             copies & 0xff,
-        ])
+        ],
+        0x14,
+        350
     );
-    await sleep(45);
 
-    // 3. Stream bitmap rows using 0x84 (blank rows) and 0x85 (1-color bitmap row from cPrinterV5::sendPrintData)
-    const segBytes = Math.floor(bytesPerRow / 3);
+    // Fallback to 4-byte SetPageSize if printer NACKed 6-byte payload
+    if (pageInfoAck && pageInfoAck.data.length > 0 && pageInfoAck.data[0] === 0) {
+        await sendCommandWaitAck(
+            0x13,
+            [
+                (heightDots >> 8) & 0xff,
+                heightDots & 0xff,
+                (widthDots >> 8) & 0xff,
+                widthDots & 0xff,
+            ],
+            0x14,
+            300
+        );
+    }
+
+    // 3. Strip trailing empty white rows at bottom of page (exact match to cPrinterV5::commitJob @ 0xff674)
+    let effectiveHeight = heightDots;
+    while (effectiveHeight > 0) {
+        const r = rows[effectiveHeight - 1];
+        let hasBlack = false;
+        for (let i = 0; i < bytesPerRow; i++) {
+            if (r[i] !== 0) {
+                hasBlack = true;
+                break;
+            }
+        }
+        if (hasBlack) break;
+        effectiveHeight--;
+    }
+    if (effectiveHeight === 0) {
+        effectiveHeight = Math.min(30, heightDots);
+    }
+
+    // 4. Stream bitmap rows using 0x84 (blank row run) and 0x85 (bitmap row run)
+    // In packageOneColorData (@ 0x1bf0b8):
+    // - cnt0 = black pixels in x = 0..191   (bytes 0..23)
+    // - cnt1 = black pixels in x = 192..383 (bytes 24..47)
+    // - cnt2 = black pixels in x >= 384     (bytes 48..)
     let y = 0;
+    let rowsInCurrentChunk = 0;
 
-    while (y < heightDots) {
+    while (y < effectiveHeight) {
         const row = rows[y];
         let totalBits = 0;
         for (let i = 0; i < bytesPerRow; i++) {
@@ -553,7 +816,7 @@ async function sendNiimbotPage(
 
         if (totalBits === 0) {
             let blankCount = 1;
-            while (y + blankCount < heightDots && blankCount < 250) {
+            while (y + blankCount < effectiveHeight && blankCount < 250) {
                 const nextRow = rows[y + blankCount];
                 let nextHasBits = false;
                 for (let i = 0; i < bytesPerRow; i++) {
@@ -574,54 +837,74 @@ async function sendNiimbotPage(
                 ])
             );
             y += blankCount;
-            await sleep(4);
-            continue;
-        }
-
-        // Compress identical consecutive rows (vertical barcode bars!)
-        let repeatCount = 1;
-        while (y + repeatCount < heightDots && repeatCount < 25) {
-            const nextRow = rows[y + repeatCount];
-            let identical = true;
-            for (let i = 0; i < bytesPerRow; i++) {
-                if (nextRow[i] !== row[i]) {
-                    identical = false;
-                    break;
+            rowsInCurrentChunk += blankCount;
+            await sleep(currentTransport === 'bluetooth' ? 5 : 2);
+        } else {
+            // Compress identical consecutive rows (up to 255 in packageOneColorData)
+            let repeatCount = 1;
+            while (y + repeatCount < effectiveHeight && repeatCount < 200) {
+                const nextRow = rows[y + repeatCount];
+                let identical = true;
+                for (let i = 0; i < bytesPerRow; i++) {
+                    if (nextRow[i] !== row[i]) {
+                        identical = false;
+                        break;
+                    }
                 }
+                if (!identical) break;
+                repeatCount++;
             }
-            if (!identical) break;
-            repeatCount++;
+
+            // Exact segment pixel counts from packageOneColorData (0..191, 192..383, 384+)
+            let cnt0 = 0;
+            let cnt1 = 0;
+            let cnt2 = 0;
+            for (let i = 0; i < bytesPerRow; i++) {
+                const bits = popcount8(row[i]);
+                if (i < 24) cnt0 += bits;
+                else if (i < 48) cnt1 += bits;
+                else cnt2 += bits;
+            }
+
+            const payload = new Uint8Array(6 + bytesPerRow);
+            payload[0] = (y >> 8) & 0xff;
+            payload[1] = y & 0xff;
+            payload[2] = cnt0 & 0xff;
+            payload[3] = cnt1 & 0xff;
+            payload[4] = cnt2 & 0xff;
+            payload[5] = repeatCount & 0xff;
+            payload.set(row, 6);
+
+            await sendRawPacket(buildNiimbotPacket(0x85, payload));
+            y += repeatCount;
+            rowsInCurrentChunk += repeatCount;
+
+            await sleep(currentTransport === 'bluetooth' ? 6 : 2);
         }
 
-        let count1 = 0;
-        let count2 = 0;
-        let count3 = 0;
-        for (let i = 0; i < bytesPerRow; i++) {
-            const bits = popcount8(row[i]);
-            if (i < segBytes) count1 += bits;
-            else if (i < segBytes * 2) count2 += bits;
-            else count3 += bits;
+        // Flow control every ~180 rows (cPrinterV5::commitJob chunks at 200 rows and waits for 0xD3 buffer status)
+        if (rowsInCurrentChunk >= 180 && y < effectiveHeight) {
+            rowsInCurrentChunk = 0;
+            await waitForPacket(0xd3, 60);
         }
-
-        const payload = new Uint8Array(6 + bytesPerRow);
-        payload[0] = (y >> 8) & 0xff;
-        payload[1] = y & 0xff;
-        payload[2] = count1 & 0xff;
-        payload[3] = count2 & 0xff;
-        payload[4] = count3 & 0xff;
-        payload[5] = repeatCount & 0xff;
-        payload.set(row, 6);
-
-        await sendRawPacket(buildNiimbotPacket(0x85, payload));
-        y += repeatCount;
-
-        await sleep(currentTransport === 'bluetooth' ? 7 : 3);
     }
 
-    // 4. PageEnd / jcSetPageTerminal (0xE3, [0x01])
-    await sleep(60);
-    await sendRawPacket(buildNiimbotPacket(0xe3, [0x01]));
-    await sleep(120 * copies);
+    // 5. PageEnd / jcSetPageTerminal (0xE3, [0x01]) -> expects 0xE4
+    await sleep(40);
+    await sendCommandWaitAck(0xe3, [0x01], 0xe4, 500);
+
+    // 6. Wait for physical printhead to finish feeding/printing copies (poll 0xA3 -> 0xB3 as in cPrinterV5::commitJob @ 0x1005cc)
+    const maxWaitIterations = Math.min(25, 6 * copies);
+    for (let poll = 0; poll < maxWaitIterations; poll++) {
+        await sleep(180);
+        const statusPkt = await sendCommandWaitAck(0xa3, [0x01], 0xb3, 220);
+        if (statusPkt && statusPkt.data.length >= 2) {
+            const printedCopies = (statusPkt.data[0] << 8) | statusPkt.data[1];
+            if (printedCopies >= copies) {
+                break;
+            }
+        }
+    }
 }
 
 /**
@@ -652,25 +935,12 @@ export async function printDirectToNiimbotB2Pro(
 
     options?.onProgress?.(0, totalPages, 'กำลังเตรียมหัวพิมพ์ NIIMBOT B2 Pro...');
 
-    // 1. Set Print Density (0x21) & Label Type (0x23 = 1 Gap Paper)
-    await sendRawPacket(buildNiimbotPacket(0x21, [density]));
-    await sleep(40);
-    await sendRawPacket(buildNiimbotPacket(0x23, [0x01]));
-    await sleep(40);
+    // 1. Set Print Density (0x21 -> 0x22) & Label Type (0x23 = 1 Gap Paper -> 0x24)
+    await sendCommandWaitAck(0x21, [density], 0x22, 300);
+    await sendCommandWaitAck(0x23, [0x01], 0x24, 300);
 
-    // 2. StartJob / jcSetPrintAllTime (0x01)
-    await sendRawPacket(
-        buildNiimbotPacket(0x01, [
-            (totalPages >> 8) & 0xff,
-            totalPages & 0xff,
-            0x00,
-            0x00,
-            0x00,
-            0x00,
-            0x01,
-        ])
-    );
-    await sleep(80);
+    // 2. StartJob / jcSetPrintAllTime (0x01 -> 0x02) with V5 8-byte payload (and automatic V6/V4/V3 fallback)
+    await startNiimbotPrintJob(totalPages);
 
     let printedSoFar = 0;
 
@@ -691,10 +961,10 @@ export async function printDirectToNiimbotB2Pro(
             totalPages,
             `พิมพ์แล้ว ${printedSoFar}/${totalPages} ดวง`
         );
-        await sleep(100);
+        await sleep(80);
     }
 
-    // 3. PrintEnd / jcSetPrintTerminal (0xF3, [0x01])
-    await sleep(120);
-    await sendRawPacket(buildNiimbotPacket(0xf3, [0x01]));
+    // 3. PrintEnd / jcSetPrintTerminal (0xF3, [0x01] -> expects 0xF4)
+    await sleep(100);
+    await sendCommandWaitAck(0xf3, [0x01], 0xf4, 400);
 }
