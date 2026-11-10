@@ -566,7 +566,15 @@ function encodeProductLabelToNiimbotRows(
     ctx.translate(offsetXDots, offsetYDots);
 
     const scaleFactor = config.fontScale === 'sm' ? 0.85 : config.fontScale === 'lg' ? 1.15 : 1.0;
-    const minDim = Math.min(wCm, hCm);
+    // Physical NIIMBOT B2 Pro gap-sensor offset:
+    // Row y=0 starts printing ~4.2-4.5mm below the top edge of the sticker.
+    // Therefore, for a 3.0cm (30mm = 354 dots) sticker, the bottom edge of the physical sticker
+    // is reached at y ≈ 297 dots (which is where the horizontal line at y=299 printed previously).
+    // By starting at y = 2 dots and ending at y = heightDots - 4.9mm (~296 dots), the entire label
+    // (including the bottom weight/dimensions line) prints inside the physical sticker!
+    const hardwareOffsetCm = Math.min(0.49, hCm * 0.165);
+    const effHCm = Math.max(1.0, hCm - hardwareOffsetCm);
+    const minDim = Math.min(wCm, effHCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
     const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
@@ -574,7 +582,7 @@ function encodeProductLabelToNiimbotRows(
     const storeFontPx = ptToPx(Math.max(5, minDim * 2.5 * scaleFactor));
     const skuFontPx = ptToPx(Math.max(6.5, minDim * 3.3 * scaleFactor));
     const nameFontPx = ptToPx(Math.max(5.5, minDim * 2.7 * scaleFactor));
-    const metaFontPx = ptToPx(Math.max(5, minDim * 2.4 * scaleFactor));
+    const metaFontPx = ptToPx(Math.max(5, minDim * 2.45 * scaleFactor));
     const priceFontPx = ptToPx(Math.max(6.5, minDim * 3.4 * scaleFactor));
 
     const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
@@ -588,31 +596,32 @@ function encodeProductLabelToNiimbotRows(
         (config.showWeightAndDim && specsLine) || (config.showPrice && priceText)
     );
 
-    const padDots = Math.round((isTiny ? 0.1 : 0.12) * dotsPerCm);
-    const bottomPadDots = Math.round((isTiny ? 0.1 : 0.14) * dotsPerCm);
+    const sidePadDots = Math.round((isTiny ? 0.1 : 0.12) * dotsPerCm);
+    const topPadDots = Math.max(2, Math.round(0.02 * dotsPerCm));
+    const bottomPadDots = Math.round(hardwareOffsetCm * dotsPerCm);
     const printableBottomDots = heightDots - bottomPadDots;
 
-    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
-    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
-    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
+    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.12) : 0;
+    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.12) : 0;
+    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.12) : 0;
     const bottomRowFontH = Math.max(priceFontPx, metaFontPx);
     const bottomBlockH = hasBottomLine
-        ? bottomRowFontH + Math.max(6, Math.round(0.06 * dotsPerCm))
+        ? bottomRowFontH + Math.max(5, Math.round(0.05 * dotsPerCm))
         : 0;
 
     const totalTextHeightDots = storeLineH + skuLineH + nameLineH + bottomBlockH;
-    const barcodeGapDots = Math.max(3, Math.round(0.04 * dotsPerCm));
+    const barcodeGapDots = Math.max(3, Math.round(0.035 * dotsPerCm));
     const maxAvailableBarcodeH =
-        printableBottomDots - padDots - totalTextHeightDots - barcodeGapDots;
-    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.36 : 0.4) * dotsPerCm);
+        printableBottomDots - topPadDots - totalTextHeightDots - barcodeGapDots;
+    const targetBarcodeH = Math.round(effHCm * (isTiny ? 0.36 : 0.4) * dotsPerCm);
     const barcodeHeightDots = Math.max(24, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    let currentY = padDots;
-    const innerW = widthDots - padDots * 2;
+    let currentY = topPadDots;
+    const innerW = widthDots - sidePadDots * 2;
 
     // 1. Store Name
     if (config.showStoreName) {
@@ -649,7 +658,7 @@ function encodeProductLabelToNiimbotRows(
         currentY += nameLineH;
     }
 
-    // 5. Weight / Dimensions & Selling Price (positioned right near the bottom edge like NIIMBOT app)
+    // 5. Weight / Dimensions & Selling Price (placed at y <= 296 dots so it prints before the physical bottom edge)
     if (hasBottomLine) {
         const dividerGap = Math.max(3, Math.round(0.03 * dotsPerCm));
         const bottomY = Math.max(
@@ -660,20 +669,20 @@ function encodeProductLabelToNiimbotRows(
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padDots, bottomY - dividerGap);
-        ctx.lineTo(widthDots - padDots, bottomY - dividerGap);
+        ctx.moveTo(sidePadDots, bottomY - dividerGap);
+        ctx.lineTo(widthDots - sidePadDots, bottomY - dividerGap);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
             ctx.textAlign = 'left';
             ctx.font = `700 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(specsLine, padDots, bottomY, innerW * 0.62);
+            ctx.fillText(specsLine, sidePadDots, bottomY, innerW * 0.62);
 
             ctx.textAlign = 'right';
             ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.fillText(
                 priceText,
-                widthDots - padDots,
+                widthDots - sidePadDots,
                 bottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
             );
         } else {
