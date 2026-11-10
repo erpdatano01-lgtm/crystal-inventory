@@ -467,11 +467,11 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2">
               <Settings className="w-6 h-6 text-purple-600" />
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                ตั้งค่าระบบ & กฎการสร้าง SKU (Settings)
+                ตั้งค่าระบบรับหิน & รหัส SKU
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              เพิ่ม ลด หรือแก้ไขรูปทรงหิน (Shapes), ชนิดหิน (Stone Types) และปรับแต่งตัวย่อ SKU ได้อิสระ
+              หมวดคลังสินค้า ➔ จัดการรูปทรงหิน (Shapes), ชนิดหิน (Stone Types) และปรับแต่งตัวย่อ SKU สำหรับการรับหินเข้าสต็อก
             </p>
           </div>
         </div>
