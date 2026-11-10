@@ -64,13 +64,13 @@ export default function NewProductPage() {
   const [itemType, setItemType] = useState<ItemType>('UNIQUE');
   const [weightGrams, setWeightGrams] = useState<string>('');
   const [dimensions, setDimensions] = useState<string>('');
-  const [gradeOrigin, setGradeOrigin] = useState<string>('5A High Grade / บราซิล');
+  const [gradeOrigin, setGradeOrigin] = useState<string>('');
   const [costPrice, setCostPrice] = useState<string>('');
   const [sellingPrice, setSellingPrice] = useState<string>('');
   const [minPrice, setMinPrice] = useState<string>('');
   const [qtyOnHand, setQtyOnHand] = useState<number>(1);
   const [status, setStatus] = useState<ProductStatus>('AVAILABLE');
-  const [storageLocation, setStorageLocation] = useState<string>('ตู้โชว์ A-01');
+  const [storageLocation, setStorageLocation] = useState<string>('Sphere');
 
   // Media (ไฟล์จากเครื่อง / กล้อง ไม่ต้องใช้ URL)
   const [thumbnailImages, setThumbnailImages] = useState<string[]>([]);
@@ -175,6 +175,7 @@ export default function NewProductPage() {
         const initialStone = loadedStones[0]?.id || 'Amethyst';
         setStoneShape(initialShape);
         setStoneType(initialStone);
+        setStorageLocation(initialShape);
 
         const initialSku = generateSmartSku(
           initialStone,
@@ -191,11 +192,21 @@ export default function NewProductPage() {
     load();
   }, []);
 
-  // When stoneShape changes, auto-generate new SKU
+  // When stoneShape changes, auto-generate new SKU and auto-sync storage location
   const handleStoneShapeChange = (newShape: string) => {
+    const prevShape = stoneShape;
     setStoneShape(newShape);
     const newSku = generateSmartSku(stoneType, existingSkus, newShape, shapes, stones);
     setSku(newSku);
+
+    // Keep storageLocation separated by shape if empty or previously matching a shape
+    if (
+      !storageLocation ||
+      storageLocation === prevShape ||
+      shapes.some((s) => s.id === storageLocation)
+    ) {
+      setStorageLocation(newShape);
+    }
   };
 
   // When stoneType changes, auto-generate new SKU if not customized
@@ -576,10 +587,13 @@ export default function NewProductPage() {
                   <label className="text-xs font-semibold text-slate-700">
                     เกรดและแหล่งที่มา (Grade & Origin)
                   </label>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    (เว้นว่างไว้ได้)
+                  </span>
                 </div>
                 <input
                   type="text"
-                  placeholder="เช่น Top Gem (เกรดอัญมณี) / บราซิล"
+                  placeholder="เช่น 5A, Top Gem, บราซิล (ไม่บังคับ)"
                   value={gradeOrigin}
                   onChange={(e) => setGradeOrigin(e.target.value)}
                   className="w-full h-11 px-3.5 text-base sm:text-sm placeholder:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
@@ -589,17 +603,47 @@ export default function NewProductPage() {
               <div>
                 <div className="h-6 flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                    ตำแหน่งที่เก็บ (Storage Location)
+                    <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                    ตำแหน่งที่เก็บ (แยกตามรูปทรง Shape)
                   </label>
+                  <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-1.5 py-0.5 rounded-md">
+                    {storageLocation || stoneShape}
+                  </span>
                 </div>
-                <input
-                  type="text"
-                  placeholder="เช่น ตู้โชว์ A-01, กล่อง B-2"
-                  value={storageLocation}
-                  onChange={(e) => setStorageLocation(e.target.value)}
-                  className="w-full h-11 px-3.5 text-base sm:text-sm placeholder:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    list="storage-locations-list"
+                    placeholder="เช่น Sphere, Cabochon, Tower"
+                    value={storageLocation}
+                    onChange={(e) => setStorageLocation(e.target.value)}
+                    className="w-full h-11 px-3.5 text-base sm:text-sm placeholder:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-slate-900"
+                  />
+                  <datalist id="storage-locations-list">
+                    {shapes.map((sh) => (
+                      <option key={sh.id} value={sh.id}>
+                        {sh.label}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
+                {/* Quick shape buttons to change storage location instantly */}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {shapes.map((sh) => (
+                    <button
+                      key={sh.id}
+                      type="button"
+                      onClick={() => setStorageLocation(sh.id)}
+                      className={`text-[11px] px-2 py-0.5 rounded-lg border transition ${
+                        storageLocation === sh.id
+                          ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200'
+                      }`}
+                    >
+                      {sh.id}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
