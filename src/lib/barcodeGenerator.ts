@@ -128,10 +128,10 @@ export interface BarcodePresetItem {
 }
 
 export const BARCODE_SIZE_PRESETS: BarcodePresetItem[] = [
-  // NIIMBOT B21 Pro Presets (Max width 5.0 cm, 300 DPI)
+  // NIIMBOT B2 Pro Presets (Max width 5.0 cm, 300 DPI)
   {
     label: '5.0 × 3.0 cm',
-    desc: 'ม้วนมาตรฐานคู่ตัว NIIMBOT B21 Pro (50×30 mm)',
+    desc: 'ม้วนมาตรฐานคู่ตัว NIIMBOT B2 Pro (50×30 mm)',
     widthCm: 5.0,
     heightCm: 3.0,
     printer: 'both',
@@ -171,7 +171,7 @@ export const BARCODE_SIZE_PRESETS: BarcodePresetItem[] = [
   },
   {
     label: '5.0 × 5.0 cm',
-    desc: 'สติกเกอร์ทรงจัตุรัส B21 Pro (50×50 mm)',
+    desc: 'สติกเกอร์ทรงจัตุรัส NIIMBOT B2 Pro (50×50 mm)',
     widthCm: 5.0,
     heightCm: 5.0,
     printer: 'niimbot_b21_pro',

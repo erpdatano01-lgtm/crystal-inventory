@@ -12,6 +12,15 @@ import {
   saveBarcodeConfig,
 } from '@/lib/barcodeGenerator';
 import {
+  connectNiimbotBluetooth,
+  connectNiimbotSerial,
+  disconnectNiimbot,
+  getNiimbotConnectionInfo,
+  printDirectToNiimbotB2Pro,
+  NiimbotConnectionInfo,
+  setNiimbotDpi,
+} from '@/lib/niimbotDirectPrint';
+import {
   Printer,
   X,
   Ruler,
@@ -29,6 +38,11 @@ import {
   Wifi,
   Move,
   AlertTriangle,
+  Bluetooth,
+  Usb,
+  Zap,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 
 interface BarcodePrintModalProps {
@@ -50,11 +64,24 @@ export default function BarcodePrintModal({
   const [showAllSelector, setShowAllSelector] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
 
+  // Direct NIIMBOT B2 Pro Web Bluetooth / Web Serial states
+  const [niimbotConn, setNiimbotConn] = useState<NiimbotConnectionInfo>(() =>
+    getNiimbotConnectionInfo()
+  );
+  const [niimbotDensity, setNiimbotDensity] = useState<number>(3);
+  const [niimbotDpiState, setNiimbotDpiState] = useState<203 | 300>(300);
+  const [isDirectPrinting, setIsDirectPrinting] = useState(false);
+  const [directPrintStatus, setDirectPrintStatus] = useState<string>('');
+  const [directPrintError, setDirectPrintError] = useState<string>('');
+
   // Load saved config and initialize selected product copies
   useEffect(() => {
     if (!isOpen) return;
     const saved = getSavedBarcodeConfig();
     setConfig(saved);
+    setNiimbotConn(getNiimbotConnectionInfo());
+    setDirectPrintStatus('');
+    setDirectPrintError('');
 
     const nextCopies: Record<string, number> = {};
     if (initialSelectedProducts && initialSelectedProducts.length > 0) {
@@ -195,6 +222,70 @@ export default function BarcodePrintModal({
   };
 
   const metrics = getScaledMetrics(config.widthCm, config.heightCm, config.fontScale);
+
+  // Direct Web Bluetooth / Web Serial connection handlers for NIIMBOT B2 Pro
+  const handleConnectBluetooth = async () => {
+    setDirectPrintError('');
+    setDirectPrintStatus('กำลังค้นหาเครื่องปริ้น NIIMBOT B2 Pro ผ่าน Bluetooth...');
+    try {
+      const info = await connectNiimbotBluetooth();
+      setNiimbotConn(info);
+      setNiimbotDpiState(info.dpi);
+      setDirectPrintStatus(`เชื่อมต่อสำเร็จ: ${info.deviceName} (${info.dpi} DPI) พร้อมสั่งปริ้นทันที!`);
+    } catch (err: any) {
+      setDirectPrintStatus('');
+      setDirectPrintError(err?.message || 'ไม่สามารถเชื่อมต่อ Bluetooth ได้');
+    }
+  };
+
+  const handleConnectUsb = async () => {
+    setDirectPrintError('');
+    setDirectPrintStatus('กำลังเชื่อมต่อเครื่องปริ้น NIIMBOT B2 Pro ผ่านสาย USB...');
+    try {
+      const info = await connectNiimbotSerial();
+      setNiimbotConn(info);
+      setNiimbotDpiState(info.dpi);
+      setDirectPrintStatus(`เชื่อมต่อสาย USB สำเร็จ: ${info.deviceName} พร้อมสั่งปริ้นทันที!`);
+    } catch (err: any) {
+      setDirectPrintStatus('');
+      setDirectPrintError(err?.message || 'ไม่สามารถเชื่อมต่อสาย USB ได้');
+    }
+  };
+
+  const handleDisconnectNiimbot = async () => {
+    await disconnectNiimbot();
+    setNiimbotConn(getNiimbotConnectionInfo());
+    setDirectPrintStatus('');
+    setDirectPrintError('');
+  };
+
+  const handleDirectNiimbotPrint = async () => {
+    if (totalLabels === 0) {
+      alert('กรุณาเลือกสินค้าอย่างน้อย 1 รายการเพื่อพิมพ์บาร์โค้ด');
+      return;
+    }
+    setDirectPrintError('');
+    setIsDirectPrinting(true);
+    try {
+      await printDirectToNiimbotB2Pro(selectedItems, config, {
+        density: niimbotDensity,
+        dpi: niimbotDpiState,
+        onProgress: (_curr, _tot, msg) => {
+          setDirectPrintStatus(msg);
+        },
+      });
+      setNiimbotConn(getNiimbotConnectionInfo());
+      setDirectPrintStatus(`✅ ปริ้นออกเครื่อง NIIMBOT B2 Pro สำเร็จครบ ${totalLabels} ดวง!`);
+    } catch (err: any) {
+      setDirectPrintStatus('');
+      setDirectPrintError(
+        err?.message ||
+          'เกิดข้อผิดพลาดในการส่งพิมพ์ (หากเปิดแอป NIIMBOT บนคอมอยู่ กรุณากดตัดการเชื่อมต่อในแอป NIIMBOT ก่อนเพื่อให้หน้าเว็บสั่งพิมพ์ตรงได้)'
+      );
+    } finally {
+      setIsDirectPrinting(false);
+    }
+  };
 
   // Build HTML and trigger print via hidden iframe for exact cm sizing
   const handlePrintLabels = () => {
@@ -647,7 +738,7 @@ export default function BarcodePrintModal({
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-base sm:text-lg truncate">
-                ปริ้นบาร์โค้ด (NIIMBOT B21 Pro & EasyPrint ES-9920EW)
+                ปริ้นบาร์โค้ด (NIIMBOT B2 Pro & EasyPrint ES-9920EW)
               </h3>
               <p className="text-xs text-slate-300 truncate">
                 ขนาดป้าย: <strong className="text-amber-300">{config.widthCm} × {config.heightCm} cm</strong> ({Math.round(config.widthCm * 10)} × {Math.round(config.heightCm * 10)} mm)
@@ -668,7 +759,7 @@ export default function BarcodePrintModal({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
           {/* Printer Model Selector Banner */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <label className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <Printer className="w-4 h-4 text-purple-600" />
               <span>เลือกเครื่องพิมพ์บาร์โค้ดที่ใช้งาน:</span>
@@ -692,7 +783,7 @@ export default function BarcodePrintModal({
                 />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
-                    <span>NIIMBOT B21 Pro</span>
+                    <span>NIIMBOT B2 Pro</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200 font-bold">
                       300 DPI
                     </span>
@@ -704,7 +795,7 @@ export default function BarcodePrintModal({
                         : 'text-slate-400'
                     }`}
                   >
-                    หน้ากว้าง 2.0–5.0 cm • รองรับทั้ง USB และส่งเข้าแอปมือถือ
+                    สั่งปริ้นตรงจากหน้าเว็บผ่าน Bluetooth / สาย USB ไม่ต้องโหลดไฟล์
                   </p>
                 </div>
               </button>
@@ -770,6 +861,129 @@ export default function BarcodePrintModal({
                 </div>
               </button>
             </div>
+
+            {/* Direct Connection & 1-Click Print Bar for NIIMBOT B2 Pro */}
+            {config.printerProfile === 'niimbot_b21_pro' && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white border border-purple-700/60 shadow-lg space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        niimbotConn.connected
+                          ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                          : 'bg-amber-400 animate-pulse'
+                      }`}
+                    />
+                    <span className="text-xs sm:text-sm font-extrabold">
+                      {niimbotConn.connected
+                        ? `เชื่อมต่อแล้ว: ${niimbotConn.deviceName} (${niimbotDpiState} DPI)`
+                        : 'โหมดสั่งปริ้นตรงเข้า NIIMBOT B2 Pro จากหน้าเว็บทันที (ไม่ต้องโหลดไฟล์)'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {!niimbotConn.connected ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleConnectBluetooth}
+                          disabled={isDirectPrinting}
+                          className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition active:scale-95"
+                        >
+                          <Bluetooth className="w-3.5 h-3.5" />
+                          <span>เชื่อมต่อ Bluetooth (B2 Pro)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConnectUsb}
+                          disabled={isDirectPrinting}
+                          className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition active:scale-95"
+                        >
+                          <Usb className="w-3.5 h-3.5" />
+                          <span>ต่อสาย USB</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectNiimbot}
+                        disabled={isDirectPrinting}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 text-[11px] font-bold transition"
+                      >
+                        สลับ / ตัดการเชื่อมต่อ
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Density & Resolution Controls */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-white/10 text-[11px] text-purple-200">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-300">ความเข้มหมึกความร้อน:</span>
+                      {[1, 2, 3, 4, 5].map((lvl) => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => setNiimbotDensity(lvl)}
+                          className={`w-6 h-6 rounded-lg font-bold transition ${
+                            niimbotDensity === lvl
+                              ? 'bg-amber-400 text-slate-950 shadow'
+                              : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                          }`}
+                        >
+                          {lvl}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-300">ความละเอียดหัวพิมพ์:</span>
+                      {([300, 203] as const).map((dpiVal) => (
+                        <button
+                          key={dpiVal}
+                          type="button"
+                          onClick={() => {
+                            setNiimbotDpiState(dpiVal);
+                            setNiimbotDpi(dpiVal);
+                          }}
+                          className={`px-2 py-0.5 rounded-lg font-bold transition ${
+                            niimbotDpiState === dpiVal
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                          }`}
+                        >
+                          {dpiVal} DPI {dpiVal === 300 ? '(B2 Pro)' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <span className="text-[11px] text-amber-300/90">
+                    💡 หากเปิดแอป NIIMBOT บนคอมอยู่ ให้กดตัดการเชื่อมต่อในแอป NIIMBOT ก่อนเพื่อให้หน้าเว็บจับสัญญาณ B2 Pro ได้ทันที
+                  </span>
+                </div>
+
+                {/* Live status or error feedback */}
+                {directPrintStatus && (
+                  <div className="px-3 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs font-bold flex items-center gap-2">
+                    {isDirectPrinting ? (
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0 text-emerald-300" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-300" />
+                    )}
+                    <span>{directPrintStatus}</span>
+                  </div>
+                )}
+
+                {directPrintError && (
+                  <div className="px-3 py-2 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-300" />
+                    <span>{directPrintError}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -787,13 +1001,13 @@ export default function BarcodePrintModal({
                   </span>
                 </div>
 
-                {/* Warning if NIIMBOT B21 Pro width > 5.0 cm */}
+                {/* Warning if NIIMBOT B2 Pro width > 5.0 cm */}
                 {isNiimbotOverWidth && (
                   <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-2 text-xs text-amber-900">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>
-                        เครื่อง <strong>NIIMBOT B21 Pro</strong> รองรับความกว้างสติกเกอร์สูงสุด{' '}
+                        เครื่อง <strong>NIIMBOT B2 Pro</strong> รองรับความกว้างสติกเกอร์สูงสุด{' '}
                         <strong>5.0 cm (50 mm)</strong>
                       </span>
                     </div>
@@ -812,7 +1026,7 @@ export default function BarcodePrintModal({
                   <span className="text-[11px] font-semibold text-slate-500 block mb-2">
                     ขนาดสติกเกอร์มาตรฐานสำหรับ{' '}
                     {config.printerProfile === 'niimbot_b21_pro'
-                      ? 'NIIMBOT B21 Pro'
+                      ? 'NIIMBOT B2 Pro'
                       : config.printerProfile === 'easyprint_es9920ew'
                       ? 'EasyPrint ES-9920EW'
                       : 'แผ่น A4'}{' '}
@@ -1425,28 +1639,43 @@ export default function BarcodePrintModal({
             ปิดหน้าต่าง
           </button>
 
-          <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
-            <button
-              type="button"
-              onClick={() => handleExport300DpiImage(previewProduct)}
-              disabled={isExportingImage}
-              className="px-3.5 py-2.5 min-h-[44px] rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs sm:text-sm flex items-center gap-1.5 active:scale-95 transition"
-              title="เซฟรูปป้าย 300 DPI เพื่อเปิดพิมพ์ในแอป NIIMBOT บนมือถือ"
-            >
-              <Download className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">เซฟรูป 300 DPI (แอป NIIMBOT)</span>
-              <span className="sm:hidden">เซฟรูปแอป</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 flex-1 sm:flex-initial justify-end">
+            {config.printerProfile === 'niimbot_b21_pro' && (
+              <button
+                type="button"
+                onClick={handleDirectNiimbotPrint}
+                disabled={totalLabels === 0 || isDirectPrinting}
+                className="flex-1 sm:flex-initial px-5 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 active:scale-95 transition"
+                title="สั่งปริ้นตรงเข้าเครื่อง NIIMBOT B2 Pro ผ่าน Bluetooth / USB ทันที ไม่ต้องโหลดไฟล์"
+              >
+                {isDirectPrinting ? (
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4 shrink-0 text-amber-300" />
+                )}
+                <span>
+                  {isDirectPrinting
+                    ? 'กำลังปริ้นออก B2 Pro...'
+                    : `ปริ้นออก NIIMBOT B2 Pro ทันที (${totalLabels} ดวง)`}
+                </span>
+              </button>
+            )}
 
             <button
               type="button"
               onClick={handlePrintLabels}
               disabled={totalLabels === 0}
-              className="flex-1 sm:flex-initial px-5 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 active:scale-95 transition"
+              className={`px-4 py-2.5 min-h-[44px] rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 active:scale-95 transition ${
+                config.printerProfile === 'niimbot_b21_pro'
+                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                  : 'flex-1 sm:flex-initial px-5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-600/25'
+              } disabled:opacity-50`}
             >
               <Printer className="w-4 h-4 shrink-0" />
               <span>
-                สั่งปริ้น ({config.widthCm}×{config.heightCm} cm • {totalLabels} ดวง)
+                {config.printerProfile === 'niimbot_b21_pro'
+                  ? 'ปริ้นผ่านไดรเวอร์ระบบ'
+                  : `สั่งปริ้น (${config.widthCm}×${config.heightCm} cm • ${totalLabels} ดวง)`}
               </span>
             </button>
           </div>
