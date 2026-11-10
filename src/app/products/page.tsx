@@ -48,8 +48,11 @@ import BarcodePrintModal from '@/components/BarcodePrintModal';
 import DimensionInputs from '@/components/DimensionInputs';
 import ImageUploader from '@/components/ImageUploader';
 import VideoUploader from '@/components/VideoUploader';
+import StoneTypeCombobox from '@/components/StoneTypeCombobox';
 import {
+  StoneTypeItem,
   getStoneTypes,
+  saveStoneTypes,
   getHideCostPreference,
   setHideCostPreference,
   fetchCloudSettings,
@@ -87,6 +90,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState<Partial<Product>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [stones, setStones] = useState<StoneTypeItem[]>([]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -97,9 +101,15 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setIsCustomerView(getHideCostPreference());
+    setStones(getStoneTypes());
     fetchCloudSettings().then((cloud) => {
-      if (cloud && typeof cloud.hideCost === 'boolean') {
-        setIsCustomerView(cloud.hideCost);
+      if (cloud) {
+        if (typeof cloud.hideCost === 'boolean') {
+          setIsCustomerView(cloud.hideCost);
+        }
+        if (cloud.stones && cloud.stones.length > 0) {
+          setStones(cloud.stones);
+        }
       }
     });
     async function load() {
@@ -1170,21 +1180,18 @@ export default function ProductsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">ชนิดหิน</label>
-                    <input
-                      type="text"
-                      list="stone-types-list"
+                    <StoneTypeCombobox
                       value={editForm.stone_type || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, stone_type: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      placeholder="พิมพ์ชื่อหิน หรือเลือกจากรายการ"
+                      onChange={(val) => setEditForm((f) => ({ ...f, stone_type: val }))}
+                      stones={stones}
+                      onAddNewStone={(newStone) => {
+                        setStones((prev) => {
+                          const next = [...prev.filter((s) => s.id !== newStone.id), newStone];
+                          saveStoneTypes(next);
+                          return next;
+                        });
+                      }}
                     />
-                    <datalist id="stone-types-list">
-                      {getStoneTypes().map((st) => (
-                        <option key={st.id} value={st.id}>
-                          {st.label} [{st.code}]
-                        </option>
-                      ))}
-                    </datalist>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">น้ำหนัก (กรัม)</label>

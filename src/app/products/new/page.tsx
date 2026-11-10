@@ -23,8 +23,10 @@ import {
   StoneTypeItem,
   getStoneShapes,
   getStoneTypes,
+  saveStoneTypes,
   fetchCloudSettings,
 } from '@/lib/settingsService';
+import StoneTypeCombobox from '@/components/StoneTypeCombobox';
 import {
   PlusCircle,
   Gem,
@@ -206,6 +208,15 @@ export default function NewProductPage() {
     if (!name || name.includes('Cluster') || name.includes('Point') || name.includes('Sphere')) {
       setName(`${newType} ${stoneShape}`);
     }
+  };
+
+  // Add brand new stone type on the fly
+  const handleAddNewStone = (newStone: StoneTypeItem) => {
+    setStones((prev) => {
+      const next = [...prev.filter((s) => s.id !== newStone.id), newStone];
+      saveStoneTypes(next);
+      return next;
+    });
   };
 
   // Selected lot details for reference
@@ -413,17 +424,12 @@ export default function NewProductPage() {
                     ⚙️ จัดการหิน
                   </Link>
                 </div>
-                <select
+                <StoneTypeCombobox
                   value={stoneType}
-                  onChange={(e) => handleStoneTypeChange(e.target.value)}
-                  className="w-full h-11 px-3.5 text-base sm:text-sm bg-white border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-purple-900 transition"
-                >
-                  {stones.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label} [{s.code}]
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => handleStoneTypeChange(val)}
+                  stones={stones}
+                  onAddNewStone={handleAddNewStone}
+                />
               </div>
             </div>
 
