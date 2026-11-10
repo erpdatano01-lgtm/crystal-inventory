@@ -566,24 +566,22 @@ function encodeProductLabelToNiimbotRows(
     ctx.translate(offsetXDots, offsetYDots);
 
     const scaleFactor = config.fontScale === 'sm' ? 0.85 : config.fontScale === 'lg' ? 1.15 : 1.0;
-    // Physical NIIMBOT B2 Pro gap-sensor offset:
-    // Row y=0 starts printing ~4.2-4.5mm below the top edge of the sticker.
-    // Therefore, for a 3.0cm (30mm = 354 dots) sticker, the bottom edge of the physical sticker
-    // is reached at y ≈ 297 dots (which is where the horizontal line at y=299 printed previously).
-    // By starting at y = 2 dots and ending at y = heightDots - 4.9mm (~296 dots), the entire label
-    // (including the bottom weight/dimensions line) prints inside the physical sticker!
-    const hardwareOffsetCm = Math.min(0.49, hCm * 0.165);
-    const effHCm = Math.max(1.0, hCm - hardwareOffsetCm);
-    const minDim = Math.min(wCm, effHCm);
+    const minDim = Math.min(wCm, hCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
-    const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
+    // Exact typography and proportional metrics aligned with BarcodePrintModal 300 DPI layout
+    const storeFontPt = Math.max(5, Math.round(minDim * 2.5 * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(6.5, Math.round(minDim * 3.3 * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(5.5, Math.round(minDim * 2.7 * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(5, Math.round(minDim * 2.4 * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(6.5, Math.round(minDim * 3.4 * scaleFactor * 10) / 10);
 
-    const storeFontPx = ptToPx(Math.max(5, minDim * 2.5 * scaleFactor));
-    const skuFontPx = ptToPx(Math.max(6.5, minDim * 3.3 * scaleFactor));
-    const nameFontPx = ptToPx(Math.max(5.5, minDim * 2.7 * scaleFactor));
-    const metaFontPx = ptToPx(Math.max(5, minDim * 2.45 * scaleFactor));
-    const priceFontPx = ptToPx(Math.max(6.5, minDim * 3.4 * scaleFactor));
+    const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
+    const storeFontPx = ptToPx(storeFontPt);
+    const skuFontPx = ptToPx(skuFontPt);
+    const nameFontPx = ptToPx(nameFontPt);
+    const metaFontPx = ptToPx(metaFontPt);
+    const priceFontPx = ptToPx(priceFontPt);
 
     const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
     const dimText = product.dimensions || '';
@@ -596,24 +594,33 @@ function encodeProductLabelToNiimbotRows(
         (config.showWeightAndDim && specsLine) || (config.showPrice && priceText)
     );
 
-    const sidePadDots = Math.round((isTiny ? 0.1 : 0.12) * dotsPerCm);
-    const topPadDots = Math.max(2, Math.round(0.02 * dotsPerCm));
-    const bottomPadDots = Math.round(hardwareOffsetCm * dotsPerCm);
-    const printableBottomDots = heightDots - bottomPadDots;
+    // Padding matches the exported image (8.5% bottom margin = ~2.5mm on a 30mm sticker)
+    // In thermal gap printing, leaving this 2.5mm on canvas aligns the bottom line
+    // perfectly with the physical bottom edge of the sticker without triggering the gap sensor cutoff!
+    const sidePadDots = Math.round((isTiny ? 0.1 : 0.15) * dotsPerCm);
+    const topPadDots = Math.round((isTiny ? 0.08 : 0.14) * dotsPerCm);
+    const bottomMarginDots = Math.max(16, Math.round(Math.min(0.255, hCm * 0.085) * dotsPerCm));
+    const printableBottomDots = heightDots - bottomMarginDots;
 
-    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.12) : 0;
-    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.12) : 0;
-    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.12) : 0;
-    const bottomRowFontH = Math.max(priceFontPx, metaFontPx);
-    const bottomBlockH = hasBottomLine
-        ? bottomRowFontH + Math.max(5, Math.round(0.05 * dotsPerCm))
-        : 0;
+    const bottomRowFontH = Math.max(
+        config.showPrice && priceText ? priceFontPx : 0,
+        config.showWeightAndDim && specsLine ? metaFontPx : 0
+    );
+    const bottomY = printableBottomDots - bottomRowFontH;
+    const dividerGap = Math.max(3, Math.round(0.03 * dotsPerCm));
+    const dividerY = bottomY - dividerGap;
 
-    const totalTextHeightDots = storeLineH + skuLineH + nameLineH + bottomBlockH;
-    const barcodeGapDots = Math.max(3, Math.round(0.035 * dotsPerCm));
-    const maxAvailableBarcodeH =
-        printableBottomDots - topPadDots - totalTextHeightDots - barcodeGapDots;
-    const targetBarcodeH = Math.round(effHCm * (isTiny ? 0.36 : 0.4) * dotsPerCm);
+    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
+    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
+    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
+    const barcodeGapDots = Math.max(3, Math.round(0.04 * dotsPerCm));
+
+    const totalTextH = storeLineH + skuLineH + nameLineH;
+    const maxAvailableBarcodeH = hasBottomLine
+        ? dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots
+        : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
+
+    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.35 : 0.38) * dotsPerCm);
     const barcodeHeightDots = Math.max(24, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
@@ -658,19 +665,13 @@ function encodeProductLabelToNiimbotRows(
         currentY += nameLineH;
     }
 
-    // 5. Weight / Dimensions & Selling Price (placed at y <= 296 dots so it prints before the physical bottom edge)
+    // 5. Weight / Dimensions & Selling Price (positioned flush against bottom edge, exactly matching exported image)
     if (hasBottomLine) {
-        const dividerGap = Math.max(3, Math.round(0.03 * dotsPerCm));
-        const bottomY = Math.max(
-            currentY + dividerGap + 2,
-            printableBottomDots - bottomRowFontH
-        );
-
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(sidePadDots, bottomY - dividerGap);
-        ctx.lineTo(widthDots - sidePadDots, bottomY - dividerGap);
+        ctx.moveTo(sidePadDots, dividerY);
+        ctx.lineTo(widthDots - sidePadDots, dividerY);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
@@ -689,7 +690,7 @@ function encodeProductLabelToNiimbotRows(
             ctx.textAlign = 'center';
             const textToDraw = config.showPrice && priceText ? priceText : specsLine;
             const fPx = config.showPrice && priceText ? priceFontPx : metaFontPx;
-            ctx.font = `900 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.font = `800 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.fillText(textToDraw, widthDots / 2, bottomY, innerW);
         }
     }
