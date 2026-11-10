@@ -566,21 +566,16 @@ function encodeProductLabelToNiimbotRows(
     ctx.translate(offsetXDots, offsetYDots);
 
     const scaleFactor = config.fontScale === 'sm' ? 0.85 : config.fontScale === 'lg' ? 1.15 : 1.0;
-    // Reserve ~0.45 cm (4.5 mm) at the bottom so NIIMBOT B2 Pro gap-sensor cutoff never clips the bottom line
-    const bottomSafeCm = Math.min(0.48, Math.max(0.35, hCm * 0.15));
-    const topPadCm = hCm <= 2.0 ? 0.08 : 0.1;
-    const effHCm = Math.max(1.0, hCm - bottomSafeCm - topPadCm);
-
-    const minDim = Math.min(wCm, effHCm);
-    const isTiny = effHCm <= 1.6 || wCm <= 2.8;
+    const minDim = Math.min(wCm, hCm);
+    const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
     const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
 
-    const storeFontPx = ptToPx(Math.max(5, minDim * 2.4 * scaleFactor));
-    const skuFontPx = ptToPx(Math.max(6.5, minDim * 3.2 * scaleFactor));
-    const nameFontPx = ptToPx(Math.max(5.5, minDim * 2.6 * scaleFactor));
-    const metaFontPx = ptToPx(Math.max(5, minDim * 2.35 * scaleFactor));
-    const priceFontPx = ptToPx(Math.max(6.5, minDim * 3.3 * scaleFactor));
+    const storeFontPx = ptToPx(Math.max(5, minDim * 2.5 * scaleFactor));
+    const skuFontPx = ptToPx(Math.max(6.5, minDim * 3.3 * scaleFactor));
+    const nameFontPx = ptToPx(Math.max(5.5, minDim * 2.7 * scaleFactor));
+    const metaFontPx = ptToPx(Math.max(5, minDim * 2.4 * scaleFactor));
+    const priceFontPx = ptToPx(Math.max(6.5, minDim * 3.4 * scaleFactor));
 
     const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
     const dimText = product.dimensions || '';
@@ -593,32 +588,31 @@ function encodeProductLabelToNiimbotRows(
         (config.showWeightAndDim && specsLine) || (config.showPrice && priceText)
     );
 
-    const padXDots = Math.round((isTiny ? 0.1 : 0.14) * dotsPerCm);
-    const topPadDots = Math.round(topPadCm * dotsPerCm);
-    const bottomSafeDots = Math.round(bottomSafeCm * dotsPerCm);
-    const printableBottomDots = heightDots - bottomSafeDots;
+    const padDots = Math.round((isTiny ? 0.1 : 0.12) * dotsPerCm);
+    const bottomPadDots = Math.round((isTiny ? 0.1 : 0.14) * dotsPerCm);
+    const printableBottomDots = heightDots - bottomPadDots;
 
-    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.14) : 0;
-    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.14) : 0;
-    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.14) : 0;
+    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
+    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
+    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
     const bottomRowFontH = Math.max(priceFontPx, metaFontPx);
     const bottomBlockH = hasBottomLine
         ? bottomRowFontH + Math.max(6, Math.round(0.06 * dotsPerCm))
         : 0;
 
     const totalTextHeightDots = storeLineH + skuLineH + nameLineH + bottomBlockH;
-    const barcodeGapDots = Math.max(3, Math.round(0.035 * dotsPerCm));
+    const barcodeGapDots = Math.max(3, Math.round(0.04 * dotsPerCm));
     const maxAvailableBarcodeH =
-        printableBottomDots - topPadDots - totalTextHeightDots - barcodeGapDots;
-    const targetBarcodeH = Math.round(effHCm * (isTiny ? 0.36 : 0.42) * dotsPerCm);
-    const barcodeHeightDots = Math.max(22, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+        printableBottomDots - padDots - totalTextHeightDots - barcodeGapDots;
+    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.36 : 0.4) * dotsPerCm);
+    const barcodeHeightDots = Math.max(24, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    let currentY = topPadDots;
-    const innerW = widthDots - padXDots * 2;
+    let currentY = padDots;
+    const innerW = widthDots - padDots * 2;
 
     // 1. Store Name
     if (config.showStoreName) {
@@ -655,7 +649,7 @@ function encodeProductLabelToNiimbotRows(
         currentY += nameLineH;
     }
 
-    // 5. Weight / Dimensions & Selling Price (positioned safely above bottomSafeDots)
+    // 5. Weight / Dimensions & Selling Price (positioned right near the bottom edge like NIIMBOT app)
     if (hasBottomLine) {
         const dividerGap = Math.max(3, Math.round(0.03 * dotsPerCm));
         const bottomY = Math.max(
@@ -666,20 +660,20 @@ function encodeProductLabelToNiimbotRows(
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padXDots, bottomY - dividerGap);
-        ctx.lineTo(widthDots - padXDots, bottomY - dividerGap);
+        ctx.moveTo(padDots, bottomY - dividerGap);
+        ctx.lineTo(widthDots - padDots, bottomY - dividerGap);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
             ctx.textAlign = 'left';
             ctx.font = `700 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(specsLine, padXDots, bottomY, innerW * 0.62);
+            ctx.fillText(specsLine, padDots, bottomY, innerW * 0.62);
 
             ctx.textAlign = 'right';
             ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.fillText(
                 priceText,
-                widthDots - padXDots,
+                widthDots - padDots,
                 bottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
             );
         } else {
@@ -822,101 +816,148 @@ async function sendNiimbotPage(
         );
     }
 
-    // 4. Stream bitmap rows using 0x84 (blank row run) and 0x85 (bitmap row run)
+    // 4. Package bitmap rows into 200-row chunks (exact match to cPrinterV5::commitJob @ 0xff288..0xff440)
     // In packageOneColorData (@ 0x1bf0b8):
     // - cnt0 = black pixels in x = 0..191   (bytes 0..23)
     // - cnt1 = black pixels in x = 192..383 (bytes 24..47)
     // - cnt2 = black pixels in x >= 384     (bytes 48..)
-    let y = 0;
-    let rowsInCurrentChunk = 0;
+    const CHUNK_ROW_LIMIT = 200;
+    const chunks: Array<{
+        startRow: number;
+        lastRow: number;
+        packets: Uint8Array[];
+    }> = [];
 
-    while (y < effectiveHeight) {
-        const row = rows[y];
-        let totalBits = 0;
-        for (let i = 0; i < bytesPerRow; i++) {
-            totalBits += popcount8(row[i]);
-        }
+    for (let chunkStart = 0; chunkStart < effectiveHeight; chunkStart += CHUNK_ROW_LIMIT) {
+        const chunkEnd = Math.min(effectiveHeight, chunkStart + CHUNK_ROW_LIMIT);
+        const packets: Uint8Array[] = [];
+        let y = chunkStart;
 
-        if (totalBits === 0) {
-            let blankCount = 1;
-            while (y + blankCount < effectiveHeight && blankCount < 250) {
-                const nextRow = rows[y + blankCount];
-                let nextHasBits = false;
-                for (let i = 0; i < bytesPerRow; i++) {
-                    if (nextRow[i] !== 0) {
-                        nextHasBits = true;
-                        break;
-                    }
-                }
-                if (nextHasBits) break;
-                blankCount++;
-            }
-
-            await sendRawPacket(
-                buildNiimbotPacket(0x84, [
-                    (y >> 8) & 0xff,
-                    y & 0xff,
-                    blankCount & 0xff,
-                ])
-            );
-            y += blankCount;
-            rowsInCurrentChunk += blankCount;
-            await sleep(currentTransport === 'bluetooth' ? 5 : 2);
-        } else {
-            // Compress identical consecutive rows (up to 255 in packageOneColorData)
-            let repeatCount = 1;
-            while (y + repeatCount < effectiveHeight && repeatCount < 200) {
-                const nextRow = rows[y + repeatCount];
-                let identical = true;
-                for (let i = 0; i < bytesPerRow; i++) {
-                    if (nextRow[i] !== row[i]) {
-                        identical = false;
-                        break;
-                    }
-                }
-                if (!identical) break;
-                repeatCount++;
-            }
-
-            // Exact segment pixel counts from packageOneColorData (0..191, 192..383, 384+)
-            let cnt0 = 0;
-            let cnt1 = 0;
-            let cnt2 = 0;
+        while (y < chunkEnd) {
+            const row = rows[y];
+            let totalBits = 0;
             for (let i = 0; i < bytesPerRow; i++) {
-                const bits = popcount8(row[i]);
-                if (i < 24) cnt0 += bits;
-                else if (i < 48) cnt1 += bits;
-                else cnt2 += bits;
+                totalBits += popcount8(row[i]);
             }
 
-            const payload = new Uint8Array(6 + bytesPerRow);
-            payload[0] = (y >> 8) & 0xff;
-            payload[1] = y & 0xff;
-            payload[2] = cnt0 & 0xff;
-            payload[3] = cnt1 & 0xff;
-            payload[4] = cnt2 & 0xff;
-            payload[5] = repeatCount & 0xff;
-            payload.set(row, 6);
+            if (totalBits === 0) {
+                let blankCount = 1;
+                while (y + blankCount < chunkEnd && blankCount < 200) {
+                    const nextRow = rows[y + blankCount];
+                    let nextHasBits = false;
+                    for (let i = 0; i < bytesPerRow; i++) {
+                        if (nextRow[i] !== 0) {
+                            nextHasBits = true;
+                            break;
+                        }
+                    }
+                    if (nextHasBits) break;
+                    blankCount++;
+                }
 
-            await sendRawPacket(buildNiimbotPacket(0x85, payload));
-            y += repeatCount;
-            rowsInCurrentChunk += repeatCount;
+                packets.push(
+                    buildNiimbotPacket(0x84, [
+                        (y >> 8) & 0xff,
+                        y & 0xff,
+                        blankCount & 0xff,
+                    ])
+                );
+                y += blankCount;
+            } else {
+                let repeatCount = 1;
+                while (y + repeatCount < chunkEnd && repeatCount < 200) {
+                    const nextRow = rows[y + repeatCount];
+                    let identical = true;
+                    for (let i = 0; i < bytesPerRow; i++) {
+                        if (nextRow[i] !== row[i]) {
+                            identical = false;
+                            break;
+                        }
+                    }
+                    if (!identical) break;
+                    repeatCount++;
+                }
 
-            await sleep(currentTransport === 'bluetooth' ? 6 : 2);
+                let cnt0 = 0;
+                let cnt1 = 0;
+                let cnt2 = 0;
+                for (let i = 0; i < bytesPerRow; i++) {
+                    const bits = popcount8(row[i]);
+                    if (i < 24) cnt0 += bits;
+                    else if (i < 48) cnt1 += bits;
+                    else cnt2 += bits;
+                }
+
+                const payload = new Uint8Array(6 + bytesPerRow);
+                payload[0] = (y >> 8) & 0xff;
+                payload[1] = y & 0xff;
+                payload[2] = cnt0 & 0xff;
+                payload[3] = cnt1 & 0xff;
+                payload[4] = cnt2 & 0xff;
+                payload[5] = repeatCount & 0xff;
+                payload.set(row, 6);
+
+                packets.push(buildNiimbotPacket(0x85, payload));
+                y += repeatCount;
+            }
         }
 
-        // Flow control every ~180 rows (cPrinterV5::commitJob chunks at 200 rows and waits for 0xD3 buffer status)
-        if (rowsInCurrentChunk >= 180 && y < effectiveHeight) {
-            rowsInCurrentChunk = 0;
-            await waitForPacket(0xd3, 60);
+        chunks.push({
+            startRow: chunkStart,
+            lastRow: chunkEnd - 1,
+            packets,
+        });
+    }
+
+    // 5. Send each 200-row chunk with 0xD3 verification and 0x86 (jcAskAfterPause) flush/retry
+    // In cPrinterV5::commitJob (@ 0xfff84..0x1004ec):
+    // - After sending a chunk, wait up to 256ms for 0xD3 notification
+    // - If no 0xD3 notification (especially on the final <200-row chunk!), call jcAskAfterPause (0x86 [lastRow_hi, lastRow_lo, 0x01]) -> expects 0xD3
+    // - If 0xD3 data[2] === 2, resend the chunk!
+    for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
+        const chunk = chunks[cIdx];
+        let retries = 0;
+
+        while (retries < 5) {
+            lastReceivedPackets.delete(0xd3);
+            const spontaneousD3 = waitForPacket(0xd3, 260);
+
+            for (const pkt of chunk.packets) {
+                await sendRawPacket(pkt);
+                await sleep(currentTransport === 'bluetooth' ? 8 : 2);
+            }
+
+            let d3Resp = await spontaneousD3;
+            if (!d3Resp) {
+                // Active query: cPrinterV5::jcAskAfterPause (0x86, [lastRow_hi, lastRow_lo, 0x01])
+                d3Resp = await sendCommandWaitAck(
+                    0x86,
+                    [
+                        (chunk.lastRow >> 8) & 0xff,
+                        chunk.lastRow & 0xff,
+                        0x01,
+                    ],
+                    0xd3,
+                    400
+                );
+            }
+
+            // If printer responds with 0xD3 status === 2 ("开始的...行需要重发"), resend this chunk
+            if (d3Resp && d3Resp.data.length >= 3 && d3Resp.data[2] === 0x02) {
+                retries++;
+                await sleep(50);
+                continue;
+            }
+
+            break;
         }
     }
 
-    // 5. PageEnd / jcSetPageTerminal (0xE3, [0x01]) -> expects 0xE4
-    await sleep(40);
+    // 6. PageEnd / jcSetPageTerminal (0xE3, [0x01]) -> expects 0xE4
+    await sleep(80);
     await sendCommandWaitAck(0xe3, [0x01], 0xe4, 500);
 
-    // 6. Wait for physical printhead to finish feeding/printing copies (poll 0xA3 -> 0xB3 as in cPrinterV5::commitJob @ 0x1005cc)
+    // 7. Wait for physical printhead to finish feeding/printing copies (poll 0xA3 -> 0xB3 as in cPrinterV5::commitJob @ 0x101004)
     const maxWaitIterations = Math.min(25, 6 * copies);
     for (let poll = 0; poll < maxWaitIterations; poll++) {
         await sleep(180);
