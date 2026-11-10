@@ -566,39 +566,65 @@ function encodeProductLabelToNiimbotRows(
     ctx.translate(offsetXDots, offsetYDots);
 
     const scaleFactor = config.fontScale === 'sm' ? 0.85 : config.fontScale === 'lg' ? 1.15 : 1.0;
-    const minDim = Math.min(wCm, hCm);
-    const isTiny = hCm <= 1.8 || wCm <= 2.8;
+    // Reserve ~0.45 cm (4.5 mm) at the bottom so NIIMBOT B2 Pro gap-sensor cutoff never clips the bottom line
+    const bottomSafeCm = Math.min(0.48, Math.max(0.35, hCm * 0.15));
+    const topPadCm = hCm <= 2.0 ? 0.08 : 0.1;
+    const effHCm = Math.max(1.0, hCm - bottomSafeCm - topPadCm);
+
+    const minDim = Math.min(wCm, effHCm);
+    const isTiny = effHCm <= 1.6 || wCm <= 2.8;
 
     const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
 
-    const storeFontPx = ptToPx(Math.max(5, minDim * 2.5 * scaleFactor));
-    const skuFontPx = ptToPx(Math.max(6.5, minDim * 3.3 * scaleFactor));
-    const nameFontPx = ptToPx(Math.max(5.5, minDim * 2.7 * scaleFactor));
-    const metaFontPx = ptToPx(Math.max(5, minDim * 2.4 * scaleFactor));
-    const priceFontPx = ptToPx(Math.max(6.5, minDim * 3.4 * scaleFactor));
+    const storeFontPx = ptToPx(Math.max(5, minDim * 2.4 * scaleFactor));
+    const skuFontPx = ptToPx(Math.max(6.5, minDim * 3.2 * scaleFactor));
+    const nameFontPx = ptToPx(Math.max(5.5, minDim * 2.6 * scaleFactor));
+    const metaFontPx = ptToPx(Math.max(5, minDim * 2.35 * scaleFactor));
+    const priceFontPx = ptToPx(Math.max(6.5, minDim * 3.3 * scaleFactor));
 
-    const activeInfoLines =
-        (config.showStoreName ? 1 : 0) +
-        (config.showSkuText ? 1 : 0) +
-        (config.showStoneName ? 1 : 0) +
-        (config.showWeightAndDim || config.showPrice ? 1 : 0);
+    const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
+    const dimText = product.dimensions || '';
+    const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
+    const priceText =
+        product.selling_price && product.selling_price > 0
+            ? `฿${product.selling_price.toLocaleString()}`
+            : '';
+    const hasBottomLine = Boolean(
+        (config.showWeightAndDim && specsLine) || (config.showPrice && priceText)
+    );
 
-    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.36 : 0.4;
-    const barcodeHeightDots = Math.max(24, Math.round(hCm * ratio * dotsPerCm));
-    const padDots = Math.round((isTiny ? 0.1 : 0.15) * dotsPerCm);
+    const padXDots = Math.round((isTiny ? 0.1 : 0.14) * dotsPerCm);
+    const topPadDots = Math.round(topPadCm * dotsPerCm);
+    const bottomSafeDots = Math.round(bottomSafeCm * dotsPerCm);
+    const printableBottomDots = heightDots - bottomSafeDots;
+
+    const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.14) : 0;
+    const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.14) : 0;
+    const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.14) : 0;
+    const bottomRowFontH = Math.max(priceFontPx, metaFontPx);
+    const bottomBlockH = hasBottomLine
+        ? bottomRowFontH + Math.max(6, Math.round(0.06 * dotsPerCm))
+        : 0;
+
+    const totalTextHeightDots = storeLineH + skuLineH + nameLineH + bottomBlockH;
+    const barcodeGapDots = Math.max(3, Math.round(0.035 * dotsPerCm));
+    const maxAvailableBarcodeH =
+        printableBottomDots - topPadDots - totalTextHeightDots - barcodeGapDots;
+    const targetBarcodeH = Math.round(effHCm * (isTiny ? 0.36 : 0.42) * dotsPerCm);
+    const barcodeHeightDots = Math.max(22, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    let currentY = padDots;
-    const innerW = widthDots - padDots * 2;
+    let currentY = topPadDots;
+    const innerW = widthDots - padXDots * 2;
 
     // 1. Store Name
     if (config.showStoreName) {
         ctx.font = `900 ${storeFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         ctx.fillText('VIVIDA CRYSTAL', widthDots / 2, currentY, innerW);
-        currentY += Math.round(storeFontPx * 1.18);
+        currentY += storeLineH;
     }
 
     // 2. Crisp Code 128 Barcode Bars
@@ -613,51 +639,47 @@ function encodeProductLabelToNiimbotRows(
         const x2 = Math.round(barcodeStartX + (bar.x + bar.width) * moduleW);
         ctx.fillRect(x1, currentY, Math.max(1, x2 - x1), barcodeHeightDots);
     });
-    currentY += barcodeHeightDots + Math.max(2, Math.round(0.04 * dotsPerCm));
+    currentY += barcodeHeightDots + barcodeGapDots;
 
     // 3. SKU Line
     if (config.showSkuText) {
         ctx.font = `900 ${skuFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillText(product.sku, widthDots / 2, currentY, innerW);
-        currentY += Math.round(skuFontPx * 1.16);
+        currentY += skuLineH;
     }
 
     // 4. Stone Name
     if (config.showStoneName) {
         ctx.font = `800 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         ctx.fillText(product.stone_type || product.name, widthDots / 2, currentY, innerW);
-        currentY += Math.round(nameFontPx * 1.18);
+        currentY += nameLineH;
     }
 
-    // 5. Weight / Dimensions & Selling Price
-    const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
-    const dimText = product.dimensions || '';
-    const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
-    const priceText =
-        product.selling_price && product.selling_price > 0
-            ? `฿${product.selling_price.toLocaleString()}`
-            : '';
-
-    if ((config.showWeightAndDim && specsLine) || (config.showPrice && priceText)) {
-        const bottomY = heightDots - padDots - Math.max(priceFontPx, metaFontPx);
+    // 5. Weight / Dimensions & Selling Price (positioned safely above bottomSafeDots)
+    if (hasBottomLine) {
+        const dividerGap = Math.max(3, Math.round(0.03 * dotsPerCm));
+        const bottomY = Math.max(
+            currentY + dividerGap + 2,
+            printableBottomDots - bottomRowFontH
+        );
 
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padDots, bottomY - Math.max(2, Math.round(0.03 * dotsPerCm)));
-        ctx.lineTo(widthDots - padDots, bottomY - Math.max(2, Math.round(0.03 * dotsPerCm)));
+        ctx.moveTo(padXDots, bottomY - dividerGap);
+        ctx.lineTo(widthDots - padXDots, bottomY - dividerGap);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
             ctx.textAlign = 'left';
             ctx.font = `700 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(specsLine, padDots, bottomY, innerW * 0.62);
+            ctx.fillText(specsLine, padXDots, bottomY, innerW * 0.62);
 
             ctx.textAlign = 'right';
             ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.fillText(
                 priceText,
-                widthDots - padDots,
+                widthDots - padXDots,
                 bottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
             );
         } else {
@@ -748,40 +770,7 @@ async function sendNiimbotPage(
     const { widthDots, heightDots, bytesPerRow, rows } = encoded;
     const copies = Math.max(1, quantity);
 
-    // 1. PageStart / jcSetPagePrint (0x03, [0x01]) -> expects 0x04
-    await sendCommandWaitAck(0x03, [0x01], 0x04, 300);
-
-    // 2. SetPageSize / jcSetPageInfo (0x13, [rows_hi, rows_lo, cols_hi, cols_lo, copies_hi, copies_lo]) -> expects 0x14
-    const pageInfoAck = await sendCommandWaitAck(
-        0x13,
-        [
-            (heightDots >> 8) & 0xff,
-            heightDots & 0xff,
-            (widthDots >> 8) & 0xff,
-            widthDots & 0xff,
-            (copies >> 8) & 0xff,
-            copies & 0xff,
-        ],
-        0x14,
-        350
-    );
-
-    // Fallback to 4-byte SetPageSize if printer NACKed 6-byte payload
-    if (pageInfoAck && pageInfoAck.data.length > 0 && pageInfoAck.data[0] === 0) {
-        await sendCommandWaitAck(
-            0x13,
-            [
-                (heightDots >> 8) & 0xff,
-                heightDots & 0xff,
-                (widthDots >> 8) & 0xff,
-                widthDots & 0xff,
-            ],
-            0x14,
-            300
-        );
-    }
-
-    // 3. Strip trailing empty white rows at bottom of page (exact match to cPrinterV5::commitJob @ 0xff674)
+    // 1. Strip trailing empty white rows at bottom of page (exact match to cPrinterV5::commitJob @ 0xff674)
     let effectiveHeight = heightDots;
     while (effectiveHeight > 0) {
         const r = rows[effectiveHeight - 1];
@@ -797,6 +786,40 @@ async function sendNiimbotPage(
     }
     if (effectiveHeight === 0) {
         effectiveHeight = Math.min(30, heightDots);
+    }
+
+    // 2. PageStart / jcSetPagePrint (0x03, [0x01]) -> expects 0x04
+    await sendCommandWaitAck(0x03, [0x01], 0x04, 300);
+
+    // 3. SetPageSize / jcSetPageInfo (0x13, [rows_hi, rows_lo, cols_hi, cols_lo, copies_hi, copies_lo]) -> expects 0x14
+    // In cPrinterV5::commitJob (@ 0xff798), rows passed to jcSetPageInfo is effectiveHeight ([x19, #0x60])
+    const pageInfoAck = await sendCommandWaitAck(
+        0x13,
+        [
+            (effectiveHeight >> 8) & 0xff,
+            effectiveHeight & 0xff,
+            (widthDots >> 8) & 0xff,
+            widthDots & 0xff,
+            (copies >> 8) & 0xff,
+            copies & 0xff,
+        ],
+        0x14,
+        350
+    );
+
+    // Fallback to 4-byte SetPageSize if printer NACKed 6-byte payload
+    if (pageInfoAck && pageInfoAck.data.length > 0 && pageInfoAck.data[0] === 0) {
+        await sendCommandWaitAck(
+            0x13,
+            [
+                (effectiveHeight >> 8) & 0xff,
+                effectiveHeight & 0xff,
+                (widthDots >> 8) & 0xff,
+                widthDots & 0xff,
+            ],
+            0x14,
+            300
+        );
     }
 
     // 4. Stream bitmap rows using 0x84 (blank row run) and 0x85 (bitmap row run)
