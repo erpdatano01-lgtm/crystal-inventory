@@ -68,7 +68,8 @@ export default function Navbar() {
       href: '/packing',
       label: 'อัดคลิปแพ็กของ',
       mobileLabel: 'แพ็กของ',
-      sublabel: 'Video Packing',
+      sublabel: 'กำลังพัฒนา (Beta)',
+      badge: 'กำลังพัฒนา',
       icon: Video,
     },
     {
@@ -152,8 +153,21 @@ export default function Navbar() {
                 >
                   <Icon className="w-4 h-4" />
                 </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="truncate leading-tight">{link.label}</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate leading-tight">{link.label}</span>
+                    {link.badge && (
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                          isActive
+                            ? 'bg-white/20 text-white'
+                            : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}
+                      >
+                        {link.badge}
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`text-[10px] font-normal leading-tight ${
                       isActive ? 'text-purple-200' : 'text-slate-400'
@@ -304,7 +318,18 @@ export default function Navbar() {
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    <span>{link.label}</span>
+                    <span className="flex-1 truncate">{link.label}</span>
+                    {link.badge && (
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          isActive
+                            ? 'bg-white/20 text-white'
+                            : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}
+                      >
+                        {link.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

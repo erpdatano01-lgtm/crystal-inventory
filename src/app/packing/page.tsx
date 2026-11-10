@@ -43,6 +43,7 @@ import {
   Box,
   ArrowRight,
   Sparkle,
+  Construction,
 } from 'lucide-react';
 
 const LS_PACKING_RECORDS = 'crystal_packing_records_v1';
@@ -67,6 +68,9 @@ export default function PackingPage() {
 
   // Item verification checklist (maps SKU / item id to checked boolean)
   const [checkedItemSkus, setCheckedItemSkus] = useState<Record<string, boolean>>({});
+
+  // Feature Flag: Under Development Presentation Mode vs Interactive Beta Studio
+  const [isBetaStudioOpen, setIsBetaStudioOpen] = useState(false);
 
   // Camera & Detection state
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -248,13 +252,20 @@ export default function PackingPage() {
       document.head.appendChild(script);
     }
 
-    // Auto-start camera on mount so it's ready to scan immediately
-    startCamera();
-
+    // Camera starts only when user enters the interactive beta studio
     return () => {
       stopCamera();
     };
   }, []);
+
+  // Control camera when entering or exiting interactive beta studio
+  useEffect(() => {
+    if (isBetaStudioOpen) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  }, [isBetaStudioOpen]);
 
   // Sync activeTargetRef
   useEffect(() => {
@@ -810,136 +821,240 @@ ${trackStr}
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* ========================================================= */}
-        {/* 1. PROGRESS WORKFLOW STEPPER BAR                          */}
-        {/* ========================================================= */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div>
-              <span className="text-xs font-bold text-purple-600 uppercase tracking-wider block">
-                Camera Barcode Detection & Guided Packing
-              </span>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
-                <Scan className="w-6 h-6 text-purple-600" />
-                <span>ระบบสแกนบาร์โค้ดผ่านกล้อง & ตรวจจับหินลงกล่อง</span>
-              </h1>
+        {!isBetaStudioOpen ? (
+          /* ========================================================= */
+          /* UNDER DEVELOPMENT PRESENTATION VIEW                        */
+          /* ========================================================= */
+          <div className="space-y-6 animate-in fade-in">
+            {/* Hero Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-indigo-950 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden text-center sm:text-left">
+              <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 max-w-3xl space-y-4">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/20 backdrop-blur border border-amber-400/30 text-amber-300 text-xs font-bold">
+                  <Construction className="w-4 h-4 text-amber-400" />
+                  <span>🚧 ฟีเจอร์นี้กำลังอยู่ระหว่างพัฒนา (Under Development)</span>
+                </div>
+
+                <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
+                  ระบบบันทึกวิดีโอขณะแพ็กสินค้า <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-amber-300">
+                    (Video Packing & Camera Scanner)
+                  </span>
+                </h1>
+
+                <p className="text-sm sm:text-base text-purple-200/90 leading-relaxed">
+                  ระบบบันทึกวิดีโอหลักฐานการตรวจสภาพหินและบรรจุกล่องพัสดุก่อนจัดส่ง กำลังอยู่ระหว่างเตรียมความพร้อมด้านการจัดวางพื้นที่โต๊ะแพ็กและอุปกรณ์กล้องประจำร้าน Vivida Crystal
+                </p>
+
+                {/* Actions */}
+                <div className="pt-4 flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsBetaStudioOpen(true)}
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-sm sm:text-base transition active:scale-95 shadow-xl shadow-purple-600/30 flex items-center gap-2"
+                  >
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>🧪 ทดลองเปิดห้องสตรีมกล้อง (Beta Preview)</span>
+                  </button>
+
+                  <div className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur border border-white/15 text-xs font-semibold text-purple-200">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>สถานะ: พัฒนาระบบตรวจจับบาร์โค้ดผ่านกล้องเสร็จแล้ว 100%</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Camera Detection Status Badge */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>ตรวจจับบาร์โค้ดผ่านกล้อง: พร้อมทำงาน</span>
-              </span>
+            {/* 4 Feature Highlights Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Scan className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">ตรวจจับบาร์โค้ดผ่านกล้องสด</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  ไม่ต้องซื้อเครื่องยิงสแกนเนอร์ ใช้กล้องเว็บแคมหรือกล้องมือถือ/ไอแพดตรวจจับบาร์โค้ดได้ทันที
+                </p>
+              </div>
 
+              <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <Box className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">สแกนเปิดกล่อง & เช็คหินทีละชิ้น</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  สแกนใบปะหน้าเพื่อเริ่มอัด จากนั้นสแกนหินลงกล่องทีละชิ้นจนครบ ป้องกันการแพ็กผิดหรือลืมใส่
+                </p>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">ผูกคลิปกับเลข Tracking</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  วิดีโอที่บันทึกจะตั้งชื่อไฟล์ตามเลข Tracking และ Order ID ค้นหาย้อนหลังเพื่อส่งให้ลูกค้าได้ใน 1 วินาที
+                </p>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-pink-100 text-pink-700 flex items-center justify-center">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">ก๊อปปี้ข้อความส่ง IG Direct</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  สร้างเทมเพลตข้อความน่ารักๆ พร้อมแนบลิงก์คลิปและเลขพัสดุ ก๊อปปี้ไปส่งให้ลูกค้าใน IG ได้ทันที
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ========================================================= */
+          /* INTERACTIVE BETA STUDIO VIEW                              */
+          /* ========================================================= */
+          <div className="space-y-6 animate-in fade-in">
+            {/* Top Bar for Returning from Beta Studio */}
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-amber-900 font-bold">
+                <Construction className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>โหมดทดลองใช้งานระบบต้นแบบ (Beta Prototype Preview) • ฟังก์ชันนี้อยู่ระหว่างพัฒนา</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`p-2 rounded-xl border transition ${
-                  soundEnabled ? 'border-purple-200 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-400'
-                }`}
-                title={soundEnabled ? 'เปิดเสียงสัญญาณ Beep' : 'ปิดเสียงสัญญาณ'}
+                onClick={() => {
+                  stopCamera();
+                  setIsBetaStudioOpen(false);
+                }}
+                className="px-4 py-2 rounded-xl bg-white border border-amber-300 font-bold text-amber-900 hover:bg-amber-100 transition shadow-xs self-start sm:self-auto"
               >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                ⬅️ กลับหน้ารายละเอียดสถานะการพัฒนา
               </button>
             </div>
-          </div>
 
-          {/* Stepper Pills */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Step 1 Pill */}
-            <div
-              className={`p-3.5 rounded-2xl border transition flex items-center gap-3 ${
-                packingStep === 'STEP_1_SCAN_ORDER'
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-600/20'
-                  : selectedOrder
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-slate-50 text-slate-400 border-slate-200'
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                  packingStep === 'STEP_1_SCAN_ORDER'
-                    ? 'bg-white text-purple-700'
-                    : selectedOrder
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
-              >
-                {selectedOrder ? <Check className="w-4 h-4 stroke-[3]" /> : '1'}
+            {/* Stepper Bar */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <span className="text-xs font-bold text-purple-600 uppercase tracking-wider block">
+                    Camera Barcode Detection & Guided Packing
+                  </span>
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+                    <Scan className="w-6 h-6 text-purple-600" />
+                    <span>ระบบสแกนบาร์โค้ดผ่านกล้อง & ตรวจจับหินลงกล่อง</span>
+                  </h1>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span>ตรวจจับบาร์โค้ดผ่านกล้อง: พร้อมทำงาน</span>
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className={`p-2 rounded-xl border transition ${
+                      soundEnabled ? 'border-purple-200 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-400'
+                    }`}
+                    title={soundEnabled ? 'เปิดเสียงสัญญาณ Beep' : 'ปิดเสียงสัญญาณ'}
+                  >
+                    {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold block uppercase tracking-wider opacity-80">ขั้นตอนที่ 1</span>
-                <span className="text-xs sm:text-sm font-black truncate block">
-                  {selectedOrder ? `เปิดกล่อง: ${selectedOrder.order_no}` : 'สแกนใบปะหน้าเปิดกล่อง'}
-                </span>
+
+              {/* Stepper Pills */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div
+                  className={`p-3.5 rounded-2xl border transition flex items-center gap-3 ${
+                    packingStep === 'STEP_1_SCAN_ORDER'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-600/20'
+                      : selectedOrder
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-slate-50 text-slate-400 border-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                      packingStep === 'STEP_1_SCAN_ORDER'
+                        ? 'bg-white text-purple-700'
+                        : selectedOrder
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {selectedOrder ? <Check className="w-4 h-4 stroke-[3]" /> : '1'}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold block uppercase tracking-wider opacity-80">ขั้นตอนที่ 1</span>
+                    <span className="text-xs sm:text-sm font-black truncate block">
+                      {selectedOrder ? `เปิดกล่อง: ${selectedOrder.order_no}` : 'สแกนใบปะหน้าเปิดกล่อง'}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-3.5 rounded-2xl border transition flex items-center gap-3 ${
+                    packingStep === 'STEP_2_SCAN_ITEMS'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-600/20'
+                      : isAllItemsVerified && selectedOrder
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-slate-50 text-slate-400 border-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                      packingStep === 'STEP_2_SCAN_ITEMS'
+                        ? 'bg-white text-purple-700'
+                        : isAllItemsVerified && selectedOrder
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {isAllItemsVerified && selectedOrder ? <Check className="w-4 h-4 stroke-[3]" /> : '2'}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold block uppercase tracking-wider opacity-80">ขั้นตอนที่ 2</span>
+                    <span className="text-xs sm:text-sm font-black truncate block">
+                      สแกนตรวจหินลงกล่อง ({verifiedItemsCount}/{totalItemsCount})
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-3.5 rounded-2xl border transition flex items-center gap-3 ${
+                    packingStep === 'STEP_3_SEAL_BOX'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/25 animate-pulse'
+                      : recordingState === 'recorded'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-slate-50 text-slate-400 border-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                      packingStep === 'STEP_3_SEAL_BOX'
+                        ? 'bg-white text-emerald-700'
+                        : recordingState === 'recorded'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {recordingState === 'recorded' ? <Check className="w-4 h-4 stroke-[3]" /> : '3'}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold block uppercase tracking-wider opacity-80">ขั้นตอนที่ 3</span>
+                    <span className="text-xs sm:text-sm font-black truncate block">
+                      ปิดกล่อง & สิ้นสุดการแพ็ก
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Step 2 Pill */}
-            <div
-              className={`p-3.5 rounded-2xl border transition flex items-center gap-3 ${
-                packingStep === 'STEP_2_SCAN_ITEMS'
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-600/20'
-                  : isAllItemsVerified && selectedOrder
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-slate-50 text-slate-400 border-slate-200'
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                  packingStep === 'STEP_2_SCAN_ITEMS'
-                    ? 'bg-white text-purple-700'
-                    : isAllItemsVerified && selectedOrder
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
-              >
-                {isAllItemsVerified && selectedOrder ? <Check className="w-4 h-4 stroke-[3]" /> : '2'}
-              </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold block uppercase tracking-wider opacity-80">ขั้นตอนที่ 2</span>
-                <span className="text-xs sm:text-sm font-black truncate block">
-                  สแกนตรวจหินลงกล่อง ({verifiedItemsCount}/{totalItemsCount})
-                </span>
-              </div>
-            </div>
-
-            {/* Step 3 Pill */}
-            <div
-              className={`p-3.5 rounded-2xl border transition flex items-center gap-3 ${
-                packingStep === 'STEP_3_SEAL_BOX'
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/25 animate-pulse'
-                  : recordingState === 'recorded'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-slate-50 text-slate-400 border-slate-200'
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                  packingStep === 'STEP_3_SEAL_BOX'
-                    ? 'bg-white text-emerald-700'
-                    : recordingState === 'recorded'
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
-              >
-                {recordingState === 'recorded' ? <Check className="w-4 h-4 stroke-[3]" /> : '3'}
-              </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold block uppercase tracking-wider opacity-80">ขั้นตอนที่ 3</span>
-                <span className="text-xs sm:text-sm font-black truncate block">
-                  ปิดกล่อง & สิ้นสุดการแพ็ก
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* 2. CAMERA STUDIO & ITEM VERIFICATION LIST (2 Columns)     */}
-        {/* ========================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Studio Main Viewfinder & Checklist */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LEFT: CAMERA VIEWFINDER WITH RETICLE SCANNER (7 or 8 Cols) */}
           <div className="lg:col-span-7 xl:col-span-8 bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
             {/* Viewfinder Header Toolbar */}
@@ -1373,10 +1488,12 @@ ${trackStr}
             </div>
           </div>
         </div>
+      </div>
+    )}
 
-        {/* ========================================================= */}
-        {/* 3. RECENT PACKING RECORDS & TRACKING SEARCH INDEX         */}
-        {/* ========================================================= */}
+      {/* ========================================================= */}
+      {/* 3. RECENT PACKING RECORDS & TRACKING SEARCH INDEX         */}
+      {/* ========================================================= */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
