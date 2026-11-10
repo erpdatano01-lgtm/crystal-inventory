@@ -15,6 +15,7 @@ import {
   X,
   Sparkles,
   Settings,
+  Video,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -62,6 +63,13 @@ export default function Navbar() {
       mobileLabel: 'เปิดบิล',
       sublabel: 'FlowAccount Orders',
       icon: ShoppingBag,
+    },
+    {
+      href: '/packing',
+      label: 'อัดคลิปแพ็กของ',
+      mobileLabel: 'แพ็กของ',
+      sublabel: 'Video Packing',
+      icon: Video,
     },
     {
       href: '/expenses',
@@ -323,7 +331,7 @@ export default function Navbar() {
       {/* 4. MOBILE BOTTOM NAVIGATION (md:hidden)                   */}
       {/* ========================================================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 pb-safe">
-        <div className="grid grid-cols-6 h-16 px-1">
+        <div className="grid grid-cols-7 h-16 px-0.5">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;

@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const folder = (formData.get('folder') as 'receipts' | 'products') || 'products';
+    const folder = (formData.get('folder') as 'receipts' | 'products' | 'packing') || 'products';
     const sku = (formData.get('sku') as string) || undefined;
 
     if (!file) {

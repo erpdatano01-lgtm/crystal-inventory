@@ -36,7 +36,7 @@ export const r2Client = isR2Configured
 export async function uploadToR2(
   fileBuffer: Buffer,
   fileName: string,
-  folder: 'receipts' | 'products' = 'products',
+  folder: 'receipts' | 'products' | 'packing' = 'products',
   sku?: string,
   contentType: string = 'image/webp'
 ): Promise<string> {
@@ -49,6 +49,9 @@ export async function uploadToR2(
 
   if (folder === 'receipts') {
     key = `receipts/${today}/${fileName}`;
+  } else if (folder === 'packing') {
+    const subFolder = sku ? sku.replace(/[^a-zA-Z0-9_-]/g, '_') : today;
+    key = `packing/${subFolder}/${fileName}`;
   } else {
     const subFolder = sku ? sku.replace(/[^a-zA-Z0-9_-]/g, '_') : today;
     key = `products/${subFolder}/${fileName}`;

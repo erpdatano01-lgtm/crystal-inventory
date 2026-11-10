@@ -127,10 +127,26 @@ export interface Order {
   profit: number;
   payment_method: string;
   slip_url?: string | null;
+  packing_video_url?: string | null;
   tracking_no?: string | null;
   notes?: string | null;
   status: OrderStatus;
   created_at: string;
+}
+
+export interface PackingLog {
+  id: string;
+  order_id?: string | null;
+  order_no?: string | null;
+  sku?: string | null;
+  product_name?: string | null;
+  customer_name?: string | null;
+  customer_ig?: string | null;
+  video_url: string;
+  duration_seconds: number;
+  packed_at: string;
+  tracking_no?: string | null;
+  notes?: string | null;
 }
 
 export const SALES_CHANNELS_CONFIG: Record<
