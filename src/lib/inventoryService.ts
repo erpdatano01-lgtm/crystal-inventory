@@ -163,32 +163,91 @@ export async function createExpenseWithOptionalLot(
 
 // ------------------- PRODUCTS -------------------
 
+// Helper to infer stone shape from SKU code or product name
+export function inferShapeFromSkuOrName(sku?: string, name?: string): string {
+  const upper = (sku || '').trim().toUpperCase();
+  if (upper.startsWith('CAB-') || upper.startsWith('CAB')) return 'Cabochon';
+  if (upper.startsWith('RAW-') || upper.startsWith('RAW')) return 'Raw';
+  if (upper.startsWith('SPH-') || upper.startsWith('SPH')) return 'Sphere';
+  if (upper.startsWith('TUM-') || upper.startsWith('TUM')) return 'Tumble';
+  if (upper.startsWith('TOW-') || upper.startsWith('TOW')) return 'Tower';
+  if (upper.startsWith('CRV-') || upper.startsWith('CRV')) return 'Carved';
+  if (upper.startsWith('FAC-') || upper.startsWith('FAC')) return 'Faceted';
+  if (upper.startsWith('PLM-') || upper.startsWith('PLM')) return 'Palm';
+
+  const n = (name || '').toLowerCase();
+  if (n.includes('cabochon') || n.includes('หลังเบี้ย')) return 'Cabochon';
+  if (n.includes('raw') || n.includes('specimen') || n.includes('ดิบ')) return 'Raw';
+  if (n.includes('sphere') || n.includes('กลม')) return 'Sphere';
+  if (n.includes('tumble') || n.includes('ทัมเบิล')) return 'Tumble';
+  if (n.includes('tower') || n.includes('แท่ง') || n.includes('เสา')) return 'Tower';
+  if (n.includes('carved') || n.includes('แกะสลัก')) return 'Carved';
+  if (n.includes('faceted') || n.includes('เหลี่ยม')) return 'Faceted';
+  if (n.includes('palm') || n.includes('ปาล์ม')) return 'Palm';
+  return 'Cabochon';
+}
+
+// Auto-clean legacy default placeholders (e.g. '5A High Grade / บราซิล', 'ตู้โชว์ A-01', 'A-01')
+export function normalizeLegacyProduct(p: Product): Product {
+  let changed = false;
+  let grade = p.grade_origin;
+  let loc = p.storage_location;
+
+  if (grade === '5A High Grade / บราซิล' || grade === '') {
+    grade = null;
+    changed = true;
+  }
+
+  if (loc === 'ตู้โชว์ A-01' || loc === 'A-01' || !loc) {
+    loc = inferShapeFromSkuOrName(p.sku, p.name);
+    changed = true;
+  }
+
+  if (!changed) return p;
+  return {
+    ...p,
+    grade_origin: grade,
+    storage_location: loc,
+  };
+}
+
 export async function fetchProducts(): Promise<Product[]> {
+  let list: Product[] = [];
+
   // If in browser, fetch through server API route (bypasses RLS with supabaseAdmin)
   if (typeof window !== 'undefined') {
     try {
       const res = await fetch('/api/products');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data)) list = data;
       }
     } catch (e) {
       console.warn('API /api/products error, falling back:', e);
     }
   }
 
-  if (isSupabaseConfigured && supabase) {
+  if (list.length === 0 && isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data) return data as Product[];
+      if (!error && data) list = data as Product[];
     } catch (e) {
       console.warn('Supabase fetch products error:', e);
     }
   }
-  return getLocal<Product[]>(LS_PRODUCTS, []);
+
+  if (list.length === 0) {
+    list = getLocal<Product[]>(LS_PRODUCTS, []);
+  }
+
+  const normalized = list.map(normalizeLegacyProduct);
+  if (typeof window !== 'undefined') {
+    setLocal(LS_PRODUCTS, normalized);
+  }
+  return normalized;
 }
 
 export async function createProduct(

@@ -15,6 +15,7 @@ import {
   StockLot,
   ProductStatus,
   STATUS_CONFIG,
+  STONE_SHAPES,
 } from '@/types';
 import {
   PackageCheck,
@@ -79,6 +80,7 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedLotId, setSelectedLotId] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   // Toast Notification state
@@ -226,6 +228,15 @@ export default function ProductsPage() {
     }
   };
 
+  // Distinct storage locations available across products
+  const availableLocations = useMemo(() => {
+    const locSet = new Set<string>();
+    products.forEach((p) => {
+      if (p.storage_location) locSet.add(p.storage_location);
+    });
+    return Array.from(locSet).sort();
+  }, [products]);
+
   // Filtered products list
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -248,9 +259,13 @@ export default function ProductsPage() {
         return false;
       }
 
+      if (selectedLocation && p.storage_location !== selectedLocation) {
+        return false;
+      }
+
       return true;
     });
-  }, [products, searchQuery, selectedStatus, selectedLotId]);
+  }, [products, searchQuery, selectedStatus, selectedLotId, selectedLocation]);
 
   // Copy Video Link to Clipboard with Toast
   const handleCopyVideoUrl = (p: Product) => {
@@ -433,7 +448,7 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Filters: Status & Lot ID */}
+          {/* Filters: Status, Lot ID & Location/Shape */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
             <select
               value={selectedStatus}
@@ -461,12 +476,26 @@ export default function ProductsPage() {
               ))}
             </select>
 
-            {(searchQuery || selectedStatus || selectedLotId) && (
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-slate-700"
+            >
+              <option value="">ที่เก็บ/ทรงหินทั้งหมด (All Shapes)</option>
+              {availableLocations.map((loc) => (
+                <option key={loc} value={loc}>
+                  📍 {loc}
+                </option>
+              ))}
+            </select>
+
+            {(searchQuery || selectedStatus || selectedLotId || selectedLocation) && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedStatus('');
                   setSelectedLotId('');
+                  setSelectedLocation('');
                 }}
                 className="col-span-2 sm:col-span-1 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition flex items-center justify-center gap-1"
               >
@@ -1212,29 +1241,74 @@ export default function ProductsPage() {
                           ? 'Sphere'
                           : editForm.sku?.startsWith('TOW')
                           ? 'Tower'
-                          : editForm.sku?.startsWith('PLM') || editForm.sku?.startsWith('CAB') || editForm.sku?.startsWith('FAC')
+                          : editForm.sku?.startsWith('CAB')
+                          ? 'Cabochon'
+                          : editForm.sku?.startsWith('PLM')
                           ? 'Palm'
+                          : editForm.sku?.startsWith('TUM')
+                          ? 'Tumble'
+                          : editForm.sku?.startsWith('FAC')
+                          ? 'Faceted'
+                          : editForm.sku?.startsWith('CRV')
+                          ? 'Carved'
                           : 'Raw'
                       }
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">เกรด / แหล่งที่มา</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-600">เกรด / แหล่งที่มา</label>
+                      <span className="text-[10px] text-slate-400">(เว้นว่างได้)</span>
+                    </div>
                     <input
                       type="text"
+                      placeholder="เช่น 5A, Top Gem, บราซิล"
                       value={editForm.grade_origin || ''}
                       onChange={(e) => setEditForm((f) => ({ ...f, grade_origin: e.target.value }))}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">ที่เก็บสินค้า</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-purple-600" />
+                        ที่เก็บสินค้า (แยกตาม Shape)
+                      </label>
+                      <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded">
+                        {editForm.storage_location || 'ยังไม่ระบุ'}
+                      </span>
+                    </div>
                     <input
                       type="text"
+                      list="edit-storage-locations-list"
+                      placeholder="เช่น Cabochon, Sphere, Raw"
                       value={editForm.storage_location || ''}
                       onChange={(e) => setEditForm((f) => ({ ...f, storage_location: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
+                    <datalist id="edit-storage-locations-list">
+                      {STONE_SHAPES.map((sh) => (
+                        <option key={sh.id} value={sh.id}>
+                          {sh.label}
+                        </option>
+                      ))}
+                    </datalist>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {STONE_SHAPES.map((sh) => (
+                        <button
+                          key={sh.id}
+                          type="button"
+                          onClick={() => setEditForm((f) => ({ ...f, storage_location: sh.id }))}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition ${
+                            editForm.storage_location === sh.id
+                              ? 'bg-purple-600 text-white border-purple-600 font-bold'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-purple-50 hover:text-purple-700'
+                          }`}
+                        >
+                          {sh.id}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
