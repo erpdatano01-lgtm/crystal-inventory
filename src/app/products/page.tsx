@@ -41,8 +41,10 @@ import {
   Trash2,
   Pencil,
   Save,
+  Printer,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
+import BarcodePrintModal from '@/components/BarcodePrintModal';
 import DimensionInputs from '@/components/DimensionInputs';
 import ImageUploader from '@/components/ImageUploader';
 import VideoUploader from '@/components/VideoUploader';
@@ -59,6 +61,13 @@ export default function ProductsPage() {
   const [lots, setLots] = useState<StockLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSheetsModal, setShowSheetsModal] = useState(false);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeTargetProducts, setBarcodeTargetProducts] = useState<Product[]>([]);
+
+  const openBarcodeModal = (items?: Product[]) => {
+    setBarcodeTargetProducts(items && items.length > 0 ? items : []);
+    setShowBarcodeModal(true);
+  };
 
   // Customer View Mode: hides cost_price & min_price (Defaults to TRUE)
   const [isCustomerView, setIsCustomerView] = useState(true);
@@ -329,6 +338,16 @@ export default function ProductsPage() {
                   <span>แสดงทุน</span>
                 </>
               )}
+            </button>
+
+            {/* Barcode Label Print Button */}
+            <button
+              onClick={() => openBarcodeModal()}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 font-semibold text-xs sm:text-sm transition active:scale-95 shadow-xs"
+              title="พิมพ์สติกเกอร์บาร์โค้ดติดหิน (กำหนดขนาดเป็น cm ได้)"
+            >
+              <Printer className="w-4 h-4 text-amber-700" />
+              <span>ปริ้นบาร์โค้ด</span>
             </button>
 
             {/* Google Sheets Live Feed Button */}
@@ -615,29 +634,40 @@ export default function ProductsPage() {
                         )}
                       </div>
 
-                      {/* Duplicate, Edit & Delete Product Buttons */}
-                      <div className="flex items-center gap-1.5">
+                      {/* Barcode, Duplicate, Edit & Delete Product Buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openBarcodeModal([p]);
+                          }}
+                          className="flex-1 py-2 px-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 active:scale-95"
+                          title="ปริ้นบาร์โค้ดติดหินชิ้นนี้"
+                        >
+                          <Printer className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">บาร์โค้ด</span>
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDuplicateProduct(p);
                           }}
-                          className="flex-1 py-2 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 active:scale-95"
+                          className="flex-1 py-2 px-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 active:scale-95"
                           title="ทำซ้ำรายการนี้ (คัดลอกข้อมูลไปลงสต็อกชิ้นใหม่)"
                         >
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>ทำซ้ำ</span>
+                          <Copy className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">ทำซ้ำ</span>
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openEditModal(p);
                           }}
-                          className="flex-1 py-2 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 active:scale-95"
+                          className="flex-1 py-2 px-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 active:scale-95"
                           title="แก้ไขสินค้านี้"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>แก้ไข</span>
+                          <Pencil className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">แก้ไข</span>
                         </button>
                         <button
                           onClick={(e) => {
@@ -757,6 +787,13 @@ export default function ProductsPage() {
                               <Video className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => openBarcodeModal([p])}
+                            className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition"
+                            title="ปริ้นสติกเกอร์บาร์โค้ด"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => setActiveModalProduct(p)}
                             className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition"
@@ -944,10 +981,18 @@ export default function ProductsPage() {
 
               {/* Pinned Status Actions Footer */}
               <div className="shrink-0 px-5 sm:px-6 pt-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-200 bg-slate-50 space-y-2">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    onClick={() => openBarcodeModal([activeModalProduct])}
+                    className="px-2 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80 transition flex items-center justify-center gap-1 active:scale-95"
+                    title="ปริ้นบาร์โค้ดติดหินชิ้นนี้"
+                  >
+                    <Printer className="w-4 h-4 shrink-0" />
+                    <span className="truncate">บาร์โค้ด</span>
+                  </button>
                   <button
                     onClick={() => handleDuplicateProduct(activeModalProduct)}
-                    className="px-2.5 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60 transition flex items-center justify-center gap-1.5 active:scale-95"
+                    className="px-2 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60 transition flex items-center justify-center gap-1 active:scale-95"
                     title="คัดลอกทำซ้ำเพื่อรับหินชิ้นใหม่เข้าสต็อก"
                   >
                     <Copy className="w-4 h-4 shrink-0" />
@@ -955,19 +1000,19 @@ export default function ProductsPage() {
                   </button>
                   <button
                     onClick={() => openEditModal(activeModalProduct)}
-                    className="px-2.5 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                    className="px-2 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition flex items-center justify-center gap-1 shadow-sm active:scale-95"
                     title="แก้ไขข้อมูลสินค้านี้"
                   >
                     <Pencil className="w-4 h-4 shrink-0" />
-                    <span className="truncate">แก้ไขข้อมูล</span>
+                    <span className="truncate">แก้ไข</span>
                   </button>
                   <button
                     onClick={() => handleDeleteProduct(activeModalProduct.id, activeModalProduct.sku)}
-                    className="px-2.5 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100 border border-red-200/60 transition flex items-center justify-center gap-1.5 active:scale-95"
+                    className="px-2 py-2.5 min-h-[42px] text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100 border border-red-200/60 transition flex items-center justify-center gap-1 active:scale-95"
                     title="ลบสินค้านี้"
                   >
                     <Trash2 className="w-4 h-4 shrink-0" />
-                    <span className="truncate">ลบชิ้นนี้</span>
+                    <span className="truncate">ลบ</span>
                   </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -1300,6 +1345,14 @@ export default function ProductsPage() {
           isOpen={showSheetsModal}
           onClose={() => setShowSheetsModal(false)}
           defaultTab="products"
+        />
+
+        {/* Barcode Label Print Modal */}
+        <BarcodePrintModal
+          isOpen={showBarcodeModal}
+          onClose={() => setShowBarcodeModal(false)}
+          products={products}
+          initialSelectedProducts={barcodeTargetProducts}
         />
       </main>
     </div>
