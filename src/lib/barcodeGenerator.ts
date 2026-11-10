@@ -29,7 +29,6 @@ export interface EncodedBarcode {
  * Automatically strips unsupported non-ASCII characters and falls back to 'CRY-001' if empty.
  */
 export function encodeCode128B(rawText: string): EncodedBarcode {
-  // Keep printable ASCII 32..126
   const cleanText =
     (rawText || '')
       .trim()
@@ -52,7 +51,7 @@ export function encodeCode128B(rawText: string): EncodedBarcode {
   codes.push(checksum % 103);
   codes.push(106); // Stop Code
 
-  const quietZone = 8; // Quiet zone modules on each side
+  const quietZone = 8;
   let cursor = quietZone;
   const bars: BarcodeBar[] = [];
 
@@ -61,7 +60,6 @@ export function encodeCode128B(rawText: string): EncodedBarcode {
     for (let i = 0; i < pattern.length; i++) {
       const w = Number(pattern[i]);
       if (i % 2 === 0) {
-        // Even index = black bar
         bars.push({ x: cursor, width: w });
       }
       cursor += w;
@@ -84,10 +82,17 @@ export function generateBarcodeSvgString(text: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalModules} 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block;shape-rendering:crispEdges;">${rects}</svg>`;
 }
 
+export type PrinterModelProfile = 'niimbot_b21_pro' | 'easyprint_es9920ew' | 'a4_sheet';
+
 export interface BarcodeLabelConfig {
+  printerProfile: PrinterModelProfile;
   widthCm: number;
   heightCm: number;
   paperMode: 'roll' | 'a4';
+  columnsPerRow: 1 | 2 | 3; // For EasyPrint multi-column sticker rolls
+  columnGapCm: number; // Horizontal gap between columns in cm (default 0.2 cm = 2mm)
+  offsetXMm: number; // Fine horizontal shift in mm (-5 to +5)
+  offsetYMm: number; // Fine vertical shift in mm (-5 to +5)
   showStoreName: boolean;
   showStoneName: boolean;
   showWeightAndDim: boolean;
@@ -97,9 +102,14 @@ export interface BarcodeLabelConfig {
 }
 
 export const DEFAULT_BARCODE_CONFIG: BarcodeLabelConfig = {
-  widthCm: 4.0,
-  heightCm: 2.5,
+  printerProfile: 'niimbot_b21_pro',
+  widthCm: 5.0,
+  heightCm: 3.0,
   paperMode: 'roll',
+  columnsPerRow: 1,
+  columnGapCm: 0.2,
+  offsetXMm: 0,
+  offsetYMm: 0,
   showStoreName: true,
   showStoneName: true,
   showWeightAndDim: true,
@@ -108,21 +118,110 @@ export const DEFAULT_BARCODE_CONFIG: BarcodeLabelConfig = {
   fontScale: 'md',
 };
 
-export const BARCODE_SIZE_PRESETS: {
+export interface BarcodePresetItem {
   label: string;
   desc: string;
   widthCm: number;
   heightCm: number;
-}[] = [
-  { label: '2.5 × 1.5 cm', desc: 'มินิ (ติดตลับพลอย/Cabochon)', widthCm: 2.5, heightCm: 1.5 },
-  { label: '3.0 × 2.0 cm', desc: 'เล็ก (ติดถุงซิป/หินชิ้นเล็ก)', widthCm: 3.0, heightCm: 2.0 },
-  { label: '3.2 × 2.5 cm', desc: 'มาตรฐานร้านจิวเวลรี่', widthCm: 3.2, heightCm: 2.5 },
-  { label: '4.0 × 2.5 cm', desc: 'มาตรฐานยอดนิยม (40×25 mm)', widthCm: 4.0, heightCm: 2.5 },
-  { label: '4.0 × 3.0 cm', desc: 'ขนาดกลาง ข้อมูลครบ (40×30 mm)', widthCm: 4.0, heightCm: 3.0 },
-  { label: '5.0 × 3.0 cm', desc: 'ขนาดใหญ่ ติดกล่อง/ฐานไม้ (50×30 mm)', widthCm: 5.0, heightCm: 3.0 },
+  printer: PrinterModelProfile | 'both';
+  columnsPerRow?: 1 | 2 | 3;
+}
+
+export const BARCODE_SIZE_PRESETS: BarcodePresetItem[] = [
+  // NIIMBOT B21 Pro Presets (Max width 5.0 cm, 300 DPI)
+  {
+    label: '5.0 × 3.0 cm',
+    desc: 'ม้วนมาตรฐานคู่ตัว NIIMBOT B21 Pro (50×30 mm)',
+    widthCm: 5.0,
+    heightCm: 3.0,
+    printer: 'both',
+    columnsPerRow: 1,
+  },
+  {
+    label: '4.0 × 3.0 cm',
+    desc: 'สติกเกอร์ขนาดกลาง ยอดนิยม (40×30 mm)',
+    widthCm: 4.0,
+    heightCm: 3.0,
+    printer: 'both',
+    columnsPerRow: 1,
+  },
+  {
+    label: '4.0 × 2.0 cm',
+    desc: 'สติกเกอร์ทรงแคบติดถุงซิป/ตลับ (40×20 mm)',
+    widthCm: 4.0,
+    heightCm: 2.0,
+    printer: 'niimbot_b21_pro',
+    columnsPerRow: 1,
+  },
+  {
+    label: '3.0 × 2.0 cm',
+    desc: 'สติกเกอร์จิ๋วติดหินชิ้นเล็ก (30×20 mm)',
+    widthCm: 3.0,
+    heightCm: 2.0,
+    printer: 'both',
+    columnsPerRow: 1,
+  },
+  {
+    label: '3.0 × 2.5 cm',
+    desc: 'ป้ายห้อยจิวเวลรี่ / T-Tag (30×25 mm)',
+    widthCm: 3.0,
+    heightCm: 2.5,
+    printer: 'niimbot_b21_pro',
+    columnsPerRow: 1,
+  },
+  {
+    label: '5.0 × 5.0 cm',
+    desc: 'สติกเกอร์ทรงจัตุรัส B21 Pro (50×50 mm)',
+    widthCm: 5.0,
+    heightCm: 5.0,
+    printer: 'niimbot_b21_pro',
+    columnsPerRow: 1,
+  },
+
+  // EasyPrint ES-9920EW Specific Presets (Supports up to 10.8 cm width & Multi-column)
+  {
+    label: '3.2 × 2.5 cm (1 ตอน)',
+    desc: 'สติกเกอร์บาร์โค้ดมาตรฐาน 1 แถว (32×25 mm)',
+    widthCm: 3.2,
+    heightCm: 2.5,
+    printer: 'easyprint_es9920ew',
+    columnsPerRow: 1,
+  },
+  {
+    label: '3.2 × 2.5 cm (3 ตอนเรียง)',
+    desc: 'สติกเกอร์บาร์โค้ด 3 ดวงเรียงต่อแถว (ES-9920EW)',
+    widthCm: 3.2,
+    heightCm: 2.5,
+    printer: 'easyprint_es9920ew',
+    columnsPerRow: 3,
+  },
+  {
+    label: '4.0 × 2.5 cm (2 ตอนคู่)',
+    desc: 'สติกเกอร์บาร์โค้ด 2 ดวงคู่ต่อแถว (ES-9920EW)',
+    widthCm: 4.0,
+    heightCm: 2.5,
+    printer: 'easyprint_es9920ew',
+    columnsPerRow: 2,
+  },
+  {
+    label: '6.0 × 4.0 cm',
+    desc: 'สติกเกอร์ป้ายใหญ่ติดกล่องหิน (60×40 mm)',
+    widthCm: 6.0,
+    heightCm: 4.0,
+    printer: 'easyprint_es9920ew',
+    columnsPerRow: 1,
+  },
+  {
+    label: '10.0 × 7.5 cm',
+    desc: 'ป้ายขนาดใหญ่พิเศษ EasyPrint (100×75 mm)',
+    widthCm: 10.0,
+    heightCm: 7.5,
+    printer: 'easyprint_es9920ew',
+    columnsPerRow: 1,
+  },
 ];
 
-const LS_BARCODE_CONFIG_KEY = 'vivida_barcode_config_v1';
+const LS_BARCODE_CONFIG_KEY = 'vivida_barcode_config_v2';
 
 export function getSavedBarcodeConfig(): BarcodeLabelConfig {
   if (typeof window === 'undefined') return DEFAULT_BARCODE_CONFIG;
@@ -135,6 +234,8 @@ export function getSavedBarcodeConfig(): BarcodeLabelConfig {
       ...parsed,
       widthCm: Number(parsed.widthCm) > 0 ? Number(parsed.widthCm) : DEFAULT_BARCODE_CONFIG.widthCm,
       heightCm: Number(parsed.heightCm) > 0 ? Number(parsed.heightCm) : DEFAULT_BARCODE_CONFIG.heightCm,
+      columnsPerRow:
+        parsed.columnsPerRow === 2 || parsed.columnsPerRow === 3 ? parsed.columnsPerRow : 1,
     };
   } catch {
     return DEFAULT_BARCODE_CONFIG;

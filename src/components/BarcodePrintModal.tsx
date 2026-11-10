@@ -5,6 +5,7 @@ import { Product } from '@/types';
 import {
   BarcodeLabelConfig,
   BARCODE_SIZE_PRESETS,
+  PrinterModelProfile,
   encodeCode128B,
   generateBarcodeSvgString,
   getSavedBarcodeConfig,
@@ -23,6 +24,11 @@ import {
   Layers,
   FileText,
   Sliders,
+  Download,
+  Smartphone,
+  Wifi,
+  Move,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface BarcodePrintModalProps {
@@ -42,6 +48,7 @@ export default function BarcodePrintModal({
   const [copiesMap, setCopiesMap] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showAllSelector, setShowAllSelector] = useState(false);
+  const [isExportingImage, setIsExportingImage] = useState(false);
 
   // Load saved config and initialize selected product copies
   useEffect(() => {
@@ -56,7 +63,6 @@ export default function BarcodePrintModal({
       });
       setShowAllSelector(initialSelectedProducts.length > 1);
     } else {
-      // Default: select available products (up to 1 each) or show selector
       products
         .filter((p) => p.status === 'AVAILABLE')
         .slice(0, 5)
@@ -78,6 +84,31 @@ export default function BarcodePrintModal({
     });
   };
 
+  // Switch printer profile with smart defaults
+  const handleSelectPrinterProfile = (profile: PrinterModelProfile) => {
+    if (profile === 'niimbot_b21_pro') {
+      updateConfig({
+        printerProfile: 'niimbot_b21_pro',
+        paperMode: 'roll',
+        columnsPerRow: 1,
+        // Cap width at 5.0 cm if previously set larger for EasyPrint
+        widthCm: config.widthCm > 5.0 ? 5.0 : config.widthCm,
+        heightCm: config.heightCm > 6.0 ? 3.0 : config.heightCm,
+      });
+    } else if (profile === 'easyprint_es9920ew') {
+      updateConfig({
+        printerProfile: 'easyprint_es9920ew',
+        paperMode: 'roll',
+      });
+    } else {
+      updateConfig({
+        printerProfile: 'a4_sheet',
+        paperMode: 'a4',
+        columnsPerRow: 1,
+      });
+    }
+  };
+
   const selectedItems = useMemo(() => {
     return products
       .filter((p) => (copiesMap[p.id] || 0) > 0)
@@ -90,6 +121,20 @@ export default function BarcodePrintModal({
   const totalLabels = useMemo(() => {
     return selectedItems.reduce((sum, item) => sum + item.copies, 0);
   }, [selectedItems]);
+
+  const filteredPresets = useMemo(() => {
+    if (config.printerProfile === 'niimbot_b21_pro') {
+      return BARCODE_SIZE_PRESETS.filter(
+        (p) => p.printer === 'niimbot_b21_pro' || p.printer === 'both'
+      );
+    }
+    if (config.printerProfile === 'easyprint_es9920ew') {
+      return BARCODE_SIZE_PRESETS.filter(
+        (p) => p.printer === 'easyprint_es9920ew' || p.printer === 'both'
+      );
+    }
+    return BARCODE_SIZE_PRESETS.filter((p) => (p.columnsPerRow || 1) === 1);
+  }, [config.printerProfile]);
 
   const filteredPickerProducts = useMemo(() => {
     if (!searchTerm.trim()) return products;
@@ -128,7 +173,6 @@ export default function BarcodePrintModal({
     const metaFontPt = Math.max(5, Math.round(minDim * 2.4 * scaleFactor * 10) / 10);
     const priceFontPt = Math.max(6.5, Math.round(minDim * 3.4 * scaleFactor * 10) / 10);
 
-    // Barcode height in cm
     const activeInfoLines =
       (config.showStoreName ? 1 : 0) +
       (config.showSkuText ? 1 : 0) +
@@ -159,11 +203,19 @@ export default function BarcodePrintModal({
       return;
     }
 
-    const wCm = Math.max(1.2, Number(config.widthCm) || 4.0);
-    const hCm = Math.max(1.0, Number(config.heightCm) || 2.5);
+    const wCm = Math.max(1.2, Number(config.widthCm) || 5.0);
+    const hCm = Math.max(1.0, Number(config.heightCm) || 3.0);
     const isRoll = config.paperMode === 'roll';
+    const cols = isRoll ? config.columnsPerRow || 1 : 1;
+    const gapCm = isRoll && cols > 1 ? Number(config.columnGapCm) || 0.2 : 0;
+    const totalRollWidthCm =
+      Math.round((wCm * cols + gapCm * (cols - 1)) * 100) / 100;
 
-    const labelHtmlList: string[] = [];
+    const offsetX = Number(config.offsetXMm) || 0;
+    const offsetY = Number(config.offsetYMm) || 0;
+
+    // Flatten all labels in queue
+    const expandedCardsHtml: string[] = [];
 
     selectedItems.forEach(({ product, copies }) => {
       const svgMarkup = generateBarcodeSvgString(product.sku);
@@ -176,7 +228,7 @@ export default function BarcodePrintModal({
           : '';
 
       for (let c = 0; c < copies; c++) {
-        labelHtmlList.push(`
+        expandedCardsHtml.push(`
           <div class="label-card">
             ${
               config.showStoreName
@@ -209,9 +261,22 @@ export default function BarcodePrintModal({
       }
     });
 
+    // Group into rows if multi-column thermal roll (e.g. EasyPrint ES-9920EW 2 or 3 columns)
+    let bodyContentHtml = '';
+    if (isRoll && cols > 1) {
+      const rowsHtml: string[] = [];
+      for (let i = 0; i < expandedCardsHtml.length; i += cols) {
+        const rowChunk = expandedCardsHtml.slice(i, i + cols);
+        rowsHtml.push(`<div class="roll-row">${rowChunk.join('\n')}</div>`);
+      }
+      bodyContentHtml = rowsHtml.join('\n');
+    } else {
+      bodyContentHtml = `<div class="labels-wrapper">${expandedCardsHtml.join('\n')}</div>`;
+    }
+
     const printCss = `
       @page {
-        size: ${isRoll ? `${wCm}cm ${hCm}cm` : 'A4 portrait'};
+        size: ${isRoll ? `${totalRollWidthCm}cm ${hCm}cm` : 'A4 portrait'};
         margin: ${isRoll ? '0cm' : '0.6cm'};
       }
       * {
@@ -235,6 +300,22 @@ export default function BarcodePrintModal({
         align-items: flex-start;
         justify-content: flex-start;
       }
+      .roll-row {
+        width: ${totalRollWidthCm}cm;
+        height: ${hCm}cm;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: ${gapCm}cm;
+        page-break-after: always;
+        break-after: page;
+        overflow: hidden;
+      }
+      .roll-row:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
       .label-card {
         width: ${wCm}cm;
         height: ${hCm}cm;
@@ -246,10 +327,13 @@ export default function BarcodePrintModal({
         text-align: center;
         overflow: hidden;
         background: #ffffff;
+        transform: translate(${offsetX}mm, ${offsetY}mm);
         ${
-          isRoll
+          isRoll && cols === 1
             ? 'page-break-after: always; break-after: page;'
-            : 'border: 0.5pt dashed #cbd5e1; page-break-inside: avoid; break-inside: avoid;'
+            : !isRoll
+            ? 'border: 0.5pt dashed #cbd5e1; page-break-inside: avoid; break-inside: avoid;'
+            : ''
         }
       }
       .label-card:last-child {
@@ -329,17 +413,14 @@ export default function BarcodePrintModal({
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>Vivida Crystal Barcode (${wCm}x${hCm}cm)</title>
+          <title>Vivida Crystal Barcode (${totalRollWidthCm}x${hCm}cm)</title>
           <style>${printCss}</style>
         </head>
         <body>
-          <div class="labels-wrapper">
-            ${labelHtmlList.join('\n')}
-          </div>
+          ${bodyContentHtml}
         </body>
       </html>`;
 
-    // Create hidden iframe to print cleanly without page scrollbars/margins
     const existingFrame = document.getElementById('vivida-barcode-print-frame');
     if (existingFrame) existingFrame.remove();
 
@@ -362,6 +443,155 @@ export default function BarcodePrintModal({
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
       }, 250);
+    }
+  };
+
+  /**
+   * Export high-resolution 300 DPI PNG label image (specifically for NIIMBOT B21 Pro / EasyPrint mobile app via Bluetooth)
+   */
+  const handleExport300DpiImage = async (targetProduct: Product) => {
+    setIsExportingImage(true);
+    try {
+      // 300 DPI = 118.11 pixels per cm. Use 2x supersampling (236.22 px/cm) for razor-sharp barcode lines
+      const pxPerCm = 236.22;
+      const canvasW = Math.round(config.widthCm * pxPerCm);
+      const canvasH = Math.round(config.heightCm * pxPerCm);
+      const padPx = Math.round(metrics.paddingCm * pxPerCm);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Pure white background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      // Convert pt to canvas px (1 pt = 0.0352778 cm)
+      const ptToPx = (pt: number) => Math.round(pt * 0.0352778 * pxPerCm);
+
+      let currentY = padPx;
+      const innerW = canvasW - padPx * 2;
+
+      // 1. Store Name
+      if (config.showStoreName) {
+        const fontPx = ptToPx(metrics.storeFontPt);
+        ctx.font = `800 ${fontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.fillText('VIVIDA CRYSTAL', canvasW / 2, currentY, innerW);
+        currentY += Math.round(fontPx * 1.2);
+      }
+
+      // 2. Barcode Bars (Crisp integer pixel coordinates)
+      const encoded = encodeCode128B(targetProduct.sku);
+      const barcodeH = Math.round(metrics.barcodeHeightCm * pxPerCm);
+      const barcodeW = Math.round(innerW * 0.96);
+      const moduleW = barcodeW / encoded.totalModules;
+      const barcodeStartX = Math.round((canvasW - barcodeW) / 2);
+
+      ctx.fillStyle = '#000000';
+      encoded.bars.forEach((bar) => {
+        const x1 = Math.round(barcodeStartX + bar.x * moduleW);
+        const x2 = Math.round(barcodeStartX + (bar.x + bar.width) * moduleW);
+        ctx.fillRect(x1, currentY, Math.max(1, x2 - x1), barcodeH);
+      });
+      currentY += barcodeH + Math.round(0.05 * pxPerCm);
+
+      // 3. SKU Line
+      if (config.showSkuText) {
+        const fontPx = ptToPx(metrics.skuFontPt);
+        ctx.font = `900 ${fontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.fillText(targetProduct.sku, canvasW / 2, currentY, innerW);
+        currentY += Math.round(fontPx * 1.18);
+      }
+
+      // 4. Stone Name
+      if (config.showStoneName) {
+        const fontPx = ptToPx(metrics.nameFontPt);
+        ctx.font = `700 ${fontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, currentY, innerW);
+        currentY += Math.round(fontPx * 1.2);
+      }
+
+      // 5. Bottom Meta & Price Line
+      const weightText = targetProduct.weight_grams ? `${targetProduct.weight_grams}g` : '';
+      const dimText = targetProduct.dimensions || '';
+      const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
+      const priceText =
+        targetProduct.selling_price && targetProduct.selling_price > 0
+          ? `฿${targetProduct.selling_price.toLocaleString()}`
+          : '';
+
+      if ((config.showWeightAndDim && specsLine) || (config.showPrice && priceText)) {
+        const priceFontPx = ptToPx(metrics.priceFontPt);
+        const metaFontPx = ptToPx(metrics.metaFontPt);
+        const bottomY = canvasH - padPx - Math.max(priceFontPx, metaFontPx);
+
+        // Divider line
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padPx, bottomY - Math.round(0.04 * pxPerCm));
+        ctx.lineTo(canvasW - padPx, bottomY - Math.round(0.04 * pxPerCm));
+        ctx.stroke();
+
+        if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
+          ctx.textAlign = 'left';
+          ctx.font = `600 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.fillText(specsLine, padPx, bottomY, innerW * 0.62);
+
+          ctx.textAlign = 'right';
+          ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.fillText(priceText, canvasW - padPx, bottomY - Math.round((priceFontPx - metaFontPx) * 0.3));
+        } else {
+          ctx.textAlign = 'center';
+          const textToDraw = config.showPrice && priceText ? priceText : specsLine;
+          const fPx = config.showPrice && priceText ? priceFontPx : metaFontPx;
+          ctx.font = `800 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.fillText(textToDraw, canvasW / 2, bottomY, innerW);
+        }
+      }
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/png', 1.0)
+      );
+      if (!blob) return;
+
+      const fileName = `Barcode_${targetProduct.sku}_${config.widthCm}x${config.heightCm}cm.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      // Try native iOS / mobile share sheet first so user can send directly to NIIMBOT app
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] })
+      ) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `บาร์โค้ด ${targetProduct.sku} (${config.widthCm}×${config.heightCm} cm)`,
+          });
+          return;
+        } catch {
+          // User cancelled share or fallback to download
+        }
+      }
+
+      // Fallback: direct file download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExportingImage(false);
     }
   };
 
@@ -397,6 +627,9 @@ export default function BarcodePrintModal({
       ? `฿${previewProduct.selling_price.toLocaleString()}`
       : '';
 
+  const isNiimbotOverWidth =
+    config.printerProfile === 'niimbot_b21_pro' && config.widthCm > 5.0;
+
   return (
     <div
       onClick={onClose}
@@ -414,10 +647,11 @@ export default function BarcodePrintModal({
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-base sm:text-lg truncate">
-                ปริ้นสติกเกอร์บาร์โค้ด (กำหนดขนาดเป็น cm)
+                ปริ้นบาร์โค้ด (NIIMBOT B21 Pro & EasyPrint ES-9920EW)
               </h3>
               <p className="text-xs text-slate-300 truncate">
-                ขนาดป้ายปัจจุบัน: <strong className="text-amber-300">{config.widthCm} × {config.heightCm} cm</strong> ({Math.round(config.widthCm * 10)} × {Math.round(config.heightCm * 10)} mm) • รวม {totalLabels} ดวง
+                ขนาดป้าย: <strong className="text-amber-300">{config.widthCm} × {config.heightCm} cm</strong> ({Math.round(config.widthCm * 10)} × {Math.round(config.heightCm * 10)} mm)
+                {config.columnsPerRow > 1 ? ` • เรียง ${config.columnsPerRow} ดวง/แถว` : ''} • รวม {totalLabels} ดวง
               </p>
             </div>
           </div>
@@ -432,32 +666,165 @@ export default function BarcodePrintModal({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
+          {/* Printer Model Selector Banner */}
+          <div className="space-y-2">
+            <label className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <Printer className="w-4 h-4 text-purple-600" />
+              <span>เลือกเครื่องพิมพ์บาร์โค้ดที่ใช้งาน:</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleSelectPrinterProfile('niimbot_b21_pro')}
+                className={`p-3 rounded-2xl border text-left transition flex items-start gap-2.5 ${
+                  config.printerProfile === 'niimbot_b21_pro'
+                    ? 'bg-purple-950 text-white border-purple-800 shadow-md ring-2 ring-purple-500/40'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300'
+                }`}
+              >
+                <Smartphone
+                  className={`w-5 h-5 mt-0.5 shrink-0 ${
+                    config.printerProfile === 'niimbot_b21_pro'
+                      ? 'text-purple-300'
+                      : 'text-purple-600'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+                    <span>NIIMBOT B21 Pro</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200 font-bold">
+                      300 DPI
+                    </span>
+                  </div>
+                  <p
+                    className={`text-[11px] mt-0.5 ${
+                      config.printerProfile === 'niimbot_b21_pro'
+                        ? 'text-purple-200'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    หน้ากว้าง 2.0–5.0 cm • รองรับทั้ง USB และส่งเข้าแอปมือถือ
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPrinterProfile('easyprint_es9920ew')}
+                className={`p-3 rounded-2xl border text-left transition flex items-start gap-2.5 ${
+                  config.printerProfile === 'easyprint_es9920ew'
+                    ? 'bg-blue-950 text-white border-blue-800 shadow-md ring-2 ring-blue-500/40'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
+                }`}
+              >
+                <Wifi
+                  className={`w-5 h-5 mt-0.5 shrink-0 ${
+                    config.printerProfile === 'easyprint_es9920ew'
+                      ? 'text-blue-300'
+                      : 'text-blue-600'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+                    <span>EasyPrint ES-9920EW</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-200 font-bold">
+                      Wi-Fi/USB
+                    </span>
+                  </div>
+                  <p
+                    className={`text-[11px] mt-0.5 ${
+                      config.printerProfile === 'easyprint_es9920ew'
+                        ? 'text-blue-200'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    หน้ากว้างสูงสุด 10.8 cm • รองรับสติกเกอร์ 1–3 ตอนเรียง
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPrinterProfile('a4_sheet')}
+                className={`p-3 rounded-2xl border text-left transition flex items-start gap-2.5 ${
+                  config.printerProfile === 'a4_sheet'
+                    ? 'bg-slate-900 text-white border-slate-800 shadow-md'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <FileText
+                  className={`w-5 h-5 mt-0.5 shrink-0 ${
+                    config.printerProfile === 'a4_sheet' ? 'text-amber-300' : 'text-slate-500'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-extrabold">กระดาษสติกเกอร์แผ่น A4</div>
+                  <p
+                    className={`text-[11px] mt-0.5 ${
+                      config.printerProfile === 'a4_sheet' ? 'text-slate-300' : 'text-slate-400'
+                    }`}
+                  >
+                    เรียงหลายดวงในแผ่น A4 พร้อมเส้นประตัด
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* LEFT COLUMN: Size & Display Settings */}
             <div className="lg:col-span-7 space-y-5">
               {/* 1. Custom Size in CM */}
               <div className="p-4 sm:p-5 bg-purple-50/60 border border-purple-200/80 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="text-xs sm:text-sm font-bold text-purple-950 flex items-center gap-1.5">
                     <Ruler className="w-4 h-4 text-purple-600" />
-                    <span>1. กำหนดขนาดสติกเกอร์ (หน่วย: เซนติเมตร cm)</span>
+                    <span>1. กำหนดไซส์สติกเกอร์ที่จะปริ้น (หน่วย: cm)</span>
                   </label>
                   <span className="text-[11px] font-bold px-2.5 py-0.5 bg-purple-200/70 text-purple-900 rounded-full">
-                    {Math.round(config.widthCm * 10)} × {Math.round(config.heightCm * 10)} มม.
+                    {config.widthCm} × {config.heightCm} cm ({Math.round(config.widthCm * 10)} × {Math.round(config.heightCm * 10)} มม.)
                   </span>
                 </div>
 
-                {/* Quick Size Presets */}
+                {/* Warning if NIIMBOT B21 Pro width > 5.0 cm */}
+                {isNiimbotOverWidth && (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-2 text-xs text-amber-900">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        เครื่อง <strong>NIIMBOT B21 Pro</strong> รองรับความกว้างสติกเกอร์สูงสุด{' '}
+                        <strong>5.0 cm (50 mm)</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateConfig({ widthCm: 5.0 })}
+                      className="px-2.5 py-1 bg-amber-600 text-white font-bold rounded-lg shrink-0 hover:bg-amber-700"
+                    >
+                      ปรับเป็น 5.0 cm
+                    </button>
+                  </div>
+                )}
+
+                {/* Quick Size Presets for Active Printer */}
                 <div>
                   <span className="text-[11px] font-semibold text-slate-500 block mb-2">
-                    เลือกขนาดมาตรฐานยอดนิยม (หรือพิมพ์ขนาดเองด้านล่าง):
+                    ขนาดสติกเกอร์มาตรฐานสำหรับ{' '}
+                    {config.printerProfile === 'niimbot_b21_pro'
+                      ? 'NIIMBOT B21 Pro'
+                      : config.printerProfile === 'easyprint_es9920ew'
+                      ? 'EasyPrint ES-9920EW'
+                      : 'แผ่น A4'}{' '}
+                    (หรือกรอกขนาด cm เองด้านล่าง):
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {BARCODE_SIZE_PRESETS.map((preset) => {
+                    {filteredPresets.map((preset) => {
+                      const presetCols = preset.columnsPerRow || 1;
                       const active =
                         Math.abs(config.widthCm - preset.widthCm) < 0.01 &&
-                        Math.abs(config.heightCm - preset.heightCm) < 0.01;
+                        Math.abs(config.heightCm - preset.heightCm) < 0.01 &&
+                        config.columnsPerRow === presetCols;
                       return (
                         <button
                           key={preset.label}
@@ -466,6 +833,7 @@ export default function BarcodePrintModal({
                             updateConfig({
                               widthCm: preset.widthCm,
                               heightCm: preset.heightCm,
+                              columnsPerRow: presetCols,
                             })
                           }
                           className={`p-2.5 rounded-xl border text-left transition active:scale-95 ${
@@ -492,7 +860,7 @@ export default function BarcodePrintModal({
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="bg-white p-3 rounded-xl border border-purple-200">
                     <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                      ความกว้าง (Width: cm)
+                      ความกว้างต่อดวง (Width: cm)
                     </label>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -511,12 +879,12 @@ export default function BarcodePrintModal({
                           type="number"
                           step="0.1"
                           min="1.5"
-                          max="15"
+                          max="12"
                           value={config.widthCm}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value);
                             if (!isNaN(val)) {
-                              updateConfig({ widthCm: Math.min(15, Math.max(1.0, val)) });
+                              updateConfig({ widthCm: Math.min(12, Math.max(1.0, val)) });
                             }
                           }}
                           className="w-full text-center font-mono font-black text-base py-1.5 px-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -526,7 +894,7 @@ export default function BarcodePrintModal({
                         type="button"
                         onClick={() =>
                           updateConfig({
-                            widthCm: Math.min(15, Math.round((config.widthCm + 0.1) * 10) / 10),
+                            widthCm: Math.min(12, Math.round((config.widthCm + 0.1) * 10) / 10),
                           })
                         }
                         className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95"
@@ -541,7 +909,7 @@ export default function BarcodePrintModal({
 
                   <div className="bg-white p-3 rounded-xl border border-purple-200">
                     <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                      ความสูง (Height: cm)
+                      ความสูงต่อดวง (Height: cm)
                     </label>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -588,64 +956,49 @@ export default function BarcodePrintModal({
                     </span>
                   </div>
                 </div>
+
+                {/* Multi-Column Roll Option for EasyPrint ES-9920EW */}
+                {config.printerProfile === 'easyprint_es9920ew' && (
+                  <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-blue-600" />
+                        จำนวนดวงสติกเกอร์ต่อแถว (สำหรับม้วน EasyPrint ES-9920EW):
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          { cols: 1, label: '1 ดวงเดี่ยว / แถว' },
+                          { cols: 2, label: '2 ดวงคู่ / แถว' },
+                          { cols: 3, label: '3 ดวงเรียง / แถว' },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.cols}
+                          type="button"
+                          onClick={() => updateConfig({ columnsPerRow: opt.cols })}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition ${
+                            config.columnsPerRow === opt.cols
+                              ? 'bg-blue-700 text-white border-blue-700'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* 2. Printer Type & Font Size */}
+              {/* 2. Font Scale, Visible Fields & Fine Offset Calibration */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <label className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                  <Sliders className="w-4 h-4 text-purple-600" />
-                  <span>2. ประเภทกระดาษ & ขนาดตัวอักษร</span>
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateConfig({ paperMode: 'roll' })}
-                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition ${
-                      config.paperMode === 'roll'
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <Layers className="w-4 h-4 mt-0.5 shrink-0 text-purple-400" />
-                    <div>
-                      <div className="text-xs font-bold">สติกเกอร์ม้วน (Thermal Roll)</div>
-                      <div
-                        className={`text-[10px] mt-0.5 ${
-                          config.paperMode === 'roll' ? 'text-slate-300' : 'text-slate-400'
-                        }`}
-                      >
-                        พิมพ์ทีละดวงตามขนาด {config.widthCm}×{config.heightCm} cm
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => updateConfig({ paperMode: 'a4' })}
-                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition ${
-                      config.paperMode === 'a4'
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 mt-0.5 shrink-0 text-purple-400" />
-                    <div>
-                      <div className="text-xs font-bold">กระดาษแผ่น A4 (เรียงหลายดวง)</div>
-                      <div
-                        className={`text-[10px] mt-0.5 ${
-                          config.paperMode === 'a4' ? 'text-slate-300' : 'text-slate-400'
-                        }`}
-                      >
-                        เรียงป้ายขนาด {config.widthCm}×{config.heightCm} cm บนแผ่น A4
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Font Size Scale + Field Checkboxes */}
-                <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-600">ขนาดตัวอักษรบนป้าย:</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Sliders className="w-4 h-4 text-purple-600" />
+                    <span>2. ข้อมูลบนป้าย & ขนาดตัวอักษร</span>
+                  </label>
                   <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
                     {(
                       [
@@ -671,43 +1024,105 @@ export default function BarcodePrintModal({
                 </div>
 
                 {/* Toggle Checkboxes for visible info */}
-                <div className="pt-2 border-t border-slate-200/80">
-                  <span className="text-[11px] font-semibold text-slate-500 block mb-2">
-                    เลือกข้อมูลที่ต้องการให้แสดงบนสติกเกอร์:
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  {[
+                    { key: 'showStoreName', label: 'ชื่อร้าน (Vivida Crystal)' },
+                    { key: 'showSkuText', label: 'รหัสสินค้า (SKU)' },
+                    { key: 'showStoneName', label: 'ชนิดหิน / ชื่อหิน' },
+                    { key: 'showWeightAndDim', label: 'น้ำหนัก (g) & ขนาด' },
+                    { key: 'showPrice', label: 'ราคาขาย (฿)' },
+                  ].map((item) => {
+                    const checked = Boolean(config[item.key as keyof BarcodeLabelConfig]);
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() =>
+                          updateConfig({
+                            [item.key]: !checked,
+                          } as Partial<BarcodeLabelConfig>)
+                        }
+                        className={`p-2 rounded-xl border flex items-center gap-2 text-left font-semibold transition ${
+                          checked
+                            ? 'bg-purple-50 border-purple-300 text-purple-900'
+                            : 'bg-white border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        {checked ? (
+                          <CheckSquare className="w-4 h-4 text-purple-600 shrink-0" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-300 shrink-0" />
+                        )}
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Fine Offset Calibration (mm) for thermal rolls */}
+                <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-slate-600 flex items-center gap-1">
+                    <Move className="w-3.5 h-3.5 text-slate-400" />
+                    ชดเชยตำแหน่งพิมพ์ (กรณีกระดาษเยื้องขอบ):
                   </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                    {[
-                      { key: 'showStoreName', label: 'ชื่อร้าน (Vivida Crystal)' },
-                      { key: 'showSkuText', label: 'รหัสสินค้า (SKU)' },
-                      { key: 'showStoneName', label: 'ชนิดหิน / ชื่อหิน' },
-                      { key: 'showWeightAndDim', label: 'น้ำหนัก (g) & ขนาด' },
-                      { key: 'showPrice', label: 'ราคาขาย (฿)' },
-                    ].map((item) => {
-                      const checked = Boolean(config[item.key as keyof BarcodeLabelConfig]);
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() =>
-                            updateConfig({
-                              [item.key]: !checked,
-                            } as Partial<BarcodeLabelConfig>)
-                          }
-                          className={`p-2 rounded-xl border flex items-center gap-2 text-left font-semibold transition ${
-                            checked
-                              ? 'bg-purple-50 border-purple-300 text-purple-900'
-                              : 'bg-white border-slate-200 text-slate-400'
-                          }`}
-                        >
-                          {checked ? (
-                            <CheckSquare className="w-4 h-4 text-purple-600 shrink-0" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-300 shrink-0" />
-                          )}
-                          <span className="truncate">{item.label}</span>
-                        </button>
-                      );
-                    })}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                      <span className="text-[11px] text-slate-500">ซ้าย-ขวา:</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateConfig({
+                            offsetXMm: Math.round(((config.offsetXMm || 0) - 0.5) * 10) / 10,
+                          })
+                        }
+                        className="px-1.5 font-bold hover:bg-slate-100 rounded"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-bold w-10 text-center">
+                        {config.offsetXMm || 0}mm
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateConfig({
+                            offsetXMm: Math.round(((config.offsetXMm || 0) + 0.5) * 10) / 10,
+                          })
+                        }
+                        className="px-1.5 font-bold hover:bg-slate-100 rounded"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                      <span className="text-[11px] text-slate-500">บน-ล่าง:</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateConfig({
+                            offsetYMm: Math.round(((config.offsetYMm || 0) - 0.5) * 10) / 10,
+                          })
+                        }
+                        className="px-1.5 font-bold hover:bg-slate-100 rounded"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-bold w-10 text-center">
+                        {config.offsetYMm || 0}mm
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateConfig({
+                            offsetYMm: Math.round(((config.offsetYMm || 0) + 0.5) * 10) / 10,
+                          })
+                        }
+                        className="px-1.5 font-bold hover:bg-slate-100 rounded"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -720,7 +1135,7 @@ export default function BarcodePrintModal({
                 <div className="w-full flex items-center justify-between text-xs text-slate-300">
                   <span className="font-bold flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    ตัวอย่างสติกเกอร์ตามขนาดจริง
+                    ตัวอย่างป้ายตามขนาดจริง
                   </span>
                   <span className="font-mono text-[11px] text-amber-300 font-bold">
                     {config.widthCm} cm × {config.heightCm} cm
@@ -728,7 +1143,7 @@ export default function BarcodePrintModal({
                 </div>
 
                 {/* Top horizontal ruler indicator */}
-                <div className="flex flex-col items-center py-3">
+                <div className="flex flex-col items-center py-2">
                   <div
                     style={{ width: `${config.widthCm}cm` }}
                     className="flex items-center justify-between text-[9px] font-mono text-amber-300 border-b border-amber-400/50 pb-0.5 mb-1.5 px-0.5"
@@ -839,9 +1254,20 @@ export default function BarcodePrintModal({
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-400 text-center">
-                  บาร์โค้ดมาตรฐาน Code-128 สแกนยิงเข้าเครื่องอ่านบาร์โค้ดและมือถือได้ทันที
-                </p>
+                {/* Direct 300 DPI PNG Save / Share for NIIMBOT iOS App */}
+                <button
+                  type="button"
+                  disabled={isExportingImage}
+                  onClick={() => handleExport300DpiImage(previewProduct)}
+                  className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/30 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>
+                    {isExportingImage
+                      ? 'กำลังสร้างภาพ 300 DPI...'
+                      : `บันทึกรูปป้าย 300 DPI (${previewProduct.sku}) ส่งเข้าแอป NIIMBOT`}
+                  </span>
+                </button>
               </div>
 
               {/* Selected Products & Quantity per Item */}
@@ -860,7 +1286,7 @@ export default function BarcodePrintModal({
                 </div>
 
                 {/* Currently Selected Items List */}
-                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                   {selectedItems.length === 0 ? (
                     <div className="text-xs text-slate-400 text-center py-4">
                       ยังไม่ได้เลือกรายการหิน กดเลือกจากรายการด้านล่างได้เลย
@@ -885,13 +1311,21 @@ export default function BarcodePrintModal({
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
+                            onClick={() => handleExport300DpiImage(product)}
+                            className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800"
+                            title="บันทึกรูป 300 DPI สำหรับแอป NIIMBOT"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setProductCopies(product.id, copies - 1)}
                             className="p-1 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700"
                             title="ลดจำนวนดวง"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="w-8 text-center font-mono font-black text-slate-900">
+                          <span className="w-7 text-center font-mono font-black text-slate-900">
                             {copies}
                           </span>
                           <button
@@ -982,7 +1416,7 @@ export default function BarcodePrintModal({
         </div>
 
         {/* Sticky Bottom Footer (Safe-area aware for iPhone 15) */}
-        <div className="shrink-0 px-5 sm:px-6 pt-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+        <div className="shrink-0 px-5 sm:px-6 pt-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2.5">
           <button
             type="button"
             onClick={onClose}
@@ -991,17 +1425,31 @@ export default function BarcodePrintModal({
             ปิดหน้าต่าง
           </button>
 
-          <button
-            type="button"
-            onClick={handlePrintLabels}
-            disabled={totalLabels === 0}
-            className="flex-1 sm:flex-initial px-6 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 active:scale-95 transition"
-          >
-            <Printer className="w-4 h-4" />
-            <span>
-              สั่งปริ้นบาร์โค้ด ({config.widthCm}×{config.heightCm} cm • {totalLabels} ดวง)
-            </span>
-          </button>
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+            <button
+              type="button"
+              onClick={() => handleExport300DpiImage(previewProduct)}
+              disabled={isExportingImage}
+              className="px-3.5 py-2.5 min-h-[44px] rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs sm:text-sm flex items-center gap-1.5 active:scale-95 transition"
+              title="เซฟรูปป้าย 300 DPI เพื่อเปิดพิมพ์ในแอป NIIMBOT บนมือถือ"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">เซฟรูป 300 DPI (แอป NIIMBOT)</span>
+              <span className="sm:hidden">เซฟรูปแอป</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintLabels}
+              disabled={totalLabels === 0}
+              className="flex-1 sm:flex-initial px-5 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 active:scale-95 transition"
+            >
+              <Printer className="w-4 h-4 shrink-0" />
+              <span>
+                สั่งปริ้น ({config.widthCm}×{config.heightCm} cm • {totalLabels} ดวง)
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
