@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import { fetchProducts } from '@/lib/inventoryService';
+import { encodeCode128B } from '@/lib/barcodeGenerator';
 import { Product, Order, PackingLog } from '@/types';
 import {
   Video,
@@ -33,6 +34,11 @@ import {
   X,
   Volume2,
   VolumeX,
+  Barcode,
+  Zap,
+  Printer,
+  Search,
+  CheckCheck,
 } from 'lucide-react';
 
 const LS_PACKING_RECORDS = 'crystal_packing_records_v1';
@@ -51,6 +57,13 @@ export default function PackingPage() {
   const [customerIg, setCustomerIg] = useState<string>('');
   const [trackingNo, setTrackingNo] = useState<string>('');
   const [packingNotes, setPackingNotes] = useState<string>('');
+
+  // Barcode Trigger & Auto-record state
+  const [barcodeInput, setBarcodeInput] = useState<string>('');
+  const [isAutoTriggerEnabled, setIsAutoTriggerEnabled] = useState<boolean>(true);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [showCommandSheetModal, setShowCommandSheetModal] = useState<boolean>(false);
 
   // Checklist state
   const [checkInspection, setCheckInspection] = useState(false);
@@ -77,20 +90,102 @@ export default function PackingPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewVideoModalUrl, setPreviewVideoModalUrl] = useState<string | null>(null);
 
-  // Past Packing Records
+  // Past Packing Records & Search
   const [packingRecords, setPackingRecords] = useState<PackingLog[]>([]);
+  const [searchHistoryQuery, setSearchHistoryQuery] = useState<string>('');
 
-  // Refs
+  // Refs for Media & Hardware Scanner
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+
+  // Active Target Ref to prevent closure staleness in async onstop callbacks
+  const activeTargetRef = useRef<{
+    order: Order | null;
+    sku: string | null;
+    trackingNo: string | null;
+    customerIg: string | null;
+    productName: string | null;
+  }>({
+    order: null,
+    sku: null,
+    trackingNo: null,
+    customerIg: null,
+    productName: null,
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // -------------------------------------------------------------
+  // Web Audio API Synthesizer (Instant Audio Cues for Packing Table)
+  // -------------------------------------------------------------
+  const playAudioCue = (type: 'scan_start' | 'stop_success' | 'chain_switch' | 'error') => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      if (type === 'scan_start') {
+        // Dual-tone high pitch beep (880Hz -> 1320Hz)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.22);
+      } else if (type === 'stop_success') {
+        // Success Chime: Major Triad (523Hz -> 659Hz -> 784Hz)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.09);
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } else if (type === 'chain_switch') {
+        // Switch sound: Fast chime-beep
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+        osc.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      } else {
+        // Error Buzz (220Hz)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      }
+    } catch (e) {
+      console.warn('AudioContext error:', e);
+    }
   };
 
   // 1. Initial Load of Products, Orders & Local Records
@@ -131,13 +226,32 @@ export default function PackingPage() {
     }
     loadData();
 
+    // Auto-focus barcode input for quick scanner readiness
+    setTimeout(() => {
+      barcodeInputRef.current?.focus();
+    }, 500);
+
     return () => {
       stopCamera();
     };
   }, []);
 
+  // Update activeTargetRef whenever target state changes
+  useEffect(() => {
+    const matchedProduct = products.find((p) => p.sku === selectedSku);
+    activeTargetRef.current = {
+      order: selectedOrder,
+      sku: selectedSku || (selectedOrder?.items[0]?.sku ?? null),
+      trackingNo: trackingNo || selectedOrder?.tracking_no || null,
+      customerIg: customerIg || (selectedOrder?.channel === 'INSTAGRAM' ? selectedOrder.customer_name : null),
+      productName: selectedOrder
+        ? selectedOrder.items.map((i) => i.name).join(', ')
+        : matchedProduct?.name || selectedSku || 'หิน Vivida Crystal',
+    };
+  }, [selectedOrder, selectedSku, trackingNo, customerIg, products]);
+
   // 2. Start / Stop Camera Stream
-  const startCamera = async (facing: 'user' | 'environment' = cameraFacing) => {
+  const startCamera = async (facing: 'user' | 'environment' = cameraFacing): Promise<MediaStream | null> => {
     stopCamera();
     setCameraError(null);
     try {
@@ -160,6 +274,7 @@ export default function PackingPage() {
         videoPreviewRef.current.play().catch(() => {});
       }
       setIsCameraActive(true);
+      return stream;
     } catch (err: any) {
       console.error('Camera access error:', err);
       setCameraError(
@@ -168,6 +283,7 @@ export default function PackingPage() {
           : `ไม่สามารถเปิดกล้องได้: ${err.message || 'เกิดข้อผิดพลาด'}`
       );
       setIsCameraActive(false);
+      return null;
     }
   };
 
@@ -190,11 +306,16 @@ export default function PackingPage() {
     }
   };
 
-  // 3. MediaRecorder controls
-  const startRecording = async () => {
-    if (!isCameraActive || !mediaStreamRef.current) {
-      await startCamera();
-      if (!mediaStreamRef.current) return;
+  // 3. Core MediaRecorder Controls
+  const startRecording = async (overrideTarget?: typeof activeTargetRef.current) => {
+    if (overrideTarget) {
+      activeTargetRef.current = overrideTarget;
+    }
+
+    let stream = mediaStreamRef.current;
+    if (!isCameraActive || !stream) {
+      stream = await startCamera();
+      if (!stream) return;
     }
 
     recordedChunksRef.current = [];
@@ -204,7 +325,6 @@ export default function PackingPage() {
     setUploadedPublicUrl(null);
 
     try {
-      // Auto-detect optimal video mimeType
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9'
         : MediaRecorder.isTypeSupported('video/webm')
@@ -214,7 +334,7 @@ export default function PackingPage() {
         : '';
 
       const options = mimeType ? { mimeType } : undefined;
-      const recorder = new MediaRecorder(mediaStreamRef.current, options);
+      const recorder = new MediaRecorder(stream, options);
 
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -229,19 +349,22 @@ export default function PackingPage() {
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
         setRecordingState('recorded');
+
+        // Automatically trigger Order Indexing & Save!
+        autoIndexAndSaveRecording(blob, url, activeTargetRef.current);
       };
 
-      recorder.start(1000); // chunk every second
+      recorder.start(1000);
       mediaRecorderRef.current = recorder;
       setRecordingState('recording');
 
-      // Start duration timer
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
 
-      showToast('🔴 เริ่มบันทึกคลิปการแพ็กแล้ว (กด Spacebar เพื่อหยุด)');
+      playAudioCue('scan_start');
+      showToast('🔴 เริ่มอัดคลิปพัสดุอัตโนมัติแล้ว! (ยิงบาร์โค้ดใบถัดไปเพื่อบันทึกต่อ)');
     } catch (err: any) {
       console.error('MediaRecorder start error:', err);
       alert(`ไม่สามารถเริ่มบันทึกวิดีโอได้: ${err.message}`);
@@ -272,7 +395,7 @@ export default function PackingPage() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      showToast('⏹️ บันทึกคลิปแพ็กเสร็จสิ้น! สามารถเปิดดูตัวอย่างได้');
+      playAudioCue('stop_success');
     }
   };
 
@@ -286,66 +409,30 @@ export default function PackingPage() {
     if (!isCameraActive) startCamera();
   };
 
-  // Keyboard shortcut: Spacebar to toggle recording
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in input or textarea
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-        return;
-      }
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (recordingState === 'idle') {
-          startRecording();
-        } else if (recordingState === 'recording') {
-          stopRecording();
-        } else if (recordingState === 'recorded') {
-          resetRecording();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [recordingState, isCameraActive]);
-
-  // 4. File input fallback (Upload existing video or mobile native camera shot)
-  const handleFileVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('video/')) {
-      alert('กรุณาเลือกไฟล์วิดีโอ (เช่น MP4, MOV, WebM)');
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-    setRecordedBlob(file);
-    setRecordedVideoUrl(url);
-    setRecordingState('recorded');
-    setRecordingDuration(0);
-    showToast(`📹 โหลดคลิป "${file.name}" เรียบร้อยแล้ว`);
-  };
-
-  // 5. Save & Upload Video to R2 / Supabase
-  const handleSaveAndUpload = async () => {
-    if (!recordedBlob) {
-      alert('ไม่พบไฟล์วิดีโอ กรุณาอัดคลิปก่อนกดบันทึก');
-      return;
-    }
-
+  // -------------------------------------------------------------
+  // Order Indexing: Automatically Bind Video with Tracking / Order ID
+  // -------------------------------------------------------------
+  const autoIndexAndSaveRecording = async (
+    blob: Blob,
+    localUrl: string,
+    target: typeof activeTargetRef.current
+  ) => {
     setIsUploading(true);
-    let finalUrl = recordedVideoUrl || '';
+    let finalUrl = localUrl;
+
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const cleanTrack = target.trackingNo ? target.trackingNo.replace(/[^a-zA-Z0-9_-]/g, '') : '';
+    const cleanOrder = target.order?.order_no ? target.order.order_no.replace(/[^a-zA-Z0-9_-]/g, '') : '';
+    const cleanSku = target.sku ? target.sku.replace(/[^a-zA-Z0-9_-]/g, '') : '';
+
+    // Standardized Index Naming: PACK_[TRACKING]_[ORDER]_[SKU]_[TIMESTAMP].ext
+    const fileName = `PACK_${cleanTrack ? cleanTrack + '_' : ''}${cleanOrder ? cleanOrder + '_' : ''}${cleanSku ? cleanSku + '_' : ''}${Date.now()}.${ext}`;
 
     try {
-      const ext = recordedBlob.type.includes('mp4') ? 'mp4' : 'webm';
-      const targetCode = selectedOrder?.order_no || selectedSku || 'PACK';
-      const fileName = `pack_${targetCode}_${Date.now()}.${ext}`;
-
       const formData = new FormData();
-      formData.append('file', recordedBlob, fileName);
+      formData.append('file', blob, fileName);
       formData.append('folder', 'packing');
-      if (selectedSku) formData.append('sku', selectedSku);
+      if (cleanSku) formData.append('sku', cleanSku);
 
       const res = await fetch('/api/upload', {
         method: 'POST',
@@ -355,83 +442,229 @@ export default function PackingPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.url) finalUrl = data.url;
-      } else {
-        console.warn('Upload API responded with non-200, fallback to local URL preview');
       }
-    } catch (uploadErr) {
-      console.warn('Upload error, persisting locally:', uploadErr);
+    } catch (e) {
+      console.warn('Background upload error, falling back to local URL:', e);
     } finally {
       setIsUploading(false);
     }
 
     setUploadedPublicUrl(finalUrl);
 
-    // Save Record to Local Storage
-    const matchedProduct = products.find((p) => p.sku === selectedSku);
+    // Save Indexed Record
     const newRecord: PackingLog = {
       id: `pack_${Date.now()}`,
-      order_id: selectedOrder?.id || null,
-      order_no: selectedOrder?.order_no || null,
-      sku: selectedSku || (selectedOrder?.items[0]?.sku ?? null),
-      product_name: selectedOrder
-        ? selectedOrder.items.map((i) => i.name).join(', ')
-        : matchedProduct?.name || 'หิน Vivida Crystal',
-      customer_name: selectedOrder?.customer_name || (customerIg ? `@${customerIg.replace('@', '')}` : 'ลูกค้า IG'),
-      customer_ig: customerIg || (selectedOrder?.channel === 'INSTAGRAM' ? selectedOrder.customer_name : null),
+      order_id: target.order?.id || null,
+      order_no: target.order?.order_no || null,
+      sku: target.sku || null,
+      product_name: target.productName || 'หิน Vivida Crystal',
+      customer_name: target.order?.customer_name || (target.customerIg ? `@${target.customerIg.replace('@', '')}` : 'ลูกค้า IG'),
+      customer_ig: target.customerIg || null,
       video_url: finalUrl,
       duration_seconds: recordingDuration,
       packed_at: new Date().toISOString(),
-      tracking_no: trackingNo || selectedOrder?.tracking_no || null,
+      tracking_no: target.trackingNo || null,
       notes: packingNotes || null,
     };
 
-    const updatedRecords = [newRecord, ...packingRecords];
-    setPackingRecords(updatedRecords);
-    localStorage.setItem(LS_PACKING_RECORDS, JSON.stringify(updatedRecords));
+    setPackingRecords((prev) => {
+      const next = [newRecord, ...prev];
+      localStorage.setItem(LS_PACKING_RECORDS, JSON.stringify(next));
+      return next;
+    });
 
-    // If order was selected, auto-update order status to SHIPPED
-    if (selectedOrder) {
+    // Automatically update Order in Supabase/API (Mark as SHIPPED + attach Tracking & Packing Video)
+    if (target.order) {
       try {
         await fetch('/api/orders', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: selectedOrder.id,
+            id: target.order.id,
             status: 'SHIPPED',
             packing_video_url: finalUrl,
-            tracking_no: trackingNo || selectedOrder.tracking_no,
+            tracking_no: target.trackingNo || target.order.tracking_no,
           }),
         });
-      } catch (e) {
-        console.warn('Order status update error:', e);
+      } catch (err) {
+        console.warn('Order sync error:', err);
       }
     }
 
-    showToast('🎉 บันทึกคลิปการแพ็กเข้าประวัติเรียบร้อยแล้ว!');
+    showToast(`✅ ผูกวิดีโอเข้ากับพัสดุ ${target.trackingNo || target.order?.order_no || target.sku} สำเร็จ!`);
   };
 
-  // 6. Download local video file (.webm / .mp4)
+  // -------------------------------------------------------------
+  // Barcode Trigger Handler (Auto-Record & Chain Next Order)
+  // -------------------------------------------------------------
+  const handleBarcodeTrigger = async (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+
+    setLastScannedCode(code);
+    setBarcodeInput('');
+
+    // Check for Command Barcodes
+    const upper = code.toUpperCase();
+    if (['FINISH', 'STOP', 'DONE', 'END', 'OK'].includes(upper)) {
+      if (recordingState === 'recording') {
+        stopRecording();
+        showToast('⏹️ ยืนยันการแพ็กเสร็จสิ้น! วิดีโอถูกบันทึกและผูกเลขพัสดุแล้ว');
+      } else {
+        playAudioCue('error');
+        showToast('ยังไม่ได้เริ่มอัดคลิป');
+      }
+      return;
+    }
+
+    if (['PAUSE'].includes(upper)) {
+      pauseRecording();
+      return;
+    }
+
+    if (['RESUME', 'CONTINUE'].includes(upper)) {
+      resumeRecording();
+      return;
+    }
+
+    // 1. Identify Target: Match against Orders (by tracking_no, order_no, or item sku)
+    const matchedOrder = orders.find(
+      (o) =>
+        (o.tracking_no && o.tracking_no.toLowerCase() === code.toLowerCase()) ||
+        o.order_no.toLowerCase() === code.toLowerCase() ||
+        o.items.some((i) => i.sku.toLowerCase() === code.toLowerCase())
+    );
+
+    // 2. Match against Products (by SKU)
+    const matchedProduct = products.find((p) => p.sku.toLowerCase() === code.toLowerCase());
+
+    // 3. Determine Tracking Number
+    let detectedTrackingNo = '';
+    if (matchedOrder?.tracking_no) {
+      detectedTrackingNo = matchedOrder.tracking_no;
+    } else if (!matchedProduct && !code.startsWith('INV-')) {
+      // It's likely a shipping label tracking number (e.g. Flash, EMS, Kerry)
+      detectedTrackingNo = code;
+    }
+
+    // Prepare target object
+    const newTarget = {
+      order: matchedOrder || null,
+      sku: matchedProduct?.sku || (matchedOrder?.items[0]?.sku ?? null),
+      trackingNo: detectedTrackingNo || (matchedOrder?.tracking_no ?? code),
+      customerIg: matchedOrder?.channel === 'INSTAGRAM' ? matchedOrder.customer_name : '',
+      productName: matchedOrder
+        ? matchedOrder.items.map((i) => i.name).join(', ')
+        : matchedProduct?.name || code,
+    };
+
+    // Update UI states
+    setSelectedOrder(matchedOrder || null);
+    if (matchedOrder) {
+      setPackMode('order');
+      setTrackingNo(detectedTrackingNo || matchedOrder.tracking_no || '');
+      if (matchedOrder.channel === 'INSTAGRAM') setCustomerIg(matchedOrder.customer_name);
+    } else if (matchedProduct) {
+      setPackMode('quick');
+      setSelectedSku(matchedProduct.sku);
+      setTrackingNo(detectedTrackingNo);
+    } else {
+      setPackMode('quick');
+      setTrackingNo(detectedTrackingNo || code);
+    }
+
+    // 4. Barcode Trigger Action:
+    if (!isAutoTriggerEnabled) {
+      showToast(`🔍 สแกนบาร์โค้ด: ${code} (โหลดข้อมูลเรียบร้อย กดเริ่มอัดได้เลย)`);
+      return;
+    }
+
+    // Case A: Currently recording another parcel -> STOP & SAVE PREVIOUS, THEN CHAIN START NEW!
+    if (recordingState === 'recording') {
+      playAudioCue('chain_switch');
+      stopRecording(); // Trigger onstop to save previous parcel
+
+      // Allow 300ms for recorder state to settle then start new recording
+      setTimeout(() => {
+        startRecording(newTarget);
+      }, 350);
+
+      showToast(`📦 บันทึกพัสดุก่อนหน้าแล้ว ➔ 🔴 สแกนใบใหม่ เริ่มอัด ${newTarget.trackingNo || code} ทันที!`);
+      return;
+    }
+
+    // Case B: Idle or recorded -> Start new recording immediately!
+    await startRecording(newTarget);
+    showToast(`⚡ Barcode Trigger: ยิงใบปะหน้า ${newTarget.trackingNo || code} ➔ เริ่มอัดวิดีโอทันที!`);
+  };
+
+  // Keyboard wedge listener for physical barcode scanners
+  const scannerBufferRef = useRef<string>('');
+  const lastKeyTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Spacebar hotkey to toggle recording (if not typing in input)
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+
+      if (e.code === 'Space' && !isInput) {
+        e.preventDefault();
+        if (recordingState === 'idle') {
+          startRecording();
+        } else if (recordingState === 'recording') {
+          stopRecording();
+        } else if (recordingState === 'recorded') {
+          resetRecording();
+        }
+        return;
+      }
+
+      // Barcode hardware scanner recognition: rapid consecutive keypresses
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTimeRef.current;
+      lastKeyTimeRef.current = currentTime;
+
+      if (timeDiff > 100 && scannerBufferRef.current.length > 0) {
+        scannerBufferRef.current = '';
+      }
+
+      if (e.key === 'Enter') {
+        if (scannerBufferRef.current.length >= 3) {
+          const scanned = scannerBufferRef.current;
+          scannerBufferRef.current = '';
+          handleBarcodeTrigger(scanned);
+        }
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        scannerBufferRef.current += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [recordingState, orders, products, isAutoTriggerEnabled, soundEnabled]);
+
+  // Download local video file (.webm / .mp4)
   const handleDownloadVideo = () => {
     if (!recordedVideoUrl) return;
     const a = document.createElement('a');
     a.href = recordedVideoUrl;
-    const targetCode = selectedOrder?.order_no || selectedSku || 'PACK';
-    a.download = `Vivida_Packing_${targetCode}_${Date.now()}.webm`;
+    const cleanTrack = trackingNo ? trackingNo.replace(/[^a-zA-Z0-9_-]/g, '') : '';
+    const cleanOrder = selectedOrder?.order_no ? selectedOrder.order_no.replace(/[^a-zA-Z0-9_-]/g, '') : '';
+    a.download = `PACK_${cleanTrack ? cleanTrack + '_' : ''}${cleanOrder ? cleanOrder + '_' : ''}${Date.now()}.webm`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     showToast('📥 ดาวน์โหลดคลิปวิดีโอลงเครื่องแล้ว');
   };
 
-  // 7. Generate Friendly IG Message with Auto Copy
-  const handleCopyIgMessage = () => {
-    const custName = selectedOrder?.customer_name || (customerIg ? `@${customerIg.replace('@', '')}` : 'คุณลูกค้า');
-    const stoneNames = selectedOrder
-      ? selectedOrder.items.map((i) => `${i.name} (${i.sku})`).join(', ')
-      : products.find((p) => p.sku === selectedSku)?.name || selectedSku || 'น้องหิน';
-
-    const videoLink = uploadedPublicUrl || recordedVideoUrl || '(แนบคลิปส่งในแชท)';
-    const trackStr = trackingNo ? `🚚 เลขพัสดุ Tracking: ${trackingNo}\n` : '';
+  // Generate Friendly IG Message with Auto Copy
+  const handleCopyIgMessage = (rec?: PackingLog) => {
+    const custName = rec?.customer_name || selectedOrder?.customer_name || (customerIg ? `@${customerIg.replace('@', '')}` : 'คุณลูกค้า');
+    const stoneNames = rec?.product_name || (selectedOrder ? selectedOrder.items.map((i) => `${i.name} (${i.sku})`).join(', ') : selectedSku || 'น้องหิน');
+    const videoLink = rec?.video_url || uploadedPublicUrl || recordedVideoUrl || '(แนบคลิปส่งในแชท)';
+    const trackCode = rec?.tracking_no || trackingNo;
+    const trackStr = trackCode ? `🚚 เลขพัสดุ Tracking: ${trackCode}\n` : '';
 
     const text = `สวัสดีค่ะคุณ ${custName} 📦✨
 ทางร้าน Vivida Crystal แพ็กน้อง ${stoneNames} ให้เรียบร้อยแล้วนะคะ
@@ -454,6 +687,20 @@ ${trackStr}
     return `${m}:${s}`;
   };
 
+  // Filtered History Records by Search Query
+  const filteredPackingRecords = useMemo(() => {
+    if (!searchHistoryQuery.trim()) return packingRecords;
+    const q = searchHistoryQuery.toLowerCase();
+    return packingRecords.filter(
+      (r) =>
+        (r.tracking_no && r.tracking_no.toLowerCase().includes(q)) ||
+        (r.order_no && r.order_no.toLowerCase().includes(q)) ||
+        (r.sku && r.sku.toLowerCase().includes(q)) ||
+        (r.customer_name && r.customer_name.toLowerCase().includes(q)) ||
+        (r.product_name && r.product_name.toLowerCase().includes(q))
+    );
+  }, [packingRecords, searchHistoryQuery]);
+
   const activeStone = products.find((p) => p.sku === selectedSku);
 
   return (
@@ -462,51 +709,153 @@ ${trackStr}
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Header Banner */}
-        <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        {/* ========================================================= */}
+        {/* 1. TOP HEADER & BARCODE TRIGGER SCANNER DOCK               */}
+        {/* ========================================================= */}
+        <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-7 text-white shadow-xl relative overflow-hidden space-y-5">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
+
+          {/* Header Title & Badges */}
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-purple-200 text-xs font-semibold">
-                <Video className="w-3.5 h-3.5 text-amber-400" />
-                <span>Video Packing Station • ระบบบันทึกวิดีโอขณะแพ็กสินค้า</span>
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Barcode Auto-Trigger & Order Indexing System</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                📦 ห้องแพ็กของ & บันทึกคลิปก่อนส่ง
+                📦 ระบบบันทึกวิดีโอขณะแพ็กสินค้า (Video Packing Station)
               </h1>
-              <p className="text-sm text-purple-200/90 max-w-2xl leading-relaxed">
-                อัดวิดีโอตรวจสภาพหิน 360° พันบับเบิ้ล และปิดกล่องพัสดุเป็นหลักฐานกันเคลม
-                พร้อมสร้างข้อความน่ารักๆ ส่งให้ลูกค้าทาง Instagram Direct ได้ใน 1 คลิก!
+              <p className="text-xs sm:text-sm text-purple-200/90 max-w-2xl">
+                ยิงบาร์โค้ดใบปะหน้า ➔ กล้องเริ่มอัดทันที ➔ บันทึกผูกชื่อไฟล์เข้ากับเลข Tracking อัตโนมัติ!
               </p>
             </div>
 
-            {/* Quick Stats Badges */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="px-4 py-3 bg-white/10 backdrop-blur rounded-2xl border border-white/10">
-                <span className="text-[11px] text-purple-200 block">ออเดอร์รอแพ็ก</span>
-                <span className="text-xl font-black text-amber-400">
-                  {orders.filter((o) => o.status === 'PAID' || o.status === 'WAITING_PAYMENT').length} บิล
+            {/* Print Command Sheet Button */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCommandSheetModal(true)}
+                className="px-3.5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white transition flex items-center gap-1.5 backdrop-blur shadow-sm active:scale-95"
+                title="เปิดแผ่นบาร์โค้ดคำสั่งสำหรับปริ้นแปะข้างโต๊ะแพ็ก (FINISH / PAUSE)"
+              >
+                <Printer className="w-4 h-4 text-amber-400" />
+                <span>🖨️ บาร์โค้ดคำสั่งโต๊ะแพ็ก</span>
+              </button>
+            </div>
+          </div>
+
+          {/* BARCODE SCANNER DOCK (The Auto-Trigger Hub) */}
+          <div className="relative z-10 p-4 sm:p-5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-inner space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-xs sm:text-sm font-bold text-emerald-300 flex items-center gap-1.5">
+                  <Barcode className="w-4 h-4" />
+                  <span>เครื่องสแกนบาร์โค้ดพร้อมทำงาน (Barcode Scanner Ready)</span>
                 </span>
               </div>
-              <div className="px-4 py-3 bg-white/10 backdrop-blur rounded-2xl border border-white/10">
-                <span className="text-[11px] text-purple-200 block">คลิปที่บันทึกแล้ว</span>
-                <span className="text-xl font-black text-emerald-400">{packingRecords.length} คลิป</span>
+
+              {/* Toggles: Auto-Trigger & Sound */}
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsAutoTriggerEnabled(!isAutoTriggerEnabled)}
+                  className={`px-3 py-1.5 rounded-xl border font-bold transition flex items-center gap-1.5 ${
+                    isAutoTriggerEnabled
+                      ? 'bg-emerald-500/30 border-emerald-400 text-emerald-300'
+                      : 'bg-white/5 border-white/20 text-slate-400'
+                  }`}
+                  title="เมื่อสแกนบาร์โค้ด ระบบจะสั่งให้กล้องเริ่มอัดวิดีโอทันที"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>สแกนแล้วเริ่มอัดอัตโนมัติ: {isAutoTriggerEnabled ? 'ON' : 'OFF'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className={`p-2 rounded-xl border transition ${
+                    soundEnabled ? 'border-purple-400 bg-purple-500/20 text-purple-200' : 'border-white/10 text-slate-500'
+                  }`}
+                  title={soundEnabled ? 'เปิดเสียงสัญญาณ Beep' : 'ปิดเสียงสัญญาณ'}
+                >
+                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
               </div>
+            </div>
+
+            {/* Big Barcode Scanner Input */}
+            <div className="relative">
+              <Barcode className="w-6 h-6 text-purple-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={barcodeInputRef}
+                type="text"
+                placeholder="ยิงบาร์โค้ดที่ใบปะหน้าพัสดุ (Flash, Kerry, EMS) หรือเลขออเดอร์ INV-... ที่นี่"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleBarcodeTrigger(barcodeInput);
+                  }
+                }}
+                className="w-full pl-13 pr-28 py-3.5 text-base sm:text-lg bg-slate-950/80 border-2 border-purple-400/50 focus:border-purple-400 text-white placeholder:text-slate-400 rounded-xl outline-none font-mono tracking-wider shadow-inner"
+              />
+              <button
+                type="button"
+                onClick={() => handleBarcodeTrigger(barcodeInput)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs sm:text-sm transition active:scale-95 shadow-md"
+              >
+                ยิงตรวจ
+              </button>
+            </div>
+
+            {/* Quick Demo Simulator Chips */}
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-purple-200/90 pt-1">
+              <span className="text-slate-300">💡 ทดสอบยิงบาร์โค้ดจำลอง:</span>
+              <button
+                type="button"
+                onClick={() => handleBarcodeTrigger('TH9876543210')}
+                className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 font-mono text-amber-300 transition"
+              >
+                ⚡ สแกน Tracking: TH9876543210
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBarcodeTrigger('INV-202611-001')}
+                className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 font-mono text-purple-300 transition"
+              >
+                ⚡ สแกนบิล: INV-202611-001
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBarcodeTrigger('CAB-MSA-002')}
+                className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 font-mono text-emerald-300 transition"
+              >
+                ⚡ สแกนหิน: CAB-MSA-002
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBarcodeTrigger('FINISH')}
+                className="px-2 py-0.5 rounded-lg bg-rose-600/80 hover:bg-rose-600 border border-rose-400 font-mono text-white font-bold transition ml-auto"
+              >
+                ⏹️ สแกนคำสั่ง: FINISH (เสร็จสิ้น)
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Studio Grid: Left Camera/Preview (2/3), Right Target/Checklist (1/3) */}
+        {/* ========================================================= */}
+        {/* 2. MAIN STUDIO GRID (Left: Camera / Right: Target Details) */}
+        {/* ========================================================= */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* ========================================================= */}
-          {/* LEFT: CAMERA VIEWFINDER & CONTROLS (7 or 8 Cols)           */}
-          {/* ========================================================= */}
+          {/* CAMERA VIEWFINDER & CONTROLS (7 or 8 Cols) */}
           <div className="lg:col-span-7 xl:col-span-8 bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
             {/* Viewfinder Header Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <span
-                  className={`w-3 h-3 rounded-full ${
+                  className={`w-3.5 h-3.5 rounded-full ${
                     recordingState === 'recording'
                       ? 'bg-rose-500 animate-ping'
                       : isCameraActive
@@ -516,10 +865,10 @@ ${trackStr}
                 />
                 <h2 className="font-bold text-sm sm:text-base text-slate-800">
                   {recordingState === 'recorded'
-                    ? '🎬 ตัวอย่างคลิปที่บันทึกเสร็จแล้ว'
+                    ? '🎬 ตัวอย่างคลิปที่บันทึกเสร็จแล้ว (ผูกเลขพัสดุเรียบร้อย)'
                     : isCameraActive
                     ? '📹 สตูดิโอกล้องสด (Live Packing Viewfinder)'
-                    : '📹 หน้าจอกล้องสำหรับแพ็กของ'}
+                    : '📹 สตูดิโอกล้องสำหรับแพ็กของ'}
                 </h2>
               </div>
 
@@ -569,9 +918,6 @@ ${trackStr}
                 <div className="space-y-1">
                   <p className="font-bold">เข้าถึงกล้องไม่สำเร็จ</p>
                   <p className="text-rose-700">{cameraError}</p>
-                  <p className="text-[11px] text-rose-600">
-                    💡 ท่านยังสามารถใช้วิธีถ่ายด้วยกล้องมือถือแล้วกดปุ่ม "อัปโหลดคลิปจากเครื่อง" ด้านล่างได้เช่นกันครับ
-                  </p>
                 </div>
               </div>
             )}
@@ -611,7 +957,7 @@ ${trackStr}
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-white">กล้องยังไม่ได้เปิดใช้งาน</p>
                     <p className="text-xs text-slate-400">
-                      คลิกปุ่มเปิดกล้องเพื่อเริ่มสตรีม หรือเลือกไฟล์วิดีโอจากเครื่อง
+                      ยิงบาร์โค้ดใบปะหน้า หรือคลิกปุ่มเปิดกล้องเพื่อเริ่มสตรีม
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
@@ -656,17 +1002,24 @@ ${trackStr}
                     )}
                   </div>
 
-                  {/* Bottom Overlay: Order / Customer info badge */}
-                  <div className="bg-black/70 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 max-w-md text-white text-xs space-y-0.5">
-                    <div className="flex items-center gap-2 font-bold text-amber-300">
-                      <span>📦 {selectedOrder ? selectedOrder.order_no : selectedSku || 'ออเดอร์แพ็กสินค้า'}</span>
-                      {customerIg && <span className="text-purple-300 text-[11px]">@{customerIg.replace('@', '')}</span>}
+                  {/* Bottom Overlay: Live Order & Tracking Index HUD */}
+                  <div className="bg-black/75 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/10 max-w-md text-white text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-amber-300 flex items-center gap-1.5 truncate">
+                        <Truck className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{trackingNo ? `TRACK: ${trackingNo}` : selectedOrder?.order_no || selectedSku || 'ออเดอร์แพ็กสินค้า'}</span>
+                      </span>
+                      {selectedOrder?.order_no && trackingNo && (
+                        <span className="text-[10px] text-purple-300 font-mono font-semibold">
+                          ({selectedOrder.order_no})
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-slate-300 truncate">
                       {selectedOrder
-                        ? selectedOrder.items.map((i) => i.name).join(', ')
+                        ? `${selectedOrder.customer_name} • ${selectedOrder.items.map((i) => i.name).join(', ')}`
                         : activeStone
-                        ? `${activeStone.name} • ${activeStone.weight_grams ?? '-'}g`
+                        ? `${activeStone.name} (${activeStone.sku}) • ${activeStone.weight_grams ?? '-'}g`
                         : 'กำลังตรวจสภาพหินและบรรจุกล่องพัสดุ'}
                     </div>
                   </div>
@@ -680,10 +1033,18 @@ ${trackStr}
               type="file"
               accept="video/*"
               className="hidden"
-              onChange={handleFileVideoUpload}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const url = URL.createObjectURL(file);
+                setRecordedBlob(file);
+                setRecordedVideoUrl(url);
+                setRecordingState('recorded');
+                autoIndexAndSaveRecording(file, url, activeTargetRef.current);
+              }}
             />
 
-            {/* Recording Action Bar & Controls */}
+            {/* Action Bar & Controls */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 {/* Left: Main Action buttons */}
@@ -691,11 +1052,11 @@ ${trackStr}
                   {recordingState === 'idle' && (
                     <button
                       type="button"
-                      onClick={startRecording}
+                      onClick={() => startRecording()}
                       className="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black text-sm sm:text-base hover:from-rose-700 hover:to-red-700 active:scale-95 transition shadow-lg shadow-rose-600/25 flex items-center gap-2"
                     >
                       <span className="w-3.5 h-3.5 rounded-full bg-white animate-ping" />
-                      <span>🔴 เริ่มอัดคลิปแพ็กของ</span>
+                      <span>🔴 เริ่มอัดคลิป (หรือยิงบาร์โค้ด)</span>
                     </button>
                   )}
 
@@ -707,7 +1068,7 @@ ${trackStr}
                         className="px-5 py-3 rounded-2xl bg-slate-900 text-white font-black text-sm sm:text-base hover:bg-black active:scale-95 transition shadow-lg flex items-center gap-2"
                       >
                         <Square className="w-4 h-4 fill-white" />
-                        <span>⏹️ หยุดบันทึก ({formatTime(recordingDuration)})</span>
+                        <span>⏹️ ยืนยันแพ็กเสร็จสิ้น ({formatTime(recordingDuration)})</span>
                       </button>
                       <button
                         type="button"
@@ -743,24 +1104,10 @@ ${trackStr}
 
                   {recordingState === 'recorded' && (
                     <>
-                      <button
-                        type="button"
-                        onClick={handleSaveAndUpload}
-                        disabled={isUploading}
-                        className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm sm:text-base hover:from-emerald-700 hover:to-teal-700 active:scale-95 transition shadow-lg shadow-emerald-600/25 flex items-center gap-2 disabled:opacity-50"
-                      >
-                        {isUploading ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>กำลังบันทึกคลิป...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-5 h-5" />
-                            <span>💾 บันทึกคลิป & ปิดกล่อง</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold border border-emerald-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>ผูกเลขพัสดุเรียบร้อย!</span>
+                      </div>
 
                       <button
                         type="button"
@@ -768,7 +1115,7 @@ ${trackStr}
                         className="px-3.5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm hover:bg-slate-300 transition flex items-center gap-1"
                       >
                         <RotateCcw className="w-4 h-4" />
-                        <span>อัดใหม่</span>
+                        <span>พร้อมแพ็กกล่องถัดไป</span>
                       </button>
 
                       <button
@@ -786,7 +1133,7 @@ ${trackStr}
                 {/* Right: Instagram Direct Message Auto-Copy Button */}
                 <button
                   type="button"
-                  onClick={handleCopyIgMessage}
+                  onClick={() => handleCopyIgMessage()}
                   className="px-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-pink-500/20 hover:opacity-95 active:scale-95 transition flex items-center gap-1.5 ml-auto"
                   title="คัดลอกข้อความทักหาลูกค้าใน IG พร้อมลิงก์คลิป"
                 >
@@ -795,18 +1142,18 @@ ${trackStr}
                 </button>
               </div>
 
-              {/* Keyboard Shortcut & Quick Hint */}
+              {/* Barcode Chaining workflow indicator */}
               <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60">
                 <span className="flex items-center gap-1">
-                  ⌨️ คีย์ลัด: กดปุ่ม <kbd className="px-1.5 py-0.5 bg-white border rounded font-mono font-bold">Spacebar</kbd> เพื่อเริ่มหรือหยุดบันทึกได้ทันที
+                  ⚡ <strong>Auto-Chain:</strong> ขณะกำลังอัดอยู่ สามารถยิงบาร์โค้ดกล่องถัดไปได้ทันที ระบบจะเซฟกล่องเก่าและเริ่มอัดกล่องใหม่ให้อัตโนมัติ!
                 </span>
-                <span>✨ ความยาวที่แนะนำ: 30 - 60 วินาที</span>
+                <span>⌨️ กด Spacebar เพื่อเริ่ม/หยุดได้เช่นกัน</span>
               </div>
             </div>
           </div>
 
           {/* ========================================================= */}
-          {/* RIGHT: ORDER SELECTOR & QUALITY CHECKLIST (4 or 5 Cols)   */}
+          {/* RIGHT: ORDER TARGET & CHECKLIST (4 or 5 Cols)             */}
           {/* ========================================================= */}
           <div className="lg:col-span-5 xl:col-span-4 space-y-5">
             {/* Target Select Card */}
@@ -814,7 +1161,7 @@ ${trackStr}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                   <Package className="w-4 h-4 text-purple-600" />
-                  <span>เลือกรายการที่กำลังจะแพ็ก</span>
+                  <span>ข้อมูลพัสดุที่กำลังบันทึก (Indexed Target)</span>
                 </h3>
 
                 {/* Mode Switcher */}
@@ -846,6 +1193,39 @@ ${trackStr}
                 </div>
               </div>
 
+              {/* Active Tracking Number Index Display */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Truck className="w-3.5 h-3.5 text-purple-600" />
+                    <span>เลขแทร็กกิ้งพัสดุ (Tracking Number)</span>
+                  </span>
+                  {trackingNo && (
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                      ผูกกับวิดีโอนี้
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="เช่น TH1234567890 (หรือยิงจากบาร์โค้ดใบปะหน้า)"
+                    value={trackingNo}
+                    onChange={(e) => setTrackingNo(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-base sm:text-sm font-mono bg-purple-50/50 border-2 border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-bold text-slate-900"
+                  />
+                  {trackingNo && (
+                    <button
+                      type="button"
+                      onClick={() => setTrackingNo('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* MODE 1: SELECT ORDER */}
               {packMode === 'order' && (
                 <div className="space-y-3">
@@ -858,12 +1238,8 @@ ${trackStr}
                       onChange={(e) => {
                         const ord = orders.find((o) => o.id === e.target.value) || null;
                         setSelectedOrder(ord);
-                        if (ord?.channel === 'INSTAGRAM') {
-                          setCustomerIg(ord.customer_name);
-                        }
-                        if (ord?.tracking_no) {
-                          setTrackingNo(ord.tracking_no);
-                        }
+                        if (ord?.channel === 'INSTAGRAM') setCustomerIg(ord.customer_name);
+                        if (ord?.tracking_no) setTrackingNo(ord.tracking_no);
                       }}
                       className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-semibold"
                     >
@@ -887,7 +1263,7 @@ ${trackStr}
                       </div>
                       <div className="text-xs text-slate-700 space-y-1">
                         <p>
-                          👤 ลูกค้า: <span className="font-bold">{selectedOrder.customer_name}</span>
+                          👤 ผู้รับ: <span className="font-bold">{selectedOrder.customer_name}</span>
                         </p>
                         {selectedOrder.customer_phone && <p>📞 เบอร์โทร: {selectedOrder.customer_phone}</p>}
                         {selectedOrder.customer_address && (
@@ -965,24 +1341,9 @@ ${trackStr}
                   </div>
                 </div>
               )}
-
-              {/* Shipping Tracking Number Input */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1 flex items-center gap-1">
-                  <Truck className="w-3.5 h-3.5 text-purple-600" />
-                  <span>เลขพัสดุ Tracking (Flash / EMS / Kerry)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="เช่น TH1234567890 หรือ TH0123"
-                  value={trackingNo}
-                  onChange={(e) => setTrackingNo(e.target.value)}
-                  className="w-full px-3.5 py-2 text-base sm:text-sm font-mono bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-semibold"
-                />
-              </div>
             </div>
 
-            {/* Quality Checklist Before Sealing (การตรวจสภาพเพื่อกันเคลม) */}
+            {/* Quality Checklist Before Sealing */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-3">
               <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -999,7 +1360,7 @@ ${trackStr}
                   />
                   <div>
                     <span className="font-semibold text-slate-800 block">1. หมุนโชว์สภาพหิน 360° หน้ากล้อง</span>
-                    <span className="text-[11px] text-slate-500">ส่องไฟเช็คความสมบูรณ์ ไม่มีรอยแตกหักเพิ่ม</span>
+                    <span className="text-[11px] text-slate-500">ส่องไฟเช็คความสมบูรณ์ ไม่มีรอยแตกหักใหม่</span>
                   </div>
                 </label>
 
@@ -1047,43 +1408,81 @@ ${trackStr}
         </div>
 
         {/* ========================================================= */}
-        {/* BOTTOM: RECENT PACKING RECORDS HISTORY                    */}
+        {/* 3. RECENT PACKING RECORDS & TRACKING SEARCH INDEX         */}
         {/* ========================================================= */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-600" />
-                <span>ประวัติการแพ็กของ & บันทึกคลิปล่าสุด (Recent Packing Logs)</span>
+                <span>คลังประวัติวิดีโอผูกเลขพัสดุ (Order & Tracking Video Logs)</span>
               </h3>
               <p className="text-xs text-slate-500">
-                คลิปวิดีโอที่บันทึกไว้จะแสดงอยู่ที่นี่ สามารถกดเปิดดู หรือคัดลอกลิงก์ส่งให้ลูกค้าได้ตลอดเวลา
+                วิดีโอทุกคลิปถูกผูกชื่อไฟล์และค้นหาได้ทันทีด้วยเลข Tracking, เลข Order หรือชื่อลูกค้า
               </p>
             </div>
-            <span className="text-xs font-bold px-3 py-1 bg-purple-50 text-purple-700 rounded-full border border-purple-100">
-              รวม {packingRecords.length} รายการ
-            </span>
+
+            {/* Search by Tracking No or Order ID */}
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="ค้นหาด้วยเลข Tracking (TH...) หรือ Order ID..."
+                value={searchHistoryQuery}
+                onChange={(e) => setSearchHistoryQuery(e.target.value)}
+                className="w-full pl-10 pr-8 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+              />
+              {searchHistoryQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchHistoryQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {packingRecords.length === 0 ? (
+          {filteredPackingRecords.length === 0 ? (
             <div className="text-center py-12 text-slate-400 space-y-2">
               <Package className="w-10 h-10 mx-auto text-slate-300 stroke-1" />
-              <p className="text-sm">ยังไม่มีคลิปบันทึกการแพ็กในระบบ</p>
-              <p className="text-xs text-slate-400">เมื่อคุณกดอัดวิดีโอและบันทึก รายการจะปรากฏขึ้นที่นี่อัตโนมัติ</p>
+              <p className="text-sm font-semibold text-slate-600">
+                {searchHistoryQuery ? `ไม่พบคลิปที่ตรงกับ "${searchHistoryQuery}"` : 'ยังไม่มีคลิปบันทึกการแพ็กในระบบ'}
+              </p>
+              <p className="text-xs text-slate-400">
+                เมื่อยิงบาร์โค้ดใบปะหน้าและอัดคลิปเสร็จ รายการจะถูกผูกเลขพัสดุและจัดเก็บที่นี่ทันที
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {packingRecords.map((rec) => (
+              {filteredPackingRecords.map((rec) => (
                 <div
                   key={rec.id}
                   className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-purple-300 transition space-y-3 flex flex-col justify-between"
                 >
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-purple-900 font-mono">
-                        {rec.order_no || rec.sku || 'PACK'}
-                      </span>
-                      <span className="text-[10px] text-slate-400">
+                    {/* Header tags: Tracking & Order */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
+                        {rec.tracking_no ? (
+                          <div className="flex items-center gap-1 text-xs font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300">
+                            <Truck className="w-3 h-3 text-emerald-600" />
+                            <span>{rec.tracking_no}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-mono font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-lg">
+                            {rec.order_no || rec.sku || 'PACK'}
+                          </span>
+                        )}
+                        {rec.order_no && rec.tracking_no && (
+                          <span className="text-[10px] text-purple-700 font-mono font-semibold block">
+                            บิล: {rec.order_no}
+                          </span>
+                        )}
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 shrink-0">
                         {new Date(rec.packed_at).toLocaleString('th-TH', {
                           day: 'numeric',
                           month: 'short',
@@ -1093,16 +1492,11 @@ ${trackStr}
                       </span>
                     </div>
 
-                    <div className="text-xs space-y-0.5">
+                    <div className="text-xs space-y-0.5 pt-1">
                       <p className="font-bold text-slate-800 truncate">{rec.product_name}</p>
                       <p className="text-slate-500 truncate">
                         👤 ผู้รับ: <span className="text-slate-700 font-medium">{rec.customer_name}</span>
                       </p>
-                      {rec.tracking_no && (
-                        <p className="text-[11px] font-mono text-emerald-700 font-semibold truncate">
-                          🚚 {rec.tracking_no}
-                        </p>
-                      )}
                     </div>
                   </div>
 
@@ -1115,6 +1509,15 @@ ${trackStr}
                     >
                       <Play className="w-3.5 h-3.5" />
                       <span>ดูคลิป</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopyIgMessage(rec)}
+                      className="p-2 rounded-xl bg-pink-50 border border-pink-200 text-pink-700 hover:bg-pink-100 transition"
+                      title="คัดลอกข้อความทักหาลูกค้าใน IG"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
                     </button>
 
                     <button
@@ -1152,11 +1555,15 @@ ${trackStr}
         </div>
       </main>
 
+      {/* ========================================================= */}
+      {/* 4. MODALS (Video Preview Modal & Barcode Command Sheet)    */}
+      {/* ========================================================= */}
+
       {/* Video Preview Modal */}
       {previewVideoModalUrl && (
         <div
           onClick={() => setPreviewVideoModalUrl(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1165,7 +1572,7 @@ ${trackStr}
             <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
               <span className="font-bold text-sm flex items-center gap-2">
                 <Video className="w-4 h-4 text-purple-400" />
-                <span>คลิปวิดีโอตอนแพ็กสินค้า</span>
+                <span>คลิปวิดีโอหลักฐานการแพ็กสินค้า</span>
               </span>
               <button
                 type="button"
@@ -1197,7 +1604,94 @@ ${trackStr}
         </div>
       )}
 
-      {/* Floating Toast Message */}
+      {/* Barcode Command Sheet Modal (สำหรับปริ้นแปะข้างโต๊ะแพ็กของ) */}
+      {showCommandSheetModal && (
+        <div
+          onClick={() => setShowCommandSheetModal(false)}
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 p-6 space-y-5"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <Printer className="w-5 h-5 text-purple-600" />
+                  <span>แผ่นบาร์โค้ดคำสั่งสำหรับโต๊ะแพ็ก</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  สามารถปริ้นแผ่นนี้ไปแปะไว้ข้างโต๊ะแพ็ก เพื่อยิงคำสั่งได้โดยไม่ต้องแตะคีย์บอร์ด
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCommandSheetModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Command Barcode Strips */}
+            <div className="space-y-4">
+              {/* Command 1: FINISH */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-2">
+                <span className="text-xs font-bold text-rose-700 uppercase tracking-wider block">
+                  1. ยิงเพื่อยืนยันการแพ็กเสร็จสิ้น & บันทึกคลิป
+                </span>
+                <div className="h-14 flex items-center justify-center bg-white p-2 rounded-xl border border-slate-100">
+                  <svg
+                    viewBox={`0 0 ${encodeCode128B('FINISH').totalModules} 100`}
+                    preserveAspectRatio="none"
+                    className="w-48 h-full"
+                    style={{ shapeRendering: 'crispEdges' }}
+                  >
+                    {encodeCode128B('FINISH').bars.map((bar, i) => (
+                      <rect key={i} x={bar.x} y={0} width={bar.width} height={100} fill="black" />
+                    ))}
+                  </svg>
+                </div>
+                <span className="font-mono font-bold text-xs text-slate-900 block">* FINISH *</span>
+              </div>
+
+              {/* Command 2: PAUSE */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-2">
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block">
+                  2. ยิงเพื่อพักการบันทึกชั่วคราว
+                </span>
+                <div className="h-14 flex items-center justify-center bg-white p-2 rounded-xl border border-slate-100">
+                  <svg
+                    viewBox={`0 0 ${encodeCode128B('PAUSE').totalModules} 100`}
+                    preserveAspectRatio="none"
+                    className="w-48 h-full"
+                    style={{ shapeRendering: 'crispEdges' }}
+                  >
+                    {encodeCode128B('PAUSE').bars.map((bar, i) => (
+                      <rect key={i} x={bar.x} y={0} width={bar.width} height={100} fill="black" />
+                    ))}
+                  </svg>
+                </div>
+                <span className="font-mono font-bold text-xs text-slate-900 block">* PAUSE *</span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-400">💡 รองรับสแกนเนอร์บาร์โค้ด 1D/2D ทุกรุ่น</span>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition flex items-center gap-1.5 shadow-md shadow-purple-600/20"
+              >
+                <Printer className="w-4 h-4" />
+                <span>สั่งพิมพ์แผ่นนี้</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-20 md:bottom-8 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs sm:text-sm font-semibold border border-slate-800 animate-in fade-in slide-in-from-bottom-2">
           <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
