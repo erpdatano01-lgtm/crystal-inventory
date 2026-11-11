@@ -541,12 +541,13 @@ function drawNiimbotLabelRegion(
     const minDim = Math.min(wCm, hCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
-    // Exact typography and proportional metrics aligned with BarcodePrintModal 300 DPI layout
-    const storeFontPt = Math.max(5, Math.round(minDim * 2.5 * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(6.5, Math.round(minDim * 3.3 * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(5.5, Math.round(minDim * 2.7 * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(5, Math.round(minDim * 2.4 * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(6.5, Math.round(minDim * 3.4 * scaleFactor * 10) / 10);
+    // Proportional metrics tuned to guarantee all 5 lines (Barcode, SKU, Name, Divider, Specs)
+    // fit inside short labels (e.g. 1.5 cm) without pushing the bottom line into the gap sensor.
+    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.2 : 2.5) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.3) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.4 : 2.7) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.1 : 2.4) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.4) * scaleFactor * 10) / 10);
 
     const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
     const storeFontPx = ptToPx(storeFontPt);
@@ -566,12 +567,10 @@ function drawNiimbotLabelRegion(
         (config.showWeightAndDim && specsLine) || (config.showPrice && priceText)
     );
 
-    // Padding matches the exported image (8.5% bottom margin = ~2.5mm on a 30mm sticker)
-    // In thermal gap printing, leaving this 2.5mm on canvas aligns the bottom line
-    // perfectly with the physical bottom edge of the sticker without triggering the gap sensor cutoff!
+    // Side & vertical padding calibrated so content stays well inside the physical sticker cut
     const sidePadDots = Math.round((isTiny ? 0.1 : 0.15) * dotsPerCm);
-    const topPadDots = Math.round((isTiny ? 0.08 : 0.14) * dotsPerCm);
-    const bottomMarginDots = Math.max(16, Math.round(Math.min(0.255, hCm * 0.085) * dotsPerCm));
+    const topPadDots = Math.round((isTiny ? 0.05 : 0.12) * dotsPerCm);
+    const bottomMarginDots = Math.max(isTiny ? 10 : 16, Math.round(Math.min(0.255, hCm * (isTiny ? 0.06 : 0.085)) * dotsPerCm));
     const printableBottomDots = heightDots - bottomMarginDots;
 
     const bottomRowFontH = Math.max(
@@ -579,21 +578,21 @@ function drawNiimbotLabelRegion(
         config.showWeightAndDim && specsLine ? metaFontPx : 0
     );
     const bottomY = printableBottomDots - bottomRowFontH;
-    const dividerGap = Math.max(3, Math.round(0.03 * dotsPerCm));
+    const dividerGap = Math.max(2, Math.round((isTiny ? 0.02 : 0.03) * dotsPerCm));
     const dividerY = bottomY - dividerGap;
 
     const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
     const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
     const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
-    const barcodeGapDots = Math.max(3, Math.round(0.04 * dotsPerCm));
+    const barcodeGapDots = Math.max(3, Math.round((isTiny ? 0.03 : 0.04) * dotsPerCm));
 
     const totalTextH = storeLineH + skuLineH + nameLineH;
     const maxAvailableBarcodeH = hasBottomLine
         ? dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots
         : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
 
-    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.35 : 0.38) * dotsPerCm);
-    const barcodeHeightDots = Math.max(24, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.32 : 0.38) * dotsPerCm);
+    const barcodeHeightDots = Math.max(22, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
@@ -684,6 +683,7 @@ function encodeSheetToNiimbotRows(
     rows: Uint8Array[];
 } {
     const dotsPerMm = dpi === 300 ? 300 / 25.4 : 8; // 11.8110236 dots/mm for 300 DPI
+    const dotsPerCm = dotsPerMm * 10;
     const maxPrintheadMm = 48; // B2 Pro widthSetEnd = 48mm
 
     const wCm = Math.min(5.0, Math.max(1.5, Number(config.widthCm) || 5.0));
@@ -719,11 +719,33 @@ function encodeSheetToNiimbotRows(
     slots.forEach((product, i) => {
         if (!product) return;
         ctx.save();
-        ctx.translate(0, i * slotDots);
-        ctx.beginPath();
-        ctx.rect(0, 0, widthDots, slotDots);
-        ctx.clip();
-        drawNiimbotLabelRegion(ctx, product, config, wCm, slotHCm, widthDots, slotDots, dotsPerMm);
+
+        if (slotCount === 2) {
+            // Physical 40x30 mm split roll has:
+            // - Top sticker: 0..13.5 mm (~160 dots)
+            // - Inter-label die cut gap: ~1.8 mm (~21 dots)
+            // - Bottom sticker: 15.5..28.5 mm (~183..336 dots)
+            // - Sensor cutoff at ~28.8 mm
+            // Calibrating topY and slotHDots keeps each slot safely inside its physical sticker!
+            const slotTopY = i === 0
+                ? Math.round(0.05 * dotsPerCm) // 0.5 mm from top
+                : Math.round((slotHCm + 0.05) * dotsPerCm); // 15.5 mm (clears inter-label gap)
+            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.15 : 0.20)) * dotsPerCm);
+            const slotHCmEffective = slotHDots / dotsPerCm;
+
+            ctx.translate(0, slotTopY);
+            ctx.beginPath();
+            ctx.rect(0, 0, widthDots, slotHDots);
+            ctx.clip();
+            drawNiimbotLabelRegion(ctx, product, config, wCm, slotHCmEffective, widthDots, slotHDots, dotsPerMm);
+        } else {
+            ctx.translate(0, i * slotDots);
+            ctx.beginPath();
+            ctx.rect(0, 0, widthDots, slotDots);
+            ctx.clip();
+            drawNiimbotLabelRegion(ctx, product, config, wCm, slotHCm, widthDots, slotDots, dotsPerMm);
+        }
+
         ctx.restore();
     });
 
@@ -996,7 +1018,8 @@ async function sendNiimbotPage(
     }
 
     // 6. PageEnd / jcSetPageTerminal (0xE3, [0x01]) -> expects 0xE4
-    await sleep(80);
+    // Allow printhead line-buffer to finish burning bottom rows before sending page terminal
+    await sleep(160);
     await sendCommandWaitAck(0xe3, [0x01], 0xe4, 500);
 
     // 7. Wait for physical printhead to finish feeding/printing copies (poll 0xA3 -> 0xB3 as in cPrinterV5::commitJob @ 0x101004)
