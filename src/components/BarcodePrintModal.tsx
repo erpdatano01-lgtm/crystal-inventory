@@ -6,8 +6,11 @@ import {
   BarcodeLabelConfig,
   BARCODE_SIZE_PRESETS,
   PrinterModelProfile,
+  SplitSheetMode,
+  buildPrintSheets,
   encodeCode128B,
   generateBarcodeSvgString,
+  getLabelSlotHeightCm,
   getSavedBarcodeConfig,
   saveBarcodeConfig,
 } from '@/lib/barcodeGenerator';
@@ -43,6 +46,9 @@ import {
   Zap,
   CheckCircle2,
   Loader2,
+  Rows2,
+  PanelTop,
+  PanelBottom,
 } from 'lucide-react';
 
 interface BarcodePrintModalProps {
@@ -149,6 +155,17 @@ export default function BarcodePrintModal({
     return selectedItems.reduce((sum, item) => sum + item.copies, 0);
   }, [selectedItems]);
 
+  // Physical sheets to be printed (split mode packs top / bottom labels on one sheet)
+  const printSheets = useMemo(
+    () => buildPrintSheets(selectedItems, config),
+    [selectedItems, config]
+  );
+  const totalSheets = printSheets.length;
+  const blankSlots = config.splitSheet
+    ? printSheets.reduce((sum, s) => sum + s.filter((p) => !p).length, 0)
+    : 0;
+  const slotHeightCm = getLabelSlotHeightCm(config);
+
   const filteredPresets = useMemo(() => {
     if (config.printerProfile === 'niimbot_b21_pro') {
       return BARCODE_SIZE_PRESETS.filter(
@@ -207,8 +224,23 @@ export default function BarcodePrintModal({
       (config.showWeightAndDim || config.showPrice ? 1 : 0);
 
     const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.36 : 0.4;
-    const barcodeHeightCm = Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
     const paddingCm = isTiny ? 0.1 : 0.15;
+
+    // Fit barcode into the space left after text lines (prevents overflow on short labels e.g. 1.5 cm)
+    const ptToCm = (pt: number) => pt * 0.0352778;
+    const textStackCm =
+      (config.showStoreName ? ptToCm(storeFontPt) * 1.05 : 0) +
+      (config.showSkuText ? ptToCm(skuFontPt) * 1.05 : 0) +
+      (config.showStoneName ? ptToCm(nameFontPt) * 1.1 : 0) +
+      (config.showWeightAndDim || config.showPrice
+        ? ptToCm(Math.max(metaFontPt, priceFontPt)) * 1.05 + 0.05
+        : 0);
+    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.06;
+    const targetBarcodeCm = Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
+    const barcodeHeightCm = Math.max(
+      0.3,
+      Math.round(Math.min(targetBarcodeCm, availableBarcodeCm) * 100) / 100
+    );
 
     return {
       storeFontPt,
@@ -221,7 +253,7 @@ export default function BarcodePrintModal({
     };
   };
 
-  const metrics = getScaledMetrics(config.widthCm, config.heightCm, config.fontScale);
+  const metrics = getScaledMetrics(config.widthCm, slotHeightCm, config.fontScale);
 
   // Direct Web Bluetooth / Web Serial connection handlers for NIIMBOT B2 Pro
   const handleConnectBluetooth = async () => {
@@ -275,7 +307,11 @@ export default function BarcodePrintModal({
         },
       });
       setNiimbotConn(getNiimbotConnectionInfo());
-      setDirectPrintStatus(`✅ ปริ้นออกเครื่อง NIIMBOT B2 Pro สำเร็จครบ ${totalLabels} ดวง!`);
+      setDirectPrintStatus(
+        config.splitSheet
+          ? `✅ ปริ้นออกเครื่อง NIIMBOT B2 Pro สำเร็จ ${totalLabels} ดวง (ใช้กระดาษ ${totalSheets} แผ่น)!`
+          : `✅ ปริ้นออกเครื่อง NIIMBOT B2 Pro สำเร็จครบ ${totalLabels} ดวง!`
+      );
     } catch (err: any) {
       setDirectPrintStatus('');
       setDirectPrintError(
@@ -296,6 +332,8 @@ export default function BarcodePrintModal({
 
     const wCm = Math.max(1.2, Number(config.widthCm) || 5.0);
     const hCm = Math.max(1.0, Number(config.heightCm) || 3.0);
+    const isSplit = Boolean(config.splitSheet);
+    const labelHCm = isSplit ? Math.round((hCm / 2) * 100) / 100 : hCm;
     const isRoll = config.paperMode === 'roll';
     const cols = isRoll ? config.columnsPerRow || 1 : 1;
     const gapCm = isRoll && cols > 1 ? Number(config.columnGapCm) || 0.2 : 0;
@@ -305,10 +343,7 @@ export default function BarcodePrintModal({
     const offsetX = Number(config.offsetXMm) || 0;
     const offsetY = Number(config.offsetYMm) || 0;
 
-    // Flatten all labels in queue
-    const expandedCardsHtml: string[] = [];
-
-    selectedItems.forEach(({ product, copies }) => {
+    const buildCardHtml = (product: Product, extraClass = '') => {
       const svgMarkup = generateBarcodeSvgString(product.sku);
       const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
       const dimText = product.dimensions ? product.dimensions : '';
@@ -318,9 +353,8 @@ export default function BarcodePrintModal({
           ? `฿${product.selling_price.toLocaleString()}`
           : '';
 
-      for (let c = 0; c < copies; c++) {
-        expandedCardsHtml.push(`
-          <div class="label-card">
+      return `
+          <div class="label-card ${extraClass}">
             ${
               config.showStoreName
                 ? `<div class="store-line">VIVIDA CRYSTAL</div>`
@@ -348,8 +382,18 @@ export default function BarcodePrintModal({
                 : ''
             }
           </div>
-        `);
+        `;
+    };
+
+    // One HTML unit per physical sheet
+    const expandedCardsHtml: string[] = printSheets.map((slots) => {
+      if (!isSplit) {
+        return buildCardHtml(slots[0] as Product, 'print-unit');
       }
+      const halves = slots
+        .map((p) => (p ? buildCardHtml(p) : `<div class="label-card blank-slot"></div>`))
+        .join('\n');
+      return `<div class="sheet-card print-unit">${halves}</div>`;
     });
 
     // Group into rows if multi-column thermal roll (e.g. EasyPrint ES-9920EW 2 or 3 columns)
@@ -409,7 +453,7 @@ export default function BarcodePrintModal({
       }
       .label-card {
         width: ${wCm}cm;
-        height: ${hCm}cm;
+        height: ${labelHCm}cm;
         padding: ${metrics.paddingCm}cm;
         display: flex;
         flex-direction: column;
@@ -418,6 +462,27 @@ export default function BarcodePrintModal({
         text-align: center;
         overflow: hidden;
         background: #ffffff;
+      }
+      .sheet-card {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #ffffff;
+      }
+      .sheet-card .label-card {
+        flex-shrink: 0;
+      }
+      .blank-slot {
+        padding: 0;
+      }
+      ${
+        !isRoll && isSplit
+          ? '.sheet-card .label-card:first-child { border-bottom: 0.5pt dashed #cbd5e1; }'
+          : ''
+      }
+      .print-unit {
+        width: ${wCm}cm;
+        height: ${hCm}cm;
         transform: translate(${offsetX}mm, ${offsetY}mm);
         ${
           isRoll && cols === 1
@@ -427,7 +492,7 @@ export default function BarcodePrintModal({
             : ''
         }
       }
-      .label-card:last-child {
+      .print-unit:last-child {
         page-break-after: auto;
         break-after: auto;
       }
@@ -504,7 +569,7 @@ export default function BarcodePrintModal({
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>Vivida Crystal Barcode (${totalRollWidthCm}x${hCm}cm)</title>
+          <title>Vivida Crystal Barcode (${totalRollWidthCm}x${hCm}cm${isSplit ? ' • 2 ดวง/แผ่น' : ''})</title>
           <style>${printCss}</style>
         </head>
         <body>
@@ -546,19 +611,33 @@ export default function BarcodePrintModal({
       // 300 DPI = 118.11 pixels per cm. Use 2x supersampling (236.22 px/cm) for razor-sharp barcode lines
       const pxPerCm = 236.22;
       const canvasW = Math.round(config.widthCm * pxPerCm);
-      const canvasH = Math.round(config.heightCm * pxPerCm);
-      const isTiny = config.heightCm <= 1.8 || config.widthCm <= 2.8;
-      const padPx = Math.round((isTiny ? 0.1 : 0.14) * pxPerCm);
+      const sheetH = Math.round(config.heightCm * pxPerCm);
 
       const canvas = document.createElement('canvas');
       canvas.width = canvasW;
-      canvas.height = canvasH;
+      canvas.height = sheetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
       // Pure white background
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvasW, canvasH);
+      ctx.fillRect(0, 0, canvasW, sheetH);
+
+      // Decide which slot(s) of the sheet to fill
+      let slots: (Product | null)[] = [targetProduct];
+      if (config.splitSheet) {
+        const found = printSheets.find((s) => s.some((p) => p?.id === targetProduct.id));
+        slots =
+          found ||
+          (config.splitMode === 'bottom' ? [null, targetProduct] : [targetProduct, null]);
+      }
+      const slotPx = Math.floor(sheetH / slots.length);
+      const slotHCm = config.heightCm / slots.length;
+
+      const drawLabelRegion = (labelProduct: Product, canvasH: number, labelHCm: number) => {
+      const targetProduct = labelProduct;
+      const isTiny = labelHCm <= 1.8 || config.widthCm <= 2.8;
+      const padPx = Math.round((isTiny ? 0.1 : 0.14) * pxPerCm);
 
       ctx.fillStyle = '#000000';
       ctx.textAlign = 'center';
@@ -586,7 +665,7 @@ export default function BarcodePrintModal({
 
       // Safe bottom margin (8.5% = ~2.5mm on a 30mm label) ensures the bottom line prints flush
       // against the physical bottom edge without sensor cutoff
-      const bottomMarginPx = Math.max(16, Math.round(Math.min(0.255, config.heightCm * 0.085) * pxPerCm));
+      const bottomMarginPx = Math.max(16, Math.round(Math.min(0.255, labelHCm * 0.085) * pxPerCm));
       const printableBottomPx = canvasH - bottomMarginPx;
       const bottomY = printableBottomPx - bottomRowFontPx;
       const dividerGap = Math.max(4, Math.round(0.035 * pxPerCm));
@@ -669,13 +748,26 @@ export default function BarcodePrintModal({
           ctx.fillText(textToDraw, canvasW / 2, bottomY, innerW);
         }
       }
+      };
+
+      slots.forEach((p, i) => {
+        if (!p) return;
+        ctx.save();
+        ctx.translate(0, i * slotPx);
+        ctx.beginPath();
+        ctx.rect(0, 0, canvasW, slotPx);
+        ctx.clip();
+        drawLabelRegion(p, slotPx, slotHCm);
+        ctx.restore();
+      });
 
       const blob: Blob | null = await new Promise((resolve) =>
         canvas.toBlob((b) => resolve(b), 'image/png', 1.0)
       );
       if (!blob) return;
 
-      const fileName = `Barcode_${targetProduct.sku}_${config.widthCm}x${config.heightCm}cm.png`;
+      const skuPart = slots.map((p) => (p ? p.sku : 'blank')).join('+');
+      const fileName = `Barcode_${skuPart}_${config.widthCm}x${config.heightCm}cm.png`;
       const file = new File([blob], fileName, { type: 'image/png' });
 
       // Try native iOS / mobile share sheet first so user can send directly to NIIMBOT app
@@ -732,14 +824,148 @@ export default function BarcodePrintModal({
       drive_media_folder_url: null,
     };
 
-  const previewBarcode = encodeCode128B(previewProduct.sku);
-  const previewWeight = previewProduct.weight_grams ? `${previewProduct.weight_grams}g` : '';
-  const previewDim = previewProduct.dimensions || '';
-  const previewSpecs = [previewWeight, previewDim].filter(Boolean).join(' • ');
-  const previewPrice =
-    previewProduct.selling_price && previewProduct.selling_price > 0
-      ? `฿${previewProduct.selling_price.toLocaleString()}`
-      : '';
+  const previewSlots: (Product | null)[] = useMemo(() => {
+    if (!config.splitSheet) {
+      return [previewProduct];
+    }
+    if (printSheets.length > 0) {
+      return printSheets[0];
+    }
+    if (config.splitMode === 'top') return [previewProduct, null];
+    if (config.splitMode === 'bottom') return [null, previewProduct];
+    const secondProduct = selectedItems[1]?.product || previewProduct;
+    return [previewProduct, secondProduct];
+  }, [config.splitSheet, config.splitMode, printSheets, previewProduct, selectedItems]);
+
+  const renderPreviewSlot = (
+    slotProduct: Product | null,
+    slotH: number,
+    slotIndex: number
+  ) => {
+    if (!slotProduct) {
+      return (
+        <div
+          key={`slot-${slotIndex}`}
+          style={{
+            width: `${config.widthCm}cm`,
+            height: `${slotH}cm`,
+          }}
+          className="flex flex-col items-center justify-center text-center p-2 bg-slate-50 text-slate-400 select-none"
+        >
+          <span className="text-[10px] font-bold text-slate-400">
+            {slotIndex === 0 ? 'ช่องบน: ว่าง (ไม่พิมพ์)' : 'ช่องล่าง: ว่าง (ไม่พิมพ์)'}
+          </span>
+          <span className="text-[9px] text-slate-300">ประหยัดสติกเกอร์ส่วนนี้</span>
+        </div>
+      );
+    }
+
+    const slotBarcode = encodeCode128B(slotProduct.sku);
+    const slotWeight = slotProduct.weight_grams ? `${slotProduct.weight_grams}g` : '';
+    const slotDim = slotProduct.dimensions || '';
+    const slotSpecs = [slotWeight, slotDim].filter(Boolean).join(' • ');
+    const slotPrice =
+      slotProduct.selling_price && slotProduct.selling_price > 0
+        ? `฿${slotProduct.selling_price.toLocaleString()}`
+        : '';
+
+    return (
+      <div
+        key={`slot-${slotIndex}`}
+        style={{
+          width: `${config.widthCm}cm`,
+          height: `${slotH}cm`,
+          padding: `${metrics.paddingCm}cm`,
+        }}
+        className="relative bg-white text-black flex flex-col justify-between items-center text-center overflow-hidden select-none"
+      >
+        {config.splitSheet && (
+          <span className="absolute top-0.5 right-1 text-[7.5px] font-extrabold text-slate-300 uppercase select-none pointer-events-none">
+            {slotIndex === 0 ? 'บน' : 'ล่าง'}
+          </span>
+        )}
+
+        {config.showStoreName && (
+          <div
+            style={{ fontSize: `${metrics.storeFontPt}pt` }}
+            className="font-extrabold tracking-wider uppercase leading-none truncate w-full text-black"
+          >
+            VIVIDA CRYSTAL
+          </div>
+        )}
+
+        {/* Crisp SVG Code 128 Barcode */}
+        <div
+          style={{ height: `${metrics.barcodeHeightCm}cm` }}
+          className="w-[96%] shrink-0 my-[0.02cm]"
+        >
+          <svg
+            viewBox={`0 0 ${slotBarcode.totalModules} 100`}
+            preserveAspectRatio="none"
+            className="w-full h-full block"
+            style={{ shapeRendering: 'crispEdges' }}
+          >
+            {slotBarcode.bars.map((bar, idx) => (
+              <rect
+                key={idx}
+                x={bar.x}
+                y={0}
+                width={bar.width}
+                height={100}
+                fill="#000000"
+              />
+            ))}
+          </svg>
+        </div>
+
+        {config.showSkuText && (
+          <div
+            style={{ fontSize: `${metrics.skuFontPt}pt` }}
+            className="font-mono font-black tracking-wide leading-none truncate w-full text-black"
+          >
+            {slotProduct.sku}
+          </div>
+        )}
+
+        {config.showStoneName && (
+          <div
+            style={{ fontSize: `${metrics.nameFontPt}pt` }}
+            className="font-bold leading-tight truncate w-full text-slate-900"
+          >
+            {slotProduct.stone_type || slotProduct.name}
+          </div>
+        )}
+
+        {((config.showWeightAndDim && slotSpecs) ||
+          (config.showPrice && slotPrice)) && (
+          <div
+            className={`w-full flex items-baseline ${
+              config.showWeightAndDim && config.showPrice
+                ? 'justify-between'
+                : 'justify-center'
+            } gap-1 border-t border-slate-200 pt-[1px] leading-none`}
+          >
+            {config.showWeightAndDim && (
+              <span
+                style={{ fontSize: `${metrics.metaFontPt}pt` }}
+                className="font-semibold text-slate-800 truncate"
+              >
+                {slotSpecs}
+              </span>
+            )}
+            {config.showPrice && (
+              <span
+                style={{ fontSize: `${metrics.priceFontPt}pt` }}
+                className="font-black text-black shrink-0"
+              >
+                {slotPrice}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const isNiimbotOverWidth =
     config.printerProfile === 'niimbot_b21_pro' && config.widthCm > 5.0;
@@ -765,7 +991,10 @@ export default function BarcodePrintModal({
               </h3>
               <p className="text-xs text-slate-300 truncate">
                 ขนาดป้าย: <strong className="text-amber-300">{config.widthCm} × {config.heightCm} cm</strong> ({Math.round(config.widthCm * 10)} × {Math.round(config.heightCm * 10)} mm)
-                {config.columnsPerRow > 1 ? ` • เรียง ${config.columnsPerRow} ดวง/แถว` : ''} • รวม {totalLabels} ดวง
+                {config.columnsPerRow > 1 ? ` • เรียง ${config.columnsPerRow} ดวง/แถว` : ''}
+                {config.splitSheet
+                  ? ` • แบ่ง 2 ดวง/แผ่น (${config.widthCm}×${slotHeightCm} cm) • ${totalLabels} ดวง = ${totalSheets} แผ่น`
+                  : ` • รวม ${totalLabels} ดวง`}
               </p>
             </div>
           </div>
@@ -1058,10 +1287,12 @@ export default function BarcodePrintModal({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {filteredPresets.map((preset) => {
                       const presetCols = preset.columnsPerRow || 1;
+                      const presetSplit = Boolean(preset.splitSheet);
                       const active =
                         Math.abs(config.widthCm - preset.widthCm) < 0.01 &&
                         Math.abs(config.heightCm - preset.heightCm) < 0.01 &&
-                        config.columnsPerRow === presetCols;
+                        config.columnsPerRow === presetCols &&
+                        Boolean(config.splitSheet) === presetSplit;
                       return (
                         <button
                           key={preset.label}
@@ -1071,6 +1302,7 @@ export default function BarcodePrintModal({
                               widthCm: preset.widthCm,
                               heightCm: preset.heightCm,
                               columnsPerRow: presetCols,
+                              splitSheet: presetSplit,
                             })
                           }
                           className={`p-2.5 rounded-xl border text-left transition active:scale-95 ${
@@ -1146,7 +1378,7 @@ export default function BarcodePrintModal({
 
                   <div className="bg-white p-3 rounded-xl border border-purple-200">
                     <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                      ความสูงต่อดวง (Height: cm)
+                      {config.splitSheet ? 'ความสูงทั้งแผ่น (Height: cm)' : 'ความสูงต่อดวง (Height: cm)'}
                     </label>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -1190,8 +1422,133 @@ export default function BarcodePrintModal({
                     </div>
                     <span className="text-[10px] text-slate-400 block text-center mt-1">
                       สูง {config.heightCm} ซม. ({Math.round(config.heightCm * 10)} มม.)
+                      {config.splitSheet ? ` → ดวงละ ${slotHeightCm} ซม.` : ''}
                     </span>
                   </div>
+                </div>
+
+                {/* Split-sheet mode: 1 sticker die-cut into top / bottom labels */}
+                <div
+                  className={`p-3 rounded-xl border space-y-2.5 transition ${
+                    config.splitSheet
+                      ? 'bg-emerald-50/80 border-emerald-300'
+                      : 'bg-white border-slate-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => updateConfig({ splitSheet: !config.splitSheet })}
+                    className="w-full flex items-center justify-between gap-2 text-left"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Rows2
+                        className={`w-4 h-4 shrink-0 ${
+                          config.splitSheet ? 'text-emerald-600' : 'text-slate-400'
+                        }`}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-bold text-slate-800">
+                          กระดาษ 1 แผ่นแบ่งเป็น 2 ดวง (บน / ล่าง)
+                        </span>
+                        <span className="block text-[10px] text-slate-500">
+                          แผ่น {config.widthCm}×{config.heightCm} cm → ดวงละ {config.widthCm}×
+                          {Math.round((config.heightCm / 2) * 100) / 100} cm
+                        </span>
+                      </span>
+                    </span>
+                    <span
+                      className={`relative w-10 h-6 rounded-full transition shrink-0 ${
+                        config.splitSheet ? 'bg-emerald-500' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                          config.splitSheet ? 'left-[18px]' : 'left-0.5'
+                        }`}
+                      />
+                    </span>
+                  </button>
+
+                  {config.splitSheet && (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(
+                          [
+                            {
+                              id: 'both',
+                              icon: Rows2,
+                              label: '2 รหัส / แผ่น',
+                              desc: 'บน + ล่าง (คุ้มสุด)',
+                            },
+                            {
+                              id: 'top',
+                              icon: PanelTop,
+                              label: '1 รหัส – บน',
+                              desc: 'ช่องล่างว่าง',
+                            },
+                            {
+                              id: 'bottom',
+                              icon: PanelBottom,
+                              label: '1 รหัส – ล่าง',
+                              desc: 'ช่องบนว่าง',
+                            },
+                          ] as { id: SplitSheetMode; icon: typeof Rows2; label: string; desc: string }[]
+                        ).map((opt) => {
+                          const Icon = opt.icon;
+                          const active = config.splitMode === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => updateConfig({ splitMode: opt.id })}
+                              className={`p-2 rounded-lg border text-left transition active:scale-95 ${
+                                active
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 text-xs font-extrabold">
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">{opt.label}</span>
+                              </div>
+                              <div
+                                className={`text-[10px] mt-0.5 truncate ${
+                                  active ? 'text-emerald-100' : 'text-slate-400'
+                                }`}
+                              >
+                                {opt.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="text-[11px] text-emerald-900 bg-white/70 border border-emerald-200 rounded-lg px-2.5 py-1.5 space-y-0.5">
+                        <div>
+                          📄 พิมพ์ <strong>{totalLabels}</strong> ดวง → ใช้กระดาษ{' '}
+                          <strong>{totalSheets}</strong> แผ่น
+                          {blankSlots > 0 && (
+                            <span className="text-amber-700"> • เว้นว่าง {blankSlots} ช่อง</span>
+                          )}
+                        </div>
+                        {config.splitMode === 'both' && totalLabels % 2 === 1 && (
+                          <div className="text-amber-700">
+                            จำนวนเป็นเลขคี่ แผ่นสุดท้ายจะเหลือช่องล่างว่าง 1 ช่อง (เพิ่มอีก 1 ดวงให้เต็มแผ่นได้)
+                          </div>
+                        )}
+                        {config.splitMode === 'both' && (
+                          <div className="text-slate-500">
+                            เรียงตามรายการ: ดวงที่ 1 → บน, ดวงที่ 2 → ล่าง, ดวงที่ 3 → บนแผ่นถัดไป…
+                          </div>
+                        )}
+                        {config.showStoreName && slotHeightCm < 2 && (
+                          <div className="text-slate-500">
+                            💡 ดวงเตี้ย {slotHeightCm} cm แนะนำปิด &quot;ชื่อร้าน&quot; เพื่อให้แท่งบาร์โค้ดสูงขึ้น สแกนง่ายขึ้น
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Multi-Column Roll Option for EasyPrint ES-9920EW */}
@@ -1396,87 +1753,11 @@ export default function BarcodePrintModal({
                       style={{
                         width: `${config.widthCm}cm`,
                         height: `${config.heightCm}cm`,
-                        padding: `${metrics.paddingCm}cm`,
                       }}
-                      className="bg-white text-black rounded-md shadow-xl border border-slate-300 flex flex-col justify-between items-center text-center overflow-hidden select-none"
+                      className="bg-white text-black rounded-md shadow-xl border border-slate-300 flex flex-col overflow-hidden select-none divide-y divide-dashed divide-amber-400"
                     >
-                      {config.showStoreName && (
-                        <div
-                          style={{ fontSize: `${metrics.storeFontPt}pt` }}
-                          className="font-extrabold tracking-wider uppercase leading-none truncate w-full text-black"
-                        >
-                          VIVIDA CRYSTAL
-                        </div>
-                      )}
-
-                      {/* Crisp SVG Code 128 Barcode */}
-                      <div
-                        style={{ height: `${metrics.barcodeHeightCm}cm` }}
-                        className="w-[96%] shrink-0 my-[0.02cm]"
-                      >
-                        <svg
-                          viewBox={`0 0 ${previewBarcode.totalModules} 100`}
-                          preserveAspectRatio="none"
-                          className="w-full h-full block"
-                          style={{ shapeRendering: 'crispEdges' }}
-                        >
-                          {previewBarcode.bars.map((bar, idx) => (
-                            <rect
-                              key={idx}
-                              x={bar.x}
-                              y={0}
-                              width={bar.width}
-                              height={100}
-                              fill="#000000"
-                            />
-                          ))}
-                        </svg>
-                      </div>
-
-                      {config.showSkuText && (
-                        <div
-                          style={{ fontSize: `${metrics.skuFontPt}pt` }}
-                          className="font-mono font-black tracking-wide leading-none truncate w-full text-black"
-                        >
-                          {previewProduct.sku}
-                        </div>
-                      )}
-
-                      {config.showStoneName && (
-                        <div
-                          style={{ fontSize: `${metrics.nameFontPt}pt` }}
-                          className="font-bold leading-tight truncate w-full text-slate-900"
-                        >
-                          {previewProduct.stone_type || previewProduct.name}
-                        </div>
-                      )}
-
-                      {((config.showWeightAndDim && previewSpecs) ||
-                        (config.showPrice && previewPrice)) && (
-                        <div
-                          className={`w-full flex items-baseline ${
-                            config.showWeightAndDim && config.showPrice
-                              ? 'justify-between'
-                              : 'justify-center'
-                          } gap-1 border-t border-slate-200 pt-[1px] leading-none`}
-                        >
-                          {config.showWeightAndDim && (
-                            <span
-                              style={{ fontSize: `${metrics.metaFontPt}pt` }}
-                              className="font-semibold text-slate-800 truncate"
-                            >
-                              {previewSpecs}
-                            </span>
-                          )}
-                          {config.showPrice && (
-                            <span
-                              style={{ fontSize: `${metrics.priceFontPt}pt` }}
-                              className="font-black text-black shrink-0"
-                            >
-                              {previewPrice}
-                            </span>
-                          )}
-                        </div>
+                      {previewSlots.map((slotProd, sIdx) =>
+                        renderPreviewSlot(slotProd, slotHeightCm, sIdx)
                       )}
                     </div>
 
@@ -1486,6 +1767,9 @@ export default function BarcodePrintModal({
                       className="flex flex-col justify-between text-[9px] font-mono text-amber-300 border-l border-amber-400/50 pl-1"
                     >
                       <span>0</span>
+                      {config.splitSheet && (
+                        <span className="text-amber-400 font-bold">-{slotHeightCm}</span>
+                      )}
                       <span>{config.heightCm}cm</span>
                     </div>
                   </div>
@@ -1495,13 +1779,19 @@ export default function BarcodePrintModal({
                 <button
                   type="button"
                   disabled={isExportingImage}
-                  onClick={() => handleExport300DpiImage(previewProduct)}
+                  onClick={() =>
+                    handleExport300DpiImage(
+                      previewSlots[0] || previewSlots[1] || previewProduct
+                    )
+                  }
                   className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/30 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>
                     {isExportingImage
                       ? 'กำลังสร้างภาพ 300 DPI...'
+                      : config.splitSheet
+                      ? `บันทึกรูปป้าย 300 DPI (แผ่น ${config.widthCm}×${config.heightCm} cm แบ่ง 2 ดวง)`
                       : `บันทึกรูปป้าย 300 DPI (${previewProduct.sku}) ส่งเข้าแอป NIIMBOT`}
                   </span>
                 </button>
@@ -1679,6 +1969,8 @@ export default function BarcodePrintModal({
                 <span>
                   {isDirectPrinting
                     ? 'กำลังปริ้นออก B2 Pro...'
+                    : config.splitSheet
+                    ? `ปริ้นออก NIIMBOT B2 Pro ทันที (${totalLabels} ดวง • ${totalSheets} แผ่น)`
                     : `ปริ้นออก NIIMBOT B2 Pro ทันที (${totalLabels} ดวง)`}
                 </span>
               </button>
@@ -1698,6 +1990,8 @@ export default function BarcodePrintModal({
               <span>
                 {config.printerProfile === 'niimbot_b21_pro'
                   ? 'ปริ้นผ่านไดรเวอร์ระบบ'
+                  : config.splitSheet
+                  ? `สั่งปริ้น (${config.widthCm}×${config.heightCm} cm • ${totalLabels} ดวง • ${totalSheets} แผ่น)`
                   : `สั่งปริ้น (${config.widthCm}×${config.heightCm} cm • ${totalLabels} ดวง)`}
               </span>
             </button>

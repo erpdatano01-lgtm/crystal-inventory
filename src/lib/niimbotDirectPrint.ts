@@ -3,7 +3,7 @@
 // Protocol reverse-engineered directly from NIIMBOT macOS SDK (libjcPrinterSdk.dylib: JCBleControl, cPrinterV5, cPrinterV6, packageOneColorData).
 
 import { Product } from '@/types';
-import { BarcodeLabelConfig, encodeCode128B } from './barcodeGenerator';
+import { BarcodeLabelConfig, buildPrintSheets, encodeCode128B } from './barcodeGenerator';
 
 // BLE Service UUIDs in exact priority order from JCBleControl (libjcPrinterSdk.dylib)
 const NIIMBOT_BLE_SERVICES = [
@@ -525,45 +525,17 @@ async function sendCommandWaitAck(
  * Render a product barcode label directly at the exact dot-matrix resolution of NIIMBOT B2 Pro
  * and pack into 1-bit monochrome rows.
  */
-function encodeProductLabelToNiimbotRows(
+function drawNiimbotLabelRegion(
+    ctx: CanvasRenderingContext2D,
     product: Product,
     config: BarcodeLabelConfig,
-    dpi: 203 | 300
-): {
-    widthDots: number;
-    heightDots: number;
-    bytesPerRow: number;
-    rows: Uint8Array[];
-} {
-    const dotsPerMm = dpi === 300 ? 300 / 25.4 : 8; // 11.8110236 dots/mm for 300 DPI
+    wCm: number,
+    hCm: number,
+    widthDots: number,
+    heightDots: number,
+    dotsPerMm: number
+): void {
     const dotsPerCm = dotsPerMm * 10;
-    const maxPrintheadMm = 48; // B2 Pro widthSetEnd = 48mm
-
-    const wCm = Math.min(5.0, Math.max(1.5, Number(config.widthCm) || 5.0));
-    const hCm = Math.min(15.0, Math.max(1.0, Number(config.heightCm) || 3.0));
-
-    const labelWidthMm = Math.min(maxPrintheadMm, wCm * 10);
-    const labelHeightMm = hCm * 10;
-
-    const rawLabelDotsW = Math.round(labelWidthMm * dotsPerMm);
-    const widthDots = Math.ceil(rawLabelDotsW / 8) * 8;
-    const heightDots = Math.round(labelHeightMm * dotsPerMm);
-    const bytesPerRow = widthDots / 8;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = widthDots;
-    canvas.height = heightDots;
-    const ctx = canvas.getContext('2d')!;
-
-    // Pure white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, widthDots, heightDots);
-
-    // Offset calibration in dots
-    const offsetXDots = Math.round((Number(config.offsetXMm) || 0) * dotsPerMm);
-    const offsetYDots = Math.round((Number(config.offsetYMm) || 0) * dotsPerMm);
-    ctx.save();
-    ctx.translate(offsetXDots, offsetYDots);
 
     const scaleFactor = config.fontScale === 'sm' ? 0.85 : config.fontScale === 'lg' ? 1.15 : 1.0;
     const minDim = Math.min(wCm, hCm);
@@ -694,6 +666,66 @@ function encodeProductLabelToNiimbotRows(
             ctx.fillText(textToDraw, widthDots / 2, bottomY, innerW);
         }
     }
+
+}
+
+/**
+ * Render one physical sheet (widthCm × heightCm) to 1-bit rows.
+ * `slots` = [product] for a normal label, or [top, bottom] for split-sheet mode (null = blank half).
+ */
+function encodeSheetToNiimbotRows(
+    slots: (Product | null)[],
+    config: BarcodeLabelConfig,
+    dpi: 203 | 300
+): {
+    widthDots: number;
+    heightDots: number;
+    bytesPerRow: number;
+    rows: Uint8Array[];
+} {
+    const dotsPerMm = dpi === 300 ? 300 / 25.4 : 8; // 11.8110236 dots/mm for 300 DPI
+    const maxPrintheadMm = 48; // B2 Pro widthSetEnd = 48mm
+
+    const wCm = Math.min(5.0, Math.max(1.5, Number(config.widthCm) || 5.0));
+    const hCm = Math.min(15.0, Math.max(1.0, Number(config.heightCm) || 3.0));
+
+    const labelWidthMm = Math.min(maxPrintheadMm, wCm * 10);
+    const labelHeightMm = hCm * 10;
+
+    const rawLabelDotsW = Math.round(labelWidthMm * dotsPerMm);
+    const widthDots = Math.ceil(rawLabelDotsW / 8) * 8;
+    const heightDots = Math.round(labelHeightMm * dotsPerMm);
+    const bytesPerRow = widthDots / 8;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = widthDots;
+    canvas.height = heightDots;
+    const ctx = canvas.getContext('2d')!;
+
+    // Pure white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, widthDots, heightDots);
+
+    // Offset calibration in dots (applied to the whole sheet)
+    const offsetXDots = Math.round((Number(config.offsetXMm) || 0) * dotsPerMm);
+    const offsetYDots = Math.round((Number(config.offsetYMm) || 0) * dotsPerMm);
+    ctx.save();
+    ctx.translate(offsetXDots, offsetYDots);
+
+    const slotCount = Math.max(1, slots.length);
+    const slotDots = Math.floor(heightDots / slotCount);
+    const slotHCm = hCm / slotCount;
+
+    slots.forEach((product, i) => {
+        if (!product) return;
+        ctx.save();
+        ctx.translate(0, i * slotDots);
+        ctx.beginPath();
+        ctx.rect(0, 0, widthDots, slotDots);
+        ctx.clip();
+        drawNiimbotLabelRegion(ctx, product, config, wCm, slotHCm, widthDots, slotDots, dotsPerMm);
+        ctx.restore();
+    });
 
     ctx.restore();
 
@@ -1005,7 +1037,24 @@ export async function printDirectToNiimbotB2Pro(
 
     const density = Math.min(5, Math.max(1, options?.density ?? 3));
     const dpi = options?.dpi ?? currentDpi;
-    const totalPages = validItems.reduce((sum, item) => sum + item.copies, 0);
+
+    // Lay out labels onto physical sheets (split mode packs 2 labels per sheet: top / bottom)
+    const sheets = buildPrintSheets(validItems, config);
+
+    // Group consecutive identical sheets so the printer can repeat them as copies
+    const sheetGroups: { slots: (Product | null)[]; copies: number }[] = [];
+    const sheetKey = (slots: (Product | null)[]) => slots.map((p) => (p ? p.id : '-')).join('|');
+    sheets.forEach((slots) => {
+        const last = sheetGroups[sheetGroups.length - 1];
+        if (last && sheetKey(last.slots) === sheetKey(slots)) {
+            last.copies += 1;
+        } else {
+            sheetGroups.push({ slots, copies: 1 });
+        }
+    });
+
+    const totalPages = sheets.length;
+    const unitLabel = config.splitSheet ? 'แผ่น' : 'ดวง';
 
     options?.onProgress?.(0, totalPages, 'กำลังเตรียมหัวพิมพ์ NIIMBOT B2 Pro...');
 
@@ -1018,22 +1067,23 @@ export async function printDirectToNiimbotB2Pro(
 
     let printedSoFar = 0;
 
-    for (let i = 0; i < validItems.length; i++) {
-        const item = validItems[i];
+    for (let i = 0; i < sheetGroups.length; i++) {
+        const group = sheetGroups[i];
+        const skuText = group.slots.map((p) => (p ? p.sku : 'ว่าง')).join(' / ');
         options?.onProgress?.(
             printedSoFar + 1,
             totalPages,
-            `กำลังส่งพิมพ์ ${item.product.sku} (${item.copies} ดวง)...`
+            `กำลังส่งพิมพ์ ${skuText} (${group.copies} ${unitLabel})...`
         );
 
-        const encoded = encodeProductLabelToNiimbotRows(item.product, config, dpi);
-        await sendNiimbotPage(encoded, item.copies);
-        printedSoFar += item.copies;
+        const encoded = encodeSheetToNiimbotRows(group.slots, config, dpi);
+        await sendNiimbotPage(encoded, group.copies);
+        printedSoFar += group.copies;
 
         options?.onProgress?.(
             printedSoFar,
             totalPages,
-            `พิมพ์แล้ว ${printedSoFar}/${totalPages} ดวง`
+            `พิมพ์แล้ว ${printedSoFar}/${totalPages} ${unitLabel}`
         );
         await sleep(80);
     }

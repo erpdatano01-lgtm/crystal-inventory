@@ -99,7 +99,16 @@ export interface BarcodeLabelConfig {
   showPrice: boolean;
   showSkuText: boolean;
   fontScale: 'sm' | 'md' | 'lg';
+  /**
+   * Split-sheet mode: 1 physical sticker (widthCm × heightCm, e.g. 4×3 cm) is die-cut
+   * into 2 stacked labels (top / bottom), each widthCm × heightCm/2 (e.g. 4×1.5 cm).
+   */
+  splitSheet: boolean;
+  /** 'both' = 2 codes per sheet (top then bottom), 'top' / 'bottom' = 1 code per sheet in that slot */
+  splitMode: SplitSheetMode;
 }
+
+export type SplitSheetMode = 'both' | 'top' | 'bottom';
 
 export const DEFAULT_BARCODE_CONFIG: BarcodeLabelConfig = {
   printerProfile: 'niimbot_b21_pro',
@@ -116,6 +125,8 @@ export const DEFAULT_BARCODE_CONFIG: BarcodeLabelConfig = {
   showPrice: true,
   showSkuText: true,
   fontScale: 'md',
+  splitSheet: false,
+  splitMode: 'both',
 };
 
 export interface BarcodePresetItem {
@@ -125,9 +136,51 @@ export interface BarcodePresetItem {
   heightCm: number;
   printer: PrinterModelProfile | 'both';
   columnsPerRow?: 1 | 2 | 3;
+  splitSheet?: boolean;
+}
+
+/** Height (cm) of a single printed label slot (half of the sheet when split mode is on) */
+export function getLabelSlotHeightCm(config: Pick<BarcodeLabelConfig, 'heightCm' | 'splitSheet'>): number {
+  const h = Number(config.heightCm) || 3.0;
+  return config.splitSheet ? Math.round((h / 2) * 100) / 100 : h;
+}
+
+/**
+ * Lay out the print queue onto physical sheets.
+ * - Normal mode: every label = 1 sheet → [product]
+ * - Split mode:  every sheet = [top, bottom] (null = leave that half blank)
+ */
+export function buildPrintSheets<P>(
+  items: { product: P; copies: number }[],
+  config: Pick<BarcodeLabelConfig, 'splitSheet' | 'splitMode'>
+): (P | null)[][] {
+  const flat: P[] = [];
+  items.forEach(({ product, copies }) => {
+    for (let c = 0; c < copies; c++) flat.push(product);
+  });
+
+  if (!config.splitSheet) return flat.map((p) => [p]);
+
+  if (config.splitMode === 'top') return flat.map((p) => [p, null]);
+  if (config.splitMode === 'bottom') return flat.map((p) => [null, p]);
+
+  const sheets: (P | null)[][] = [];
+  for (let i = 0; i < flat.length; i += 2) {
+    sheets.push([flat[i], flat[i + 1] ?? null]);
+  }
+  return sheets;
 }
 
 export const BARCODE_SIZE_PRESETS: BarcodePresetItem[] = [
+  {
+    label: '4.0 × 3.0 cm แบ่ง 2 ดวง',
+    desc: 'แผ่นเดียวแบ่งบน/ล่าง ดวงละ 4×1.5 cm',
+    widthCm: 4.0,
+    heightCm: 3.0,
+    printer: 'both',
+    columnsPerRow: 1,
+    splitSheet: true,
+  },
   // NIIMBOT B2 Pro Presets (Max width 5.0 cm, 300 DPI)
   {
     label: '5.0 × 3.0 cm',
@@ -236,6 +289,9 @@ export function getSavedBarcodeConfig(): BarcodeLabelConfig {
       heightCm: Number(parsed.heightCm) > 0 ? Number(parsed.heightCm) : DEFAULT_BARCODE_CONFIG.heightCm,
       columnsPerRow:
         parsed.columnsPerRow === 2 || parsed.columnsPerRow === 3 ? parsed.columnsPerRow : 1,
+      splitSheet: Boolean(parsed.splitSheet),
+      splitMode:
+        parsed.splitMode === 'top' || parsed.splitMode === 'bottom' ? parsed.splitMode : 'both',
     };
   } catch {
     return DEFAULT_BARCODE_CONFIG;
