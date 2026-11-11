@@ -191,8 +191,6 @@ export default function BarcodePrintModal({
     );
   }, [products, searchTerm]);
 
-  if (!isOpen) return null;
-
   const setProductCopies = (id: string, count: number) => {
     setCopiesMap((prev) => {
       const next = { ...prev };
@@ -969,6 +967,8 @@ export default function BarcodePrintModal({
 
   const isNiimbotOverWidth =
     config.printerProfile === 'niimbot_b21_pro' && config.widthCm > 5.0;
+
+  if (!isOpen) return null;
 
   return (
     <div
