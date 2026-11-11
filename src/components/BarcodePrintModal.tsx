@@ -21,6 +21,7 @@ import {
   getNiimbotConnectionInfo,
   printDirectToNiimbotB2Pro,
   NiimbotConnectionInfo,
+  NiimbotPrintQueueItem,
   setNiimbotDpi,
 } from '@/lib/niimbotDirectPrint';
 import {
@@ -309,8 +310,8 @@ export default function BarcodePrintModal({
       setNiimbotConn(getNiimbotConnectionInfo());
       setDirectPrintStatus(
         config.splitSheet
-          ? `✅ ปริ้นออกเครื่อง NIIMBOT B2 Pro สำเร็จ ${totalLabels} ดวง (ใช้กระดาษ ${totalSheets} แผ่น)!`
-          : `✅ ปริ้นออกเครื่อง NIIMBOT B2 Pro สำเร็จครบ ${totalLabels} ดวง!`
+          ? `✅ ปริ้นออกเครื่อง NIIMBOT สำเร็จ ${totalLabels} ดวง (ใช้กระดาษ ${totalSheets} แผ่น)!`
+          : `✅ ปริ้นออกเครื่อง NIIMBOT สำเร็จครบ ${totalLabels} ดวง!`
       );
     } catch (err: any) {
       setDirectPrintStatus('');
@@ -318,6 +319,87 @@ export default function BarcodePrintModal({
         err?.message ||
           'เกิดข้อผิดพลาดในการส่งพิมพ์ (หากเปิดแอป NIIMBOT บนคอมอยู่ กรุณากดตัดการเชื่อมต่อในแอป NIIMBOT ก่อนเพื่อให้หน้าเว็บสั่งพิมพ์ตรงได้)'
       );
+    } finally {
+      setIsDirectPrinting(false);
+    }
+  };
+
+  // One-click Test Print for NIIMBOT (prints 1 sheet with 2 codes to verify bottom line doesn't disappear)
+  const handleTestPrintNiimbot = async (testDpi: 203 | 300 = niimbotDpiState) => {
+    setDirectPrintError('');
+    setIsDirectPrinting(true);
+    setDirectPrintStatus(`กำลังเตรียมพิมพ์แผ่นทดสอบ (${testDpi} DPI)...`);
+
+    // Calibrated test products with full specs so the user can verify every single line
+    const testItems: NiimbotPrintQueueItem[] = [
+      {
+        product: {
+          id: 'test-azu-001',
+          sku: 'CAB-AZU-001',
+          lot_id: null,
+          status: 'AVAILABLE',
+          item_type: 'UNIQUE',
+          qty_on_hand: 1,
+          name: 'Azurite Cabochon',
+          stone_type: 'Azurite',
+          weight_grams: 10.0,
+          dimensions: '3.5 x 2.7 x 0.5 cm',
+          selling_price: 450,
+          cost_price: 200,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        copies: 1,
+      },
+      {
+        product: {
+          id: 'test-azu-002',
+          sku: 'CAB-AZU-002',
+          lot_id: null,
+          status: 'AVAILABLE',
+          item_type: 'UNIQUE',
+          qty_on_hand: 1,
+          name: 'Azurite Cabochon',
+          stone_type: 'Azurite',
+          weight_grams: 11.0,
+          dimensions: '3.3 x 2.2 x 0.6 cm',
+          selling_price: 520,
+          cost_price: 220,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        copies: 1,
+      },
+    ];
+
+    const testConfig: BarcodeLabelConfig = {
+      ...config,
+      widthCm: 4.0,
+      heightCm: 3.0,
+      splitSheet: true,
+      splitMode: 'both',
+      showStoreName: config.showStoreName,
+      showSkuText: true,
+      showStoneName: true,
+      showWeightAndDim: true,
+      showPrice: false,
+    };
+
+    try {
+      await printDirectToNiimbotB2Pro(testItems, testConfig, {
+        density: niimbotDensity,
+        dpi: testDpi,
+        onProgress: (_curr, _tot, msg) => {
+          setDirectPrintStatus(msg);
+        },
+      });
+      setNiimbotConn(getNiimbotConnectionInfo());
+      setDirectPrintStatus(
+        `✅ พิมพ์แผ่นทดสอบสำเร็จ (${testDpi} DPI)! ดูที่กระดาษ: แผ่นบน (CAB-AZU-001) และแผ่นล่าง (CAB-AZU-002) จะมีเส้นคั่นและสเปกครบทั้ง 2 แผ่น ไม่หายครับ`
+      );
+    } catch (err: any) {
+      setDirectPrintStatus('');
+      setDirectPrintError(err?.message || 'เกิดข้อผิดพลาดในการพิมพ์แผ่นทดสอบ');
     } finally {
       setIsDirectPrinting(false);
     }
@@ -1229,6 +1311,46 @@ export default function BarcodePrintModal({
                   <span className="text-[11px] text-amber-300/90">
                     💡 NIIMBOT B21 มาตรฐานคือ 203 DPI (8 จุด/มม.) • หากเปิดแอป NIIMBOT บนคอมอยู่ ให้กดตัดการเชื่อมต่อในแอปก่อน
                   </span>
+                </div>
+
+                {/* 1-Click Quick Test Print Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-purple-900/60 border border-purple-500/40 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                    <div>
+                      <div className="font-bold text-white flex items-center gap-1.5">
+                        <span>ทดสอบพิมพ์ป้ายแบ่ง 2 ชั้น (4×1.5 cm × 2)</span>
+                        <span className="text-[10px] bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 px-1.5 py-0.2 rounded font-extrabold">
+                          1 แผ่น
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-purple-200">
+                        พิมพ์ AZU-001 บน และ AZU-002 ล่าง (มีสเปกครบทั้งคู่ เพื่อดูว่าด้านล่างไม่หาย)
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleTestPrintNiimbot(203)}
+                      disabled={isDirectPrinting}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                      title="สั่งพิมพ์แผ่นทดสอบที่ 203 DPI (แนะนำสำหรับ B21) ปริ้นครบยันบรรทัดล่างสุด"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>พิมพ์เทส 203 DPI (แนะนำ)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTestPrintNiimbot(300)}
+                      disabled={isDirectPrinting}
+                      className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-xs border border-white/20 transition active:scale-95 disabled:opacity-50"
+                      title="ลองพิมพ์ที่ 300 DPI เพื่อดูความแตกต่าง (จะเห็นว่าสเปกแผ่นล่างหลุดขอบ)"
+                    >
+                      <span>พิมพ์เทส 300 DPI</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Live status or error feedback */}
