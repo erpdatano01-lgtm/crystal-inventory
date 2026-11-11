@@ -539,11 +539,11 @@ function drawNiimbotLabelRegion(
 
     // Proportional metrics tuned to guarantee all 5 lines (Barcode, SKU, Name, Divider, Specs)
     // fit inside short labels (e.g. 1.5 cm) without pushing the bottom line into the gap sensor.
-    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.2 : 2.5) * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.3) * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.4 : 2.7) * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.1 : 2.4) * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.4) * scaleFactor * 10) / 10);
+    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.0 : 2.5) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.3) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.1 : 2.7) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(4.0, Math.round(minDim * (isTiny ? 1.9 : 2.4) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.4) * scaleFactor * 10) / 10);
 
     const ptToPx = (pt: number) => Math.max(8, Math.round(pt * 0.0352778 * dotsPerCm));
     const storeFontPx = ptToPx(storeFontPt);
@@ -587,8 +587,8 @@ function drawNiimbotLabelRegion(
         ? dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots
         : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
 
-    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.32 : 0.38) * dotsPerCm);
-    const barcodeHeightDots = Math.max(18, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.22 : 0.38) * dotsPerCm);
+    const barcodeHeightDots = Math.max(isTiny ? 14 : 18, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
@@ -632,33 +632,44 @@ function drawNiimbotLabelRegion(
         currentY += nameLineH;
     }
 
-    // 5. Weight / Dimensions & Selling Price (positioned flush against bottom edge, exactly matching exported image)
+    // 5. Weight / Dimensions & Selling Price
+    // In tiny or split labels (<= 1.8 cm slot height), we must position the divider and bottom specs line
+    // sequentially right after the stone name (with tight padding).
+    // Why? Because physical thermal label printers have an optical gap sensor located ~4.5 mm before the tear bar.
+    // When printing a 3.0 cm label, any line placed past 25.5 mm falls directly into the sensor's cutoff zone!
+    // Stacking sequentially right below the stone name guarantees that ALL 5 lines finish within ~8.8 mm
+    // (i.e. Slot 1 ends at ~23.8 mm from the top of the roll), keeping it safely before the 25.5 mm gap sensor cutoff!
+    const sequentialDividerY = currentY + dividerGap;
+    const sequentialBottomY = sequentialDividerY + dividerGap + 1;
+    const actualDividerY = isTiny ? sequentialDividerY : Math.min(sequentialDividerY, dividerY);
+    const actualBottomY = isTiny ? sequentialBottomY : Math.min(sequentialBottomY, bottomY);
+
     if (hasBottomLine) {
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(sidePadDots, dividerY);
-        ctx.lineTo(widthDots - sidePadDots, dividerY);
+        ctx.moveTo(sidePadDots, actualDividerY);
+        ctx.lineTo(widthDots - sidePadDots, actualDividerY);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
             ctx.textAlign = 'left';
             ctx.font = `700 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(specsLine, sidePadDots, bottomY, innerW * 0.62);
+            ctx.fillText(specsLine, sidePadDots, actualBottomY, innerW * 0.62);
 
             ctx.textAlign = 'right';
             ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.fillText(
                 priceText,
                 widthDots - sidePadDots,
-                bottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
+                actualBottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
             );
         } else {
             ctx.textAlign = 'center';
             const textToDraw = config.showPrice && priceText ? priceText : specsLine;
             const fPx = config.showPrice && priceText ? priceFontPx : metaFontPx;
             ctx.font = `800 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(textToDraw, widthDots / 2, bottomY, innerW);
+            ctx.fillText(textToDraw, widthDots / 2, actualBottomY, innerW);
         }
     }
 
@@ -718,14 +729,16 @@ function encodeSheetToNiimbotRows(
 
         if (slotCount === 2) {
             // Physical 40x30 mm split roll has:
-            // - Top sticker: 0..13.5 mm (~110 dots at 203 DPI)
-            // - Inter-label die cut gap: ~1.5 - 2 mm (~14 dots at 203 DPI)
-            // - Bottom sticker: 15.5..28.5 mm (~126..230 dots at 203 DPI)
-            // - 30 mm roll finishes at 240 dots at 203 DPI (or 354 dots at 300 DPI)
+            // - Top sticker: 0..14 mm
+            // - Inter-label die cut gap: ~14..14.5 mm
+            // - Bottom sticker: 14.5..28.5 mm
+            // - Physical optical gap sensor shutoff zone: starts at ~24.5..25.0 mm
+            // Starting Slot 1 at 14.5 mm and stacking sequentially ensures all 5 lines finish by ~23.4 mm,
+            // safely inside the active thermal firing zone before the hardware gap sensor cutoff!
             const slotTopY = i === 0
-                ? Math.round(0.04 * dotsPerCm) // 0.4 mm (~3 dots at 203 DPI)
-                : Math.round((slotHCm + 0.08) * dotsPerCm); // 15.8 mm (~126 dots at 203 DPI, clears middle gap!)
-            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.12 : 0.18)) * dotsPerCm);
+                ? Math.round(0.02 * dotsPerCm) // 0.2 mm from top
+                : Math.round((slotHCm - 0.05) * dotsPerCm); // 14.5 mm (clears middle gap!)
+            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.08 : 0.14)) * dotsPerCm);
             const slotHCmEffective = slotHDots / dotsPerCm;
 
             ctx.translate(0, slotTopY);
@@ -845,12 +858,13 @@ async function sendNiimbotPage(
     await sendCommandWaitAck(0x03, [0x01], 0x04, 300);
 
     // 3. SetPageSize / jcSetPageInfo (0x13, [rows_hi, rows_lo, cols_hi, cols_lo, copies_hi, copies_lo]) -> expects 0x14
-    // In cPrinterV5::commitJob (@ 0xff798), rows passed to jcSetPageInfo is effectiveHeight ([x19, #0x60])
+    // In Cb21Printer::commitJob (@ 0x84896), page height sent to jcSetPageHigh is the full physical page height (heightDots)
+    const reportedPageHeight = Math.max(heightDots, effectiveHeight);
     const pageInfoAck = await sendCommandWaitAck(
         0x13,
         [
-            (effectiveHeight >> 8) & 0xff,
-            effectiveHeight & 0xff,
+            (reportedPageHeight >> 8) & 0xff,
+            reportedPageHeight & 0xff,
             (widthDots >> 8) & 0xff,
             widthDots & 0xff,
             (copies >> 8) & 0xff,
@@ -865,8 +879,8 @@ async function sendNiimbotPage(
         await sendCommandWaitAck(
             0x13,
             [
-                (effectiveHeight >> 8) & 0xff,
-                effectiveHeight & 0xff,
+                (reportedPageHeight >> 8) & 0xff,
+                reportedPageHeight & 0xff,
                 (widthDots >> 8) & 0xff,
                 widthDots & 0xff,
             ],

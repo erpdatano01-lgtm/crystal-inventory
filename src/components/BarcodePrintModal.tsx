@@ -212,11 +212,11 @@ export default function BarcodePrintModal({
     const minDim = Math.min(wCm, hCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
-    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.2 : 2.5) * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.3) * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.4 : 2.7) * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.1 : 2.4) * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.4) * scaleFactor * 10) / 10);
+    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.0 : 2.5) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.3) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.1 : 2.7) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(4.0, Math.round(minDim * (isTiny ? 1.9 : 2.4) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.4) * scaleFactor * 10) / 10);
 
     const activeInfoLines =
       (config.showStoreName ? 1 : 0) +
@@ -224,7 +224,7 @@ export default function BarcodePrintModal({
       (config.showStoneName ? 1 : 0) +
       (config.showWeightAndDim || config.showPrice ? 1 : 0);
 
-    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.32 : 0.4;
+    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.22 : 0.4;
     const paddingCm = isTiny ? 0.08 : 0.15;
 
     // Fit barcode into the space left after text lines (prevents overflow on short labels e.g. 1.5 cm)
@@ -237,7 +237,7 @@ export default function BarcodePrintModal({
         ? ptToCm(Math.max(metaFontPt, priceFontPt)) * 1.05 + 0.05
         : 0);
     const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.06;
-    const targetBarcodeCm = Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
+    const targetBarcodeCm = isTiny ? 0.30 : Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
     const barcodeHeightCm = Math.max(
       0.3,
       Math.round(Math.min(targetBarcodeCm, availableBarcodeCm) * 100) / 100
@@ -805,29 +805,36 @@ export default function BarcodePrintModal({
       }
 
       // 5. Bottom Meta & Price Line
+      // In tiny or split labels, stack divider & specs directly below stone name so it finishes
+      // well before the physical 25.5 mm gap sensor cutoff
+      const sequentialDividerY = currentY + dividerGap;
+      const sequentialBottomY = sequentialDividerY + dividerGap + 2;
+      const actualDividerY = isTiny ? sequentialDividerY : Math.min(sequentialDividerY, dividerY);
+      const actualBottomY = isTiny ? sequentialBottomY : Math.min(sequentialBottomY, bottomY);
+
       if (hasBottomLine) {
         // Divider line (pure black for sharp thermal printing)
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padPx, dividerY);
-        ctx.lineTo(canvasW - padPx, dividerY);
+        ctx.moveTo(padPx, actualDividerY);
+        ctx.lineTo(canvasW - padPx, actualDividerY);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
           ctx.textAlign = 'left';
           ctx.font = `600 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillText(specsLine, padPx, bottomY, innerW * 0.62);
+          ctx.fillText(specsLine, padPx, actualBottomY, innerW * 0.62);
 
           ctx.textAlign = 'right';
           ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillText(priceText, canvasW - padPx, bottomY - Math.round((priceFontPx - metaFontPx) * 0.3));
+          ctx.fillText(priceText, canvasW - padPx, actualBottomY - Math.round((priceFontPx - metaFontPx) * 0.3));
         } else {
           ctx.textAlign = 'center';
           const textToDraw = config.showPrice && priceText ? priceText : specsLine;
           const fPx = config.showPrice && priceText ? priceFontPx : metaFontPx;
           ctx.font = `800 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillText(textToDraw, canvasW / 2, bottomY, innerW);
+          ctx.fillText(textToDraw, canvasW / 2, actualBottomY, innerW);
         }
       }
       };
@@ -837,9 +844,9 @@ export default function BarcodePrintModal({
         ctx.save();
         if (config.splitSheet && slots.length === 2) {
           const slotTopPx = i === 0
-            ? Math.round(0.05 * pxPerCm)
-            : Math.round((slotHCm + 0.05) * pxPerCm);
-          const slotHPx = Math.round((slotHCm - (i === 0 ? 0.15 : 0.20)) * pxPerCm);
+            ? Math.round(0.02 * pxPerCm)
+            : Math.round((slotHCm - 0.05) * pxPerCm);
+          const slotHPx = Math.round((slotHCm - (i === 0 ? 0.08 : 0.14)) * pxPerCm);
           const slotHCmEffective = slotHPx / pxPerCm;
           ctx.translate(0, slotTopPx);
           ctx.beginPath();
