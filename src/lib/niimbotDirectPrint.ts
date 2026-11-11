@@ -67,7 +67,7 @@ let activeBle: ActiveBleConnection | null = null;
 let activeSerial: ActiveSerialConnection | null = null;
 let currentDeviceName = '';
 let currentTransport: NiimbotTransportType | null = null;
-let currentDpi: 203 | 300 = 300; // NIIMBOT B2 Pro is native 300 DPI (paccuracyName: "300" in devices.json)
+let currentDpi: 203 | 300 = 203; // Standard NIIMBOT B21 is native 203 DPI (8 dots/mm); B2 Pro is 300 DPI
 
 // Incoming packet buffer and resolvers for BLE / Serial notifications
 let rxBuffer: number[] = [];
@@ -371,18 +371,14 @@ export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> 
         writeChar: foundWriteChar,
         notifyChar: foundNotifyChar,
     };
-    currentDeviceName = device.name || 'NIIMBOT B2 Pro (Bluetooth)';
+    currentDeviceName = device.name || 'NIIMBOT B21 (Bluetooth)';
     currentTransport = 'bluetooth';
 
-    // B2 Pro is native 300 DPI; standard B2 (without Pro) is 203 DPI
-    if (
-        currentDeviceName.toLowerCase().includes('b2-') &&
-        !currentDeviceName.toLowerCase().includes('pro')
-    ) {
-        currentDpi = 203;
-    } else {
-        currentDpi = 300;
-    }
+    // NIIMBOT B21 / B21S / B2 / B1 / D1 are 203 DPI (8 dots/mm)
+    // Only models explicitly marked 'Pro' (e.g. B21 Pro, B2 Pro) are 300 DPI
+    const nameLower = currentDeviceName.toLowerCase();
+    const isPro = nameLower.includes('pro');
+    currentDpi = isPro ? 300 : 203;
 
     // Handshake sequence from cPrinterControl::connectBluetoothPrinter:
     // 1. openConnect (0xC1 [0x01]) -> expects 0xC2 (printer beeps!)
@@ -435,9 +431,9 @@ export async function connectNiimbotSerial(): Promise<NiimbotConnectionInfo> {
     }
 
     activeSerial = { port, writer, reader };
-    currentDeviceName = 'NIIMBOT B2 Pro (USB)';
+    currentDeviceName = 'NIIMBOT B21 (USB)';
     currentTransport = 'serial';
-    currentDpi = 300;
+    currentDpi = 203;
 
     // Send Connect handshake packet (0xC1, [0x01])
     await sendCommandWaitAck(0xc1, [0x01], 0xc2, 350);
@@ -549,7 +545,7 @@ function drawNiimbotLabelRegion(
     const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.1 : 2.4) * scaleFactor * 10) / 10);
     const priceFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.0 : 3.4) * scaleFactor * 10) / 10);
 
-    const ptToPx = (pt: number) => Math.max(10, Math.round(pt * 0.0352778 * dotsPerCm));
+    const ptToPx = (pt: number) => Math.max(8, Math.round(pt * 0.0352778 * dotsPerCm));
     const storeFontPx = ptToPx(storeFontPt);
     const skuFontPx = ptToPx(skuFontPt);
     const nameFontPx = ptToPx(nameFontPt);
@@ -569,8 +565,8 @@ function drawNiimbotLabelRegion(
 
     // Side & vertical padding calibrated so content stays well inside the physical sticker cut
     const sidePadDots = Math.round((isTiny ? 0.1 : 0.15) * dotsPerCm);
-    const topPadDots = Math.round((isTiny ? 0.05 : 0.12) * dotsPerCm);
-    const bottomMarginDots = Math.max(isTiny ? 10 : 16, Math.round(Math.min(0.255, hCm * (isTiny ? 0.06 : 0.085)) * dotsPerCm));
+    const topPadDots = Math.round((isTiny ? 0.04 : 0.12) * dotsPerCm);
+    const bottomMarginDots = Math.max(isTiny ? 6 : 12, Math.round(Math.min(0.255, hCm * (isTiny ? 0.05 : 0.085)) * dotsPerCm));
     const printableBottomDots = heightDots - bottomMarginDots;
 
     const bottomRowFontH = Math.max(
@@ -584,7 +580,7 @@ function drawNiimbotLabelRegion(
     const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
     const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
     const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
-    const barcodeGapDots = Math.max(3, Math.round((isTiny ? 0.03 : 0.04) * dotsPerCm));
+    const barcodeGapDots = Math.max(2, Math.round((isTiny ? 0.025 : 0.04) * dotsPerCm));
 
     const totalTextH = storeLineH + skuLineH + nameLineH;
     const maxAvailableBarcodeH = hasBottomLine
@@ -592,7 +588,7 @@ function drawNiimbotLabelRegion(
         : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
 
     const targetBarcodeH = Math.round(hCm * (isTiny ? 0.32 : 0.38) * dotsPerCm);
-    const barcodeHeightDots = Math.max(22, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+    const barcodeHeightDots = Math.max(18, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
@@ -722,15 +718,14 @@ function encodeSheetToNiimbotRows(
 
         if (slotCount === 2) {
             // Physical 40x30 mm split roll has:
-            // - Top sticker: 0..13.5 mm (~160 dots)
-            // - Inter-label die cut gap: ~1.8 mm (~21 dots)
-            // - Bottom sticker: 15.5..28.5 mm (~183..336 dots)
-            // - Sensor cutoff at ~28.8 mm
-            // Calibrating topY and slotHDots keeps each slot safely inside its physical sticker!
+            // - Top sticker: 0..13.5 mm (~110 dots at 203 DPI)
+            // - Inter-label die cut gap: ~1.5 - 2 mm (~14 dots at 203 DPI)
+            // - Bottom sticker: 15.5..28.5 mm (~126..230 dots at 203 DPI)
+            // - 30 mm roll finishes at 240 dots at 203 DPI (or 354 dots at 300 DPI)
             const slotTopY = i === 0
-                ? Math.round(0.05 * dotsPerCm) // 0.5 mm from top
-                : Math.round((slotHCm + 0.05) * dotsPerCm); // 15.5 mm (clears inter-label gap)
-            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.15 : 0.20)) * dotsPerCm);
+                ? Math.round(0.04 * dotsPerCm) // 0.4 mm (~3 dots at 203 DPI)
+                : Math.round((slotHCm + 0.08) * dotsPerCm); // 15.8 mm (~126 dots at 203 DPI, clears middle gap!)
+            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.12 : 0.18)) * dotsPerCm);
             const slotHCmEffective = slotHDots / dotsPerCm;
 
             ctx.translate(0, slotTopY);
@@ -880,141 +875,88 @@ async function sendNiimbotPage(
         );
     }
 
-    // 4. Package bitmap rows into 200-row chunks (exact match to cPrinterV5::commitJob @ 0xff288..0xff440)
-    // In packageOneColorData (@ 0x1bf0b8):
+    // 4. Package bitmap rows into run-length packets (exact match to Cb21Printer::commitJob in libjcPrinterSdk.dylib)
+    // Run-length encoding collapses blank lines (0x84) and repeated lines (0x85)
     // - cnt0 = black pixels in x = 0..191   (bytes 0..23)
     // - cnt1 = black pixels in x = 192..383 (bytes 24..47)
     // - cnt2 = black pixels in x >= 384     (bytes 48..)
-    const CHUNK_ROW_LIMIT = 200;
-    const chunks: Array<{
-        startRow: number;
-        lastRow: number;
-        packets: Uint8Array[];
-    }> = [];
+    const packets: Uint8Array[] = [];
+    let y = 0;
 
-    for (let chunkStart = 0; chunkStart < effectiveHeight; chunkStart += CHUNK_ROW_LIMIT) {
-        const chunkEnd = Math.min(effectiveHeight, chunkStart + CHUNK_ROW_LIMIT);
-        const packets: Uint8Array[] = [];
-        let y = chunkStart;
-
-        while (y < chunkEnd) {
-            const row = rows[y];
-            let totalBits = 0;
-            for (let i = 0; i < bytesPerRow; i++) {
-                totalBits += popcount8(row[i]);
-            }
-
-            if (totalBits === 0) {
-                let blankCount = 1;
-                while (y + blankCount < chunkEnd && blankCount < 200) {
-                    const nextRow = rows[y + blankCount];
-                    let nextHasBits = false;
-                    for (let i = 0; i < bytesPerRow; i++) {
-                        if (nextRow[i] !== 0) {
-                            nextHasBits = true;
-                            break;
-                        }
-                    }
-                    if (nextHasBits) break;
-                    blankCount++;
-                }
-
-                packets.push(
-                    buildNiimbotPacket(0x84, [
-                        (y >> 8) & 0xff,
-                        y & 0xff,
-                        blankCount & 0xff,
-                    ])
-                );
-                y += blankCount;
-            } else {
-                let repeatCount = 1;
-                while (y + repeatCount < chunkEnd && repeatCount < 200) {
-                    const nextRow = rows[y + repeatCount];
-                    let identical = true;
-                    for (let i = 0; i < bytesPerRow; i++) {
-                        if (nextRow[i] !== row[i]) {
-                            identical = false;
-                            break;
-                        }
-                    }
-                    if (!identical) break;
-                    repeatCount++;
-                }
-
-                let cnt0 = 0;
-                let cnt1 = 0;
-                let cnt2 = 0;
-                for (let i = 0; i < bytesPerRow; i++) {
-                    const bits = popcount8(row[i]);
-                    if (i < 24) cnt0 += bits;
-                    else if (i < 48) cnt1 += bits;
-                    else cnt2 += bits;
-                }
-
-                const payload = new Uint8Array(6 + bytesPerRow);
-                payload[0] = (y >> 8) & 0xff;
-                payload[1] = y & 0xff;
-                payload[2] = cnt0 & 0xff;
-                payload[3] = cnt1 & 0xff;
-                payload[4] = cnt2 & 0xff;
-                payload[5] = repeatCount & 0xff;
-                payload.set(row, 6);
-
-                packets.push(buildNiimbotPacket(0x85, payload));
-                y += repeatCount;
-            }
+    while (y < effectiveHeight) {
+        const row = rows[y];
+        let totalBits = 0;
+        for (let i = 0; i < bytesPerRow; i++) {
+            totalBits += popcount8(row[i]);
         }
 
-        chunks.push({
-            startRow: chunkStart,
-            lastRow: chunkEnd - 1,
-            packets,
-        });
+        if (totalBits === 0) {
+            let blankCount = 1;
+            while (y + blankCount < effectiveHeight && blankCount < 250) {
+                const nextRow = rows[y + blankCount];
+                let nextHasBits = false;
+                for (let i = 0; i < bytesPerRow; i++) {
+                    if (nextRow[i] !== 0) {
+                        nextHasBits = true;
+                        break;
+                    }
+                }
+                if (nextHasBits) break;
+                blankCount++;
+            }
+
+            packets.push(
+                buildNiimbotPacket(0x84, [
+                    (y >> 8) & 0xff,
+                    y & 0xff,
+                    blankCount & 0xff,
+                ])
+            );
+            y += blankCount;
+        } else {
+            let repeatCount = 1;
+            while (y + repeatCount < effectiveHeight && repeatCount < 250) {
+                const nextRow = rows[y + repeatCount];
+                let identical = true;
+                for (let i = 0; i < bytesPerRow; i++) {
+                    if (nextRow[i] !== row[i]) {
+                        identical = false;
+                        break;
+                    }
+                }
+                if (!identical) break;
+                repeatCount++;
+            }
+
+            let cnt0 = 0;
+            let cnt1 = 0;
+            let cnt2 = 0;
+            for (let i = 0; i < bytesPerRow; i++) {
+                const bits = popcount8(row[i]);
+                if (i < 24) cnt0 += bits;
+                else if (i < 48) cnt1 += bits;
+                else cnt2 += bits;
+            }
+
+            const payload = new Uint8Array(6 + bytesPerRow);
+            payload[0] = (y >> 8) & 0xff;
+            payload[1] = y & 0xff;
+            payload[2] = cnt0 & 0xff;
+            payload[3] = cnt1 & 0xff;
+            payload[4] = cnt2 & 0xff;
+            payload[5] = repeatCount & 0xff;
+            payload.set(row, 6);
+
+            packets.push(buildNiimbotPacket(0x85, payload));
+            y += repeatCount;
+        }
     }
 
-    // 5. Send each 200-row chunk with 0xD3 verification and 0x86 (jcAskAfterPause) flush/retry
-    // In cPrinterV5::commitJob (@ 0xfff84..0x1004ec):
-    // - After sending a chunk, wait up to 256ms for 0xD3 notification
-    // - If no 0xD3 notification (especially on the final <200-row chunk!), call jcAskAfterPause (0x86 [lastRow_hi, lastRow_lo, 0x01]) -> expects 0xD3
-    // - If 0xD3 data[2] === 2, resend the chunk!
-    for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
-        const chunk = chunks[cIdx];
-        let retries = 0;
-
-        while (retries < 5) {
-            lastReceivedPackets.delete(0xd3);
-            const spontaneousD3 = waitForPacket(0xd3, 260);
-
-            for (const pkt of chunk.packets) {
-                await sendRawPacket(pkt);
-                await sleep(currentTransport === 'bluetooth' ? 8 : 2);
-            }
-
-            let d3Resp = await spontaneousD3;
-            if (!d3Resp) {
-                // Active query: cPrinterV5::jcAskAfterPause (0x86, [lastRow_hi, lastRow_lo, 0x01])
-                d3Resp = await sendCommandWaitAck(
-                    0x86,
-                    [
-                        (chunk.lastRow >> 8) & 0xff,
-                        chunk.lastRow & 0xff,
-                        0x01,
-                    ],
-                    0xd3,
-                    400
-                );
-            }
-
-            // If printer responds with 0xD3 status === 2 ("开始的...行需要重发"), resend this chunk
-            if (d3Resp && d3Resp.data.length >= 3 && d3Resp.data[2] === 0x02) {
-                retries++;
-                await sleep(50);
-                continue;
-            }
-
-            break;
-        }
+    // 5. Send packets sequentially with paced delay (matches Cb21Printer::commitJob loop in libjcPrinterSdk.dylib)
+    // Pacing at 6ms (BLE) / 2ms (USB) gives printer MCU time to burn each line without buffer overruns or 0x86 stalls
+    for (const pkt of packets) {
+        await sendRawPacket(pkt);
+        await sleep(currentTransport === 'bluetooth' ? 6 : 2);
     }
 
     // 6. PageEnd / jcSetPageTerminal (0xE3, [0x01]) -> expects 0xE4

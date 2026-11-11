@@ -70,12 +70,12 @@ export default function BarcodePrintModal({
   const [showAllSelector, setShowAllSelector] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
 
-  // Direct NIIMBOT B2 Pro Web Bluetooth / Web Serial states
+  // Direct NIIMBOT B21 / B2 Pro Web Bluetooth / Web Serial states
   const [niimbotConn, setNiimbotConn] = useState<NiimbotConnectionInfo>(() =>
     getNiimbotConnectionInfo()
   );
   const [niimbotDensity, setNiimbotDensity] = useState<number>(3);
-  const [niimbotDpiState, setNiimbotDpiState] = useState<203 | 300>(300);
+  const [niimbotDpiState, setNiimbotDpiState] = useState<203 | 300>(203);
   const [isDirectPrinting, setIsDirectPrinting] = useState(false);
   const [directPrintStatus, setDirectPrintStatus] = useState<string>('');
   const [directPrintError, setDirectPrintError] = useState<string>('');
@@ -1129,7 +1129,7 @@ export default function BarcodePrintModal({
               </button>
             </div>
 
-            {/* Direct Connection & 1-Click Print Bar for NIIMBOT B2 Pro */}
+            {/* Direct Connection & 1-Click Print Bar for NIIMBOT B21 / B2 Pro */}
             {config.printerProfile === 'niimbot_b21_pro' && (
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white border border-purple-700/60 shadow-lg space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1144,7 +1144,7 @@ export default function BarcodePrintModal({
                     <span className="text-xs sm:text-sm font-extrabold">
                       {niimbotConn.connected
                         ? `เชื่อมต่อแล้ว: ${niimbotConn.deviceName} (${niimbotDpiState} DPI)`
-                        : 'โหมดสั่งปริ้นตรงเข้า NIIMBOT B2 Pro จากหน้าเว็บทันที (ไม่ต้องโหลดไฟล์)'}
+                        : 'โหมดสั่งปริ้นตรงเข้า NIIMBOT B21 / B2 Pro จากหน้าเว็บทันที (ไม่ต้องโหลดไฟล์)'}
                     </span>
                   </div>
 
@@ -1158,7 +1158,7 @@ export default function BarcodePrintModal({
                           className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition active:scale-95"
                         >
                           <Bluetooth className="w-3.5 h-3.5" />
-                          <span>เชื่อมต่อ Bluetooth (B2 Pro)</span>
+                          <span>เชื่อมต่อ Bluetooth (B21 / B2 Pro)</span>
                         </button>
                         <button
                           type="button"
@@ -1205,8 +1205,8 @@ export default function BarcodePrintModal({
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <span className="font-semibold text-slate-300">ความละเอียดหัวพิมพ์:</span>
-                      {([300, 203] as const).map((dpiVal) => (
+                      <span className="font-semibold text-slate-300">ความละเอียด:</span>
+                      {([203, 300] as const).map((dpiVal) => (
                         <button
                           key={dpiVal}
                           type="button"
@@ -1216,18 +1216,18 @@ export default function BarcodePrintModal({
                           }}
                           className={`px-2 py-0.5 rounded-lg font-bold transition ${
                             niimbotDpiState === dpiVal
-                              ? 'bg-purple-500 text-white'
+                              ? 'bg-purple-500 text-white shadow'
                               : 'bg-white/10 text-slate-300 hover:bg-white/20'
                           }`}
                         >
-                          {dpiVal} DPI {dpiVal === 300 ? '(B2 Pro)' : ''}
+                          {dpiVal} DPI {dpiVal === 203 ? '(B21 มาตรฐาน)' : '(B2 Pro)'}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <span className="text-[11px] text-amber-300/90">
-                    💡 หากเปิดแอป NIIMBOT บนคอมอยู่ ให้กดตัดการเชื่อมต่อในแอป NIIMBOT ก่อนเพื่อให้หน้าเว็บจับสัญญาณ B2 Pro ได้ทันที
+                    💡 NIIMBOT B21 มาตรฐานคือ 203 DPI (8 จุด/มม.) • หากเปิดแอป NIIMBOT บนคอมอยู่ ให้กดตัดการเชื่อมต่อในแอปก่อน
                   </span>
                 </div>
 
@@ -1974,7 +1974,7 @@ export default function BarcodePrintModal({
                 onClick={handleDirectNiimbotPrint}
                 disabled={totalLabels === 0 || isDirectPrinting}
                 className="flex-1 sm:flex-initial px-5 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 active:scale-95 transition"
-                title="สั่งปริ้นตรงเข้าเครื่อง NIIMBOT B2 Pro ผ่าน Bluetooth / USB ทันที ไม่ต้องโหลดไฟล์"
+                title="สั่งปริ้นตรงเข้าเครื่อง NIIMBOT B21 / B2 Pro ผ่าน Bluetooth / USB ทันที ไม่ต้องโหลดไฟล์"
               >
                 {isDirectPrinting ? (
                   <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
@@ -1983,10 +1983,10 @@ export default function BarcodePrintModal({
                 )}
                 <span>
                   {isDirectPrinting
-                    ? 'กำลังปริ้นออก B2 Pro...'
+                    ? 'กำลังปริ้นออก NIIMBOT...'
                     : config.splitSheet
-                    ? `ปริ้นออก NIIMBOT B2 Pro ทันที (${totalLabels} ดวง • ${totalSheets} แผ่น)`
-                    : `ปริ้นออก NIIMBOT B2 Pro ทันที (${totalLabels} ดวง)`}
+                    ? `ปริ้นออก NIIMBOT ทันที (${totalLabels} ดวง • ${totalSheets} แผ่น)`
+                    : `ปริ้นออก NIIMBOT ทันที (${totalLabels} ดวง)`}
                 </span>
               </button>
             )}
