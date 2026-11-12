@@ -134,6 +134,7 @@ export function suggestAbbreviation(
       CABOCHON: ['CAB', 'CBC', 'CABO'],
       CARVED: ['CRV', 'CVD', 'CARV'],
       TUMBLE: ['TUM', 'TMB', 'TUMB'],
+      TUMBLED: ['TUM', 'TMB', 'TUMB'],
       PYRAMID: ['PYR', 'PRM', 'PYRM'],
       BRACELET: ['BRC', 'BRL', 'BRAC'],
       CLUSTER: ['CLU', 'CLS', 'CLST'],
@@ -349,7 +350,27 @@ export function getStoneShapes(): StoneShapeItem[] {
       return sorted;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return sortAlphabetically(parsed);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      let migrated = false;
+      const updated = parsed.map((item: StoneShapeItem) => {
+        if (
+          item.id.toLowerCase() === 'tumble' ||
+          (item.label.toLowerCase().includes('tumble') && !item.label.toLowerCase().includes('tumbled'))
+        ) {
+          migrated = true;
+          return {
+            ...item,
+            id: 'Tumbled',
+            label: item.label.replace(/tumble(?!d)/gi, 'Tumbled'),
+          };
+        }
+        return item;
+      });
+      if (migrated) {
+        localStorage.setItem(LS_SHAPES_KEY, JSON.stringify(sortAlphabetically(updated)));
+      }
+      return sortAlphabetically(updated);
+    }
   } catch (e) {
     console.warn('Error reading shapes from localStorage:', e);
   }

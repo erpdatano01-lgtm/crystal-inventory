@@ -181,7 +181,7 @@ export const STONE_SHAPES = [
   { id: 'Raw', code: 'RAW', label: 'Raw / Specimen (หินดิบ)', desc: 'หินดิบ ผลึกธรรมชาติ ก้อนแร่สะสม' },
   { id: 'Sphere', code: 'SPH', label: 'Sphere (ทรงกลม)', desc: 'หินเจียทรงกลม ลูกแก้ว' },
   { id: 'Tower', code: 'TOW', label: 'Tower (แท่ง/เสา)', desc: 'หินทรงแท่งปลายแหลม ตั้งโต๊ะ' },
-  { id: 'Tumble', code: 'TUM', label: 'Tumble (หินก้อนขัดเงา)', desc: 'หินก้อนกลิ้งขัดมัน พกพา' },
+  { id: 'Tumbled', code: 'TUM', label: 'Tumbled (หินก้อนขัดเงา)', desc: 'หินก้อนกลิ้งขัดมัน พกพา' },
 ] as const;
 
 export const STONE_TYPES = [

@@ -21,7 +21,7 @@ export const DEFAULT_STONE_SHAPES: StoneShapeItem[] = [
   { id: 'Raw', code: 'RAW', label: 'Raw / Specimen (หินดิบ)', desc: 'หินดิบ ผลึกธรรมชาติ ก้อนแร่สะสม', isDefault: true },
   { id: 'Sphere', code: 'SPH', label: 'Sphere (ทรงกลม)', desc: 'หินเจียทรงกลม ลูกแก้ว', isDefault: true },
   { id: 'Tower', code: 'TOW', label: 'Tower (แท่ง/เสา)', desc: 'หินทรงแท่งปลายแหลม ตั้งโต๊ะ', isDefault: true },
-  { id: 'Tumble', code: 'TUM', label: 'Tumble (หินก้อนขัดเงา)', desc: 'หินก้อนกลิ้งขัดมัน พกพา', isDefault: true },
+  { id: 'Tumbled', code: 'TUM', label: 'Tumbled (หินก้อนขัดเงา)', desc: 'หินก้อนกลิ้งขัดมัน พกพา', isDefault: true },
 ];
 
 export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [

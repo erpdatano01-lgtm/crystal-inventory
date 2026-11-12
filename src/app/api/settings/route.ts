@@ -23,6 +23,22 @@ let cachedSettings: {
   updatedAt: string;
 } | null = null;
 
+function sanitizeShapes(shapes: StoneShapeItem[]): StoneShapeItem[] {
+  return shapes.map((s) => {
+    if (
+      s.id.toLowerCase() === 'tumble' ||
+      (s.label.toLowerCase().includes('tumble') && !s.label.toLowerCase().includes('tumbled'))
+    ) {
+      return {
+        ...s,
+        id: 'Tumbled',
+        label: s.label.replace(/tumble(?!d)/gi, 'Tumbled'),
+      };
+    }
+    return s;
+  });
+}
+
 function sanitizeStones(stones: StoneTypeItem[]): StoneTypeItem[] {
   return stones.map((s) => {
     if (
@@ -73,7 +89,7 @@ export async function GET() {
           const parsed = JSON.parse(raw);
 
           const shapes = Array.isArray(parsed.shapes) && parsed.shapes.length > 0
-            ? sortAlphabetically(parsed.shapes as StoneShapeItem[])
+            ? sortAlphabetically(sanitizeShapes(parsed.shapes as StoneShapeItem[]))
             : sortAlphabetically(DEFAULT_STONE_SHAPES);
 
           const stones = Array.isArray(parsed.stones) && parsed.stones.length > 0
@@ -147,7 +163,7 @@ export async function POST(request: Request) {
     const { shapes, stones, hideCost } = body;
 
     const cleanShapes = Array.isArray(shapes) && shapes.length > 0
-      ? sortAlphabetically(shapes as StoneShapeItem[])
+      ? sortAlphabetically(sanitizeShapes(shapes as StoneShapeItem[]))
       : sortAlphabetically(DEFAULT_STONE_SHAPES);
 
     const cleanStones = Array.isArray(stones) && stones.length > 0

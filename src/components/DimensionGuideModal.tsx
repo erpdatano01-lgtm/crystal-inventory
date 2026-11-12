@@ -272,17 +272,17 @@ export default function DimensionGuideButton({
                 </div>
               </div>
 
-              {/* 4. PALM / CABOCHON / FACETED / TUMBLE */}
+              {/* 4. PALM / CABOCHON / FACETED / TUMBLED */}
               <div
                 className={`p-4 rounded-2xl border-2 transition ${
-                  ['Palm', 'Cabochon', 'Faceted', 'Tumble'].includes(activeShape)
+                  ['Palm', 'Cabochon', 'Faceted', 'Tumbled', 'Tumble'].includes(activeShape)
                     ? 'border-purple-500 bg-purple-50/40'
                     : 'border-slate-200 bg-slate-50/60'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-extrabold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                    4. Palm / Cabochon / Faceted / Tumble
+                    4. Palm / Cabochon / Faceted / Tumbled
                   </span>
                   <span className="text-[11px] font-mono font-bold text-slate-500">
                     [PLM/CAB/FAC/TUM]
@@ -355,7 +355,7 @@ export default function DimensionGuideButton({
               </div>
               <ul className="list-disc list-inside text-slate-700 space-y-1 pl-1">
                 <li>
-                  <strong>หินชิ้นเล็ก / หินเจียทำเครื่องประดับ (Cabochon, Faceted, Tumble, Sphere ลูกเล็ก):</strong> ใช้หน่วย{' '}
+                  <strong>หินชิ้นเล็ก / หินเจียทำเครื่องประดับ (Cabochon, Faceted, Tumbled, Sphere ลูกเล็ก):</strong> ใช้หน่วย{' '}
                   <span className="font-mono font-bold text-purple-800 bg-white px-1.5 py-0.5 rounded border">mm (มิลลิเมตร)</span> เช่น <code className="font-bold">18 x 14 x 6 mm</code> (10 mm = 1 cm)
                 </li>
                 <li>

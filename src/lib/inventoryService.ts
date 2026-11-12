@@ -169,7 +169,7 @@ export function inferShapeFromSkuOrName(sku?: string, name?: string): string {
   if (upper.startsWith('CAB-') || upper.startsWith('CAB')) return 'Cabochon';
   if (upper.startsWith('RAW-') || upper.startsWith('RAW')) return 'Raw';
   if (upper.startsWith('SPH-') || upper.startsWith('SPH')) return 'Sphere';
-  if (upper.startsWith('TUM-') || upper.startsWith('TUM')) return 'Tumble';
+  if (upper.startsWith('TUM-') || upper.startsWith('TUM')) return 'Tumbled';
   if (upper.startsWith('TOW-') || upper.startsWith('TOW')) return 'Tower';
   if (upper.startsWith('CRV-') || upper.startsWith('CRV')) return 'Carved';
   if (upper.startsWith('FAC-') || upper.startsWith('FAC')) return 'Faceted';
@@ -179,7 +179,7 @@ export function inferShapeFromSkuOrName(sku?: string, name?: string): string {
   if (n.includes('cabochon') || n.includes('หลังเบี้ย')) return 'Cabochon';
   if (n.includes('raw') || n.includes('specimen') || n.includes('ดิบ')) return 'Raw';
   if (n.includes('sphere') || n.includes('กลม')) return 'Sphere';
-  if (n.includes('tumble') || n.includes('ทัมเบิล')) return 'Tumble';
+  if (n.includes('tumbled') || n.includes('tumble') || n.includes('ทัมเบิล')) return 'Tumbled';
   if (n.includes('tower') || n.includes('แท่ง') || n.includes('เสา')) return 'Tower';
   if (n.includes('carved') || n.includes('แกะสลัก')) return 'Carved';
   if (n.includes('faceted') || n.includes('เหลี่ยม')) return 'Faceted';

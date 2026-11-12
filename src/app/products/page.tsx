@@ -1246,7 +1246,7 @@ export default function ProductsPage() {
                           : editForm.sku?.startsWith('PLM')
                           ? 'Palm'
                           : editForm.sku?.startsWith('TUM')
-                          ? 'Tumble'
+                          ? 'Tumbled'
                           : editForm.sku?.startsWith('FAC')
                           ? 'Faceted'
                           : editForm.sku?.startsWith('CRV')
