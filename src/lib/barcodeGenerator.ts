@@ -119,7 +119,7 @@ export const DEFAULT_BARCODE_CONFIG: BarcodeLabelConfig = {
   columnGapCm: 0.2,
   offsetXMm: 0,
   offsetYMm: 0,
-  showStoreName: true,
+  showStoreName: false,
   showStoneName: true,
   showWeightAndDim: true,
   showPrice: true,

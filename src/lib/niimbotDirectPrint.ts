@@ -537,13 +537,13 @@ function drawNiimbotLabelRegion(
     const minDim = Math.min(wCm, hCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
-    // Proportional metrics tuned to guarantee all 5 lines (Barcode, SKU, Name, Divider, Specs)
-    // fit inside short labels (e.g. 1.5 cm) without pushing the bottom line into the gap sensor.
+    // Proportional metrics tuned to guarantee all lines (Stone Name, Barcode, SKU, Divider, Specs)
+    // fill the label nicely without leaving an empty bottom void or pushing into the gap sensor.
     const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.0 : 2.5) * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.3) * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.1 : 2.7) * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(4.0, Math.round(minDim * (isTiny ? 1.9 : 2.4) * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.4) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(5.5, Math.round(minDim * (isTiny ? 2.8 : 3.0) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.2, Math.round(minDim * (isTiny ? 2.7 : 3.3) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.2 : 2.4) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.4, Math.round(minDim * (isTiny ? 2.8 : 3.4) * scaleFactor * 10) / 10);
 
     const ptToPx = (pt: number) => Math.max(8, Math.round(pt * 0.0352778 * dotsPerCm));
     const storeFontPx = ptToPx(storeFontPt);
@@ -587,8 +587,8 @@ function drawNiimbotLabelRegion(
         ? dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots
         : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
 
-    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.22 : 0.38) * dotsPerCm);
-    const barcodeHeightDots = Math.max(isTiny ? 14 : 18, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.28 : 0.38) * dotsPerCm);
+    const barcodeHeightDots = Math.max(isTiny ? 16 : 18, Math.min(targetBarcodeH, maxAvailableBarcodeH));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
@@ -597,11 +597,18 @@ function drawNiimbotLabelRegion(
     let currentY = topPadDots;
     const innerW = widthDots - sidePadDots * 2;
 
-    // 1. Store Name
+    // Optional: Store Name (only if explicitly checked by user, placed above stone name)
     if (config.showStoreName) {
         ctx.font = `900 ${storeFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         ctx.fillText('VIVIDA CRYSTAL', widthDots / 2, currentY, innerW);
         currentY += storeLineH;
+    }
+
+    // 1. Stone Name (Primary header at the very top of label)
+    if (config.showStoneName) {
+        ctx.font = `800 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.fillText(product.stone_type || product.name, widthDots / 2, currentY, innerW);
+        currentY += nameLineH;
     }
 
     // 2. Crisp Code 128 Barcode Bars
@@ -618,27 +625,14 @@ function drawNiimbotLabelRegion(
     });
     currentY += barcodeHeightDots + barcodeGapDots;
 
-    // 3. SKU Line
+    // 3. SKU Line (Directly below barcode bars)
     if (config.showSkuText) {
         ctx.font = `900 ${skuFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillText(product.sku, widthDots / 2, currentY, innerW);
         currentY += skuLineH;
     }
 
-    // 4. Stone Name
-    if (config.showStoneName) {
-        ctx.font = `800 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText(product.stone_type || product.name, widthDots / 2, currentY, innerW);
-        currentY += nameLineH;
-    }
-
-    // 5. Weight / Dimensions & Selling Price
-    // In tiny or split labels (<= 1.8 cm slot height), we must position the divider and bottom specs line
-    // sequentially right after the stone name (with tight padding).
-    // Why? Because physical thermal label printers have an optical gap sensor located ~4.5 mm before the tear bar.
-    // When printing a 3.0 cm label, any line placed past 25.5 mm falls directly into the sensor's cutoff zone!
-    // Stacking sequentially right below the stone name guarantees that ALL 5 lines finish within ~8.8 mm
-    // (i.e. Slot 1 ends at ~23.8 mm from the top of the roll), keeping it safely before the 25.5 mm gap sensor cutoff!
+    // 4. Weight / Dimensions & Selling Price with Divider Line
     const sequentialDividerY = currentY + dividerGap;
     const sequentialBottomY = sequentialDividerY + dividerGap + 1;
     const actualDividerY = isTiny ? sequentialDividerY : Math.min(sequentialDividerY, dividerY);
@@ -732,13 +726,12 @@ function encodeSheetToNiimbotRows(
             // - Top sticker: 0..14 mm
             // - Inter-label die cut gap: ~14..14.5 mm
             // - Bottom sticker: 14.5..28.5 mm
-            // - Physical optical gap sensor shutoff zone: starts at ~24.5..25.0 mm
-            // Starting Slot 1 at 14.5 mm and stacking sequentially ensures all 5 lines finish by ~23.4 mm,
-            // safely inside the active thermal firing zone before the hardware gap sensor cutoff!
+            // Starting Slot 1 at 14.4 mm and balancing layout ensures the content fills ~11.5 mm of each sticker,
+            // avoiding empty bottom voids while safely finishing before the hardware gap sensor cutoff!
             const slotTopY = i === 0
-                ? Math.round(0.02 * dotsPerCm) // 0.2 mm from top
-                : Math.round((slotHCm - 0.05) * dotsPerCm); // 14.5 mm (clears middle gap!)
-            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.08 : 0.14)) * dotsPerCm);
+                ? Math.round(0.04 * dotsPerCm) // 0.4 mm from top
+                : Math.round((slotHCm - 0.06) * dotsPerCm); // 14.4 mm (clears middle gap!)
+            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.08 : 0.12)) * dotsPerCm);
             const slotHCmEffective = slotHDots / dotsPerCm;
 
             ctx.translate(0, slotTopY);
@@ -1070,4 +1063,135 @@ export async function printDirectToNiimbotB2Pro(
     // 3. PrintEnd / jcSetPrintTerminal (0xF3, [0x01] -> expects 0xF4)
     await sleep(100);
     await sendCommandWaitAck(0xf3, [0x01], 0xf4, 400);
+}
+
+/**
+ * Print a physical calibration ruler (0 to 30 mm) directly to NIIMBOT B21
+ * Allows the user to see the exact millimeter mark where thermal cutoff occurs on their machine.
+ */
+export async function printNiimbotRulerTest(options?: {
+    dpi?: 203 | 300;
+    density?: number;
+    onProgress?: (msg: string) => void;
+}): Promise<void> {
+    const info = getNiimbotConnectionInfo();
+    if (!info.connected) {
+        await connectNiimbotBluetooth();
+    }
+
+    const dpi = options?.dpi ?? currentDpi;
+    const density = Math.min(5, Math.max(1, options?.density ?? 3));
+    const dotsPerMm = dpi === 300 ? 300 / 25.4 : 8;
+    const widthMm = 40;
+    const heightMm = 30;
+
+    const rawLabelDotsW = Math.round(widthMm * dotsPerMm);
+    const widthDots = Math.ceil(rawLabelDotsW / 8) * 8;
+    const heightDots = Math.round(heightMm * dotsPerMm);
+    const bytesPerRow = widthDots / 8;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = widthDots;
+    canvas.height = heightDots;
+    const ctx = canvas.getContext('2d')!;
+
+    // Pure white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, widthDots, heightDots);
+
+    ctx.fillStyle = '#000000';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, Math.round(dotsPerMm * 0.12));
+
+    // Draw millimeter ruler tick marks down left & right edges
+    for (let mm = 0; mm <= 30; mm++) {
+        const y = Math.round(mm * dotsPerMm);
+        if (y >= heightDots) break;
+
+        const isMajor = mm % 5 === 0;
+        const isCritical = mm >= 22;
+        const tickLen = isMajor ? Math.round(dotsPerMm * 4.0) : Math.round(dotsPerMm * 2.0);
+
+        // Left ticks
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(tickLen, y);
+        ctx.stroke();
+
+        // Right ticks
+        ctx.beginPath();
+        ctx.moveTo(widthDots - tickLen, y);
+        ctx.lineTo(widthDots, y);
+        ctx.stroke();
+
+        if (isMajor || isCritical) {
+            ctx.font = `bold ${Math.round(dotsPerMm * 1.7)}px sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${mm}`, tickLen + 3, y);
+
+            ctx.textAlign = 'right';
+            ctx.fillText(`${mm}`, widthDots - tickLen - 3, y);
+        }
+    }
+
+    // Mid die-cut marker at 14.5 mm
+    const midY = Math.round(14.5 * dotsPerMm);
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, midY);
+    ctx.lineTo(widthDots, midY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.font = `bold ${Math.round(dotsPerMm * 1.8)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('---- รอยตัดกึ่งกลาง (14.5 mm) ----', widthDots / 2, midY);
+
+    // Center content for Slot 1 (Top)
+    ctx.textBaseline = 'top';
+    ctx.font = `bold ${Math.round(dotsPerMm * 2.2)}px sans-serif`;
+    ctx.fillText('ไม้บรรทัดวัดระยะพิมพ์ (ดวงบน)', widthDots / 2, Math.round(1.5 * dotsPerMm));
+    ctx.font = `600 ${Math.round(dotsPerMm * 1.8)}px sans-serif`;
+    ctx.fillText('Azurite • CAB-AZU-001', widthDots / 2, Math.round(5.5 * dotsPerMm));
+    ctx.fillText('11g • 3.3x2.2 cm • ฿1,500', widthDots / 2, Math.round(9 * dotsPerMm));
+
+    // Center content for Slot 2 (Bottom)
+    ctx.font = `bold ${Math.round(dotsPerMm * 2.2)}px sans-serif`;
+    ctx.fillText('ไม้บรรทัดวัดระยะพิมพ์ (ดวงล่าง)', widthDots / 2, Math.round(16.0 * dotsPerMm));
+    ctx.font = `600 ${Math.round(dotsPerMm * 1.8)}px sans-serif`;
+    ctx.fillText('Seraphinite • CAB-SER-002', widthDots / 2, Math.round(19.5 * dotsPerMm));
+    ctx.fillText('5g • 3.3x2 cm • ฿850', widthDots / 2, Math.round(22.8 * dotsPerMm));
+
+    ctx.font = `bold ${Math.round(dotsPerMm * 1.5)}px sans-serif`;
+    ctx.fillText('▲ สังเกตตัวเลขสุดท้ายที่ยิงติด ▲', widthDots / 2, Math.round(25.5 * dotsPerMm));
+
+    // Extract rows and send
+    const imgData = ctx.getImageData(0, 0, widthDots, heightDots).data;
+    const rows: Uint8Array[] = [];
+    for (let y = 0; y < heightDots; y++) {
+        const rowBytes = new Uint8Array(bytesPerRow);
+        for (let x = 0; x < widthDots; x++) {
+            const idx = (y * widthDots + x) * 4;
+            const r = imgData[idx];
+            const g = imgData[idx + 1];
+            const b = imgData[idx + 2];
+            const a = imgData[idx + 3];
+            const lum = a < 128 ? 255 : 0.299 * r + 0.587 * g + 0.114 * b;
+            if (lum < 175) {
+                rowBytes[x >> 3] |= 1 << (7 - (x & 7));
+            }
+        }
+        rows.push(rowBytes);
+    }
+
+    options?.onProgress?.('กำลังส่งพิมพ์ไม้บรรทัดวัดระยะ...');
+    await sendCommandWaitAck(0x21, [density], 0x22, 300);
+    await sendCommandWaitAck(0x23, [0x01], 0x24, 300);
+    await startNiimbotPrintJob(1);
+    await sendNiimbotPage({ widthDots, heightDots, bytesPerRow, rows }, 1);
+    await sleep(100);
+    await sendCommandWaitAck(0xf3, [0x01], 0xf4, 400);
+    options?.onProgress?.('พิมพ์ไม้บรรทัดสำเร็จ!');
 }

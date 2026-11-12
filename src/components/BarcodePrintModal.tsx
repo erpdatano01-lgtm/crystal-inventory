@@ -20,6 +20,7 @@ import {
   disconnectNiimbot,
   getNiimbotConnectionInfo,
   printDirectToNiimbotB2Pro,
+  printNiimbotRulerTest,
   NiimbotConnectionInfo,
   NiimbotPrintQueueItem,
   setNiimbotDpi,
@@ -213,10 +214,10 @@ export default function BarcodePrintModal({
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
     const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.0 : 2.5) * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.3) * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.1 : 2.7) * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(4.0, Math.round(minDim * (isTiny ? 1.9 : 2.4) * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.6 : 3.4) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(5.5, Math.round(minDim * (isTiny ? 2.8 : 3.0) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.2, Math.round(minDim * (isTiny ? 2.7 : 3.3) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.2 : 2.4) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.4, Math.round(minDim * (isTiny ? 2.8 : 3.4) * scaleFactor * 10) / 10);
 
     const activeInfoLines =
       (config.showStoreName ? 1 : 0) +
@@ -224,8 +225,8 @@ export default function BarcodePrintModal({
       (config.showStoneName ? 1 : 0) +
       (config.showWeightAndDim || config.showPrice ? 1 : 0);
 
-    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.22 : 0.4;
-    const paddingCm = isTiny ? 0.08 : 0.15;
+    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.28 : 0.4;
+    const paddingCm = isTiny ? 0.06 : 0.15;
 
     // Fit barcode into the space left after text lines (prevents overflow on short labels e.g. 1.5 cm)
     const ptToCm = (pt: number) => pt * 0.0352778;
@@ -236,10 +237,10 @@ export default function BarcodePrintModal({
       (config.showWeightAndDim || config.showPrice
         ? ptToCm(Math.max(metaFontPt, priceFontPt)) * 1.05 + 0.05
         : 0);
-    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.06;
-    const targetBarcodeCm = isTiny ? 0.30 : Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
+    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.04;
+    const targetBarcodeCm = isTiny ? 0.38 : Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
     const barcodeHeightCm = Math.max(
-      0.3,
+      0.32,
       Math.round(Math.min(targetBarcodeCm, availableBarcodeCm) * 100) / 100
     );
 
@@ -405,6 +406,32 @@ export default function BarcodePrintModal({
     }
   };
 
+  // Physical calibration ruler print (0 to 30 mm) to see exact cutoff boundary
+  const handlePrintRulerTest = async () => {
+    setDirectPrintError('');
+    setIsDirectPrinting(true);
+    setDirectPrintStatus(`กำลังเตรียมพิมพ์ไม้บรรทัดวัดระยะ (${niimbotDpiState} DPI)...`);
+
+    try {
+      await printNiimbotRulerTest({
+        dpi: niimbotDpiState,
+        density: niimbotDensity,
+        onProgress: (msg) => {
+          setDirectPrintStatus(msg);
+        },
+      });
+      setNiimbotConn(getNiimbotConnectionInfo());
+      setDirectPrintStatus(
+        `✅ พิมพ์ไม้บรรทัดวัดระยะสำเร็จ! ดูตัวเลขขีดมิลลิเมตร (mm) ล่างสุดที่ยิงติดบนกระดาษ จะรู้ระยะตัดความร้อนเป๊ะๆ ครับ`
+      );
+    } catch (err: any) {
+      setDirectPrintStatus('');
+      setDirectPrintError(err?.message || 'เกิดข้อผิดพลาดในการพิมพ์ไม้บรรทัดวัดระยะ');
+    } finally {
+      setIsDirectPrinting(false);
+    }
+  };
+
   // Build HTML and trigger print via hidden iframe for exact cm sizing
   const handlePrintLabels = () => {
     if (totalLabels === 0) {
@@ -442,17 +469,17 @@ export default function BarcodePrintModal({
                 ? `<div class="store-line">VIVIDA CRYSTAL</div>`
                 : ''
             }
+            ${
+              config.showStoneName
+                ? `<div class="name-line">${product.stone_type || product.name}</div>`
+                : ''
+            }
             <div class="barcode-box">
               ${svgMarkup}
             </div>
             ${
               config.showSkuText
                 ? `<div class="sku-line">${product.sku}</div>`
-                : ''
-            }
-            ${
-              config.showStoneName
-                ? `<div class="name-line">${product.stone_type || product.name}</div>`
                 : ''
             }
             ${
@@ -769,11 +796,18 @@ export default function BarcodePrintModal({
       let currentY = padPx;
       const innerW = canvasW - padPx * 2;
 
-      // 1. Store Name
+      // Optional: Store Name (only if enabled, placed above stone name)
       if (config.showStoreName) {
         ctx.font = `800 ${storeFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         ctx.fillText('VIVIDA CRYSTAL', canvasW / 2, currentY, innerW);
         currentY += storeLineH;
+      }
+
+      // 1. Stone Name (Primary header at top)
+      if (config.showStoneName) {
+        ctx.font = `700 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, currentY, innerW);
+        currentY += nameLineH;
       }
 
       // 2. Barcode Bars (Crisp integer pixel coordinates)
@@ -790,25 +824,16 @@ export default function BarcodePrintModal({
       });
       currentY += barcodeH + barcodeGap;
 
-      // 3. SKU Line
+      // 3. SKU Line (Directly below barcode bars)
       if (config.showSkuText) {
         ctx.font = `900 ${skuFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillText(targetProduct.sku, canvasW / 2, currentY, innerW);
         currentY += skuLineH;
       }
 
-      // 4. Stone Name (Guaranteed clean gap before divider line)
-      if (config.showStoneName) {
-        ctx.font = `700 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, currentY, innerW);
-        currentY += nameLineH;
-      }
-
-      // 5. Bottom Meta & Price Line
-      // In tiny or split labels, stack divider & specs directly below stone name so it finishes
-      // well before the physical 25.5 mm gap sensor cutoff
+      // 4. Bottom Meta & Price Line with Divider
       const sequentialDividerY = currentY + dividerGap;
-      const sequentialBottomY = sequentialDividerY + dividerGap + 2;
+      const sequentialBottomY = sequentialDividerY + dividerGap + 1;
       const actualDividerY = isTiny ? sequentialDividerY : Math.min(sequentialDividerY, dividerY);
       const actualBottomY = isTiny ? sequentialBottomY : Math.min(sequentialBottomY, bottomY);
 
@@ -844,9 +869,9 @@ export default function BarcodePrintModal({
         ctx.save();
         if (config.splitSheet && slots.length === 2) {
           const slotTopPx = i === 0
-            ? Math.round(0.02 * pxPerCm)
-            : Math.round((slotHCm - 0.05) * pxPerCm);
-          const slotHPx = Math.round((slotHCm - (i === 0 ? 0.08 : 0.14)) * pxPerCm);
+            ? Math.round(0.04 * pxPerCm)
+            : Math.round((slotHCm - 0.06) * pxPerCm);
+          const slotHPx = Math.round((slotHCm - (i === 0 ? 0.08 : 0.12)) * pxPerCm);
           const slotHCmEffective = slotHPx / pxPerCm;
           ctx.translate(0, slotTopPx);
           ctx.beginPath();
@@ -996,6 +1021,15 @@ export default function BarcodePrintModal({
           </div>
         )}
 
+        {config.showStoneName && (
+          <div
+            style={{ fontSize: `${metrics.nameFontPt}pt` }}
+            className="font-bold leading-tight truncate w-full text-slate-900"
+          >
+            {slotProduct.stone_type || slotProduct.name}
+          </div>
+        )}
+
         {/* Crisp SVG Code 128 Barcode */}
         <div
           style={{ height: `${metrics.barcodeHeightCm}cm` }}
@@ -1026,15 +1060,6 @@ export default function BarcodePrintModal({
             className="font-mono font-black tracking-wide leading-none truncate w-full text-black"
           >
             {slotProduct.sku}
-          </div>
-        )}
-
-        {config.showStoneName && (
-          <div
-            style={{ fontSize: `${metrics.nameFontPt}pt` }}
-            className="font-bold leading-tight truncate w-full text-slate-900"
-          >
-            {slotProduct.stone_type || slotProduct.name}
           </div>
         )}
 
@@ -1346,16 +1371,26 @@ export default function BarcodePrintModal({
                       title="สั่งพิมพ์แผ่นทดสอบที่ 203 DPI (แนะนำสำหรับ B21) ปริ้นครบยันบรรทัดล่างสุด"
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span>พิมพ์เทส 203 DPI (แนะนำ)</span>
+                      <span>พิมพ์เทส 203 DPI</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleTestPrintNiimbot(300)}
                       disabled={isDirectPrinting}
                       className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-xs border border-white/20 transition active:scale-95 disabled:opacity-50"
-                      title="ลองพิมพ์ที่ 300 DPI เพื่อดูความแตกต่าง (จะเห็นว่าสเปกแผ่นล่างหลุดขอบ)"
+                      title="ลองพิมพ์ที่ 300 DPI เพื่อดูความละเอียด"
                     >
                       <span>พิมพ์เทส 300 DPI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePrintRulerTest}
+                      disabled={isDirectPrinting}
+                      className="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                      title="พิมพ์สเกลไม้บรรทัด 0-30 mm เพื่อดูว่าเครื่องพิมพ์ความร้อนยิงติดถึงขีดมิลลิเมตรที่เท่าไร"
+                    >
+                      <Ruler className="w-3.5 h-3.5" />
+                      <span>พิมพ์ไม้บรรทัดวัดระยะ</span>
                     </button>
                   </div>
                 </div>
