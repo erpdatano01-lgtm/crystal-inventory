@@ -26,6 +26,17 @@ let cachedSettings: {
 function sanitizeStones(stones: StoneTypeItem[]): StoneTypeItem[] {
   return stones.map((s) => {
     if (
+      s.id.toLowerCase() === 'bloodston' ||
+      s.label.toLowerCase().includes('bloodston')
+    ) {
+      return {
+        id: 'Bloodstone',
+        code: s.code || 'BLO',
+        label: 'Bloodstone (บลัดสโตน)',
+        isDefault: s.isDefault ?? false,
+      };
+    }
+    if (
       s.id.toLowerCase() === 'chinese alphabet stone' ||
       s.code === 'CAS' ||
       s.label.toLowerCase().includes('chinese alphabet stone')

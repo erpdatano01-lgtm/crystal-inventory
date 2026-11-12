@@ -170,6 +170,7 @@ export function suggestAbbreviation(
       APOPHYLLITE: ['APO', 'APP', 'APOP'],
       AVENTURINE: ['AVE', 'AVN', 'AVEN'],
       AZURITE: ['AZU', 'AZR', 'AZUR'],
+      BLOODSTONE: ['BLO', 'BLD', 'BLDS'],
       AGATE: ['AGA', 'AGT', 'AGAT'],
       ANGELITE: ['ANG', 'AGL', 'ANGL'],
       ARAGONITE: ['ARG', 'ARA', 'ARAG'],
@@ -406,6 +407,18 @@ export function getStoneTypes(): StoneTypeItem[] {
             id: 'Chinese Writing Stone',
             code: 'CWS',
             label: item.label.replace(/Chinese Alphabet Stone/gi, 'Chinese Writing Stone'),
+          };
+        }
+        if (
+          item.id.toLowerCase() === 'bloodston' ||
+          (item.label.toLowerCase().includes('bloodston') && !item.label.toLowerCase().includes('bloodstone'))
+        ) {
+          migrated = true;
+          return {
+            ...item,
+            id: 'Bloodstone',
+            code: item.code || 'BLO',
+            label: item.label.replace(/Bloodston(?!e)/gi, 'Bloodstone'),
           };
         }
         return item;

@@ -190,6 +190,7 @@ export const STONE_TYPES = [
   { id: 'Aquamarine', code: 'AQU', label: 'Aquamarine (อความารีน)' },
   { id: 'Azurite', code: 'AZU', label: 'Azurite (อะซูไรต์)' },
   { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)' },
+  { id: 'Bloodstone', code: 'BLO', label: 'Bloodstone (บลัดสโตน)' },
   { id: 'Blue Lace Agate', code: 'BLA', label: 'Blue Lace Agate (บลูเลซอาเกต)' },
   { id: 'Chinese Writing Stone', code: 'CWS', label: 'Chinese Writing Stone (หินอักษรจีน)' },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)' },
