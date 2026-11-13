@@ -67,7 +67,7 @@ let activeBle: ActiveBleConnection | null = null;
 let activeSerial: ActiveSerialConnection | null = null;
 let currentDeviceName = '';
 let currentTransport: NiimbotTransportType | null = null;
-let currentDpi: 203 | 300 = 203; // Standard NIIMBOT B21 is native 203 DPI (8 dots/mm); B2 Pro is 300 DPI
+let currentDpi: 203 | 300 = 300; // Default to 300 DPI as configured
 
 // Incoming packet buffer and resolvers for BLE / Serial notifications
 let rxBuffer: number[] = [];
@@ -374,11 +374,12 @@ export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> 
     currentDeviceName = device.name || 'NIIMBOT B21 (Bluetooth)';
     currentTransport = 'bluetooth';
 
-    // NIIMBOT B21 / B21S / B2 / B1 / D1 are 203 DPI (8 dots/mm)
-    // Only models explicitly marked 'Pro' (e.g. B21 Pro, B2 Pro) are 300 DPI
+    // Keep current DPI preference (defaults to 300 DPI as requested)
     const nameLower = currentDeviceName.toLowerCase();
     const isPro = nameLower.includes('pro');
-    currentDpi = isPro ? 300 : 203;
+    if (isPro) {
+        currentDpi = 300;
+    }
 
     // Handshake sequence from cPrinterControl::connectBluetoothPrinter:
     // 1. openConnect (0xC1 [0x01]) -> expects 0xC2 (printer beeps!)
@@ -433,7 +434,6 @@ export async function connectNiimbotSerial(): Promise<NiimbotConnectionInfo> {
     activeSerial = { port, writer, reader };
     currentDeviceName = 'NIIMBOT B21 (USB)';
     currentTransport = 'serial';
-    currentDpi = 203;
 
     // Send Connect handshake packet (0xC1, [0x01])
     await sendCommandWaitAck(0xc1, [0x01], 0xc2, 350);
@@ -992,7 +992,7 @@ export async function printDirectToNiimbotB2Pro(
     items: NiimbotPrintQueueItem[],
     config: BarcodeLabelConfig,
     options?: {
-        density?: number; // 1..5 (default 3)
+        density?: number; // 1..5 (default 1)
         dpi?: 203 | 300;
         onProgress?: (current: number, total: number, statusText: string) => void;
     }
@@ -1007,7 +1007,7 @@ export async function printDirectToNiimbotB2Pro(
         await connectNiimbotBluetooth();
     }
 
-    const density = Math.min(5, Math.max(1, options?.density ?? 3));
+    const density = Math.min(5, Math.max(1, options?.density ?? 1));
     const dpi = options?.dpi ?? currentDpi;
 
     // Lay out labels onto physical sheets (split mode packs 2 labels per sheet: top / bottom)
@@ -1080,7 +1080,7 @@ export async function printNiimbotRulerTest(options?: {
     }
 
     const dpi = options?.dpi ?? currentDpi;
-    const density = Math.min(5, Math.max(1, options?.density ?? 3));
+    const density = Math.min(5, Math.max(1, options?.density ?? 1));
     const dotsPerMm = dpi === 300 ? 300 / 25.4 : 8;
     const widthMm = 40;
     const heightMm = 30;

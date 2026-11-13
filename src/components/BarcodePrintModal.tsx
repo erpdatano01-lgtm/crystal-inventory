@@ -73,14 +73,60 @@ export default function BarcodePrintModal({
   const [isExportingImage, setIsExportingImage] = useState(false);
 
   // Direct NIIMBOT B21 / B2 Pro Web Bluetooth / Web Serial states
+  const LS_NIIMBOT_DENSITY_KEY = 'vivida_niimbot_density';
+  const LS_NIIMBOT_DPI_KEY = 'vivida_niimbot_dpi';
+
   const [niimbotConn, setNiimbotConn] = useState<NiimbotConnectionInfo>(() =>
     getNiimbotConnectionInfo()
   );
-  const [niimbotDensity, setNiimbotDensity] = useState<number>(3);
-  const [niimbotDpiState, setNiimbotDpiState] = useState<203 | 300>(203);
+  const [niimbotDensity, setNiimbotDensity] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('vivida_niimbot_density');
+        if (saved) {
+          const val = Number(saved);
+          if (val >= 1 && val <= 5) return val;
+        }
+      } catch {}
+    }
+    return 1; // Default to heat 1 (ร้อน 1)
+  });
+  const [niimbotDpiState, setNiimbotDpiState] = useState<203 | 300>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('vivida_niimbot_dpi');
+        if (saved === '203' || saved === '300') {
+          const val = Number(saved) as 203 | 300;
+          setNiimbotDpi(val);
+          return val;
+        }
+      } catch {}
+    }
+    setNiimbotDpi(300);
+    return 300; // Default to 300 DPI
+  });
   const [isDirectPrinting, setIsDirectPrinting] = useState(false);
   const [directPrintStatus, setDirectPrintStatus] = useState<string>('');
   const [directPrintError, setDirectPrintError] = useState<string>('');
+
+  const handleSetNiimbotDensity = (lvl: number) => {
+    setNiimbotDensity(lvl);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(LS_NIIMBOT_DENSITY_KEY, String(lvl));
+      } catch {}
+    }
+  };
+
+  const handleSetNiimbotDpi = (dpiVal: 203 | 300) => {
+    setNiimbotDpiState(dpiVal);
+    setNiimbotDpi(dpiVal);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(LS_NIIMBOT_DPI_KEY, String(dpiVal));
+      } catch {}
+    }
+  };
 
   // Load saved config and initialize selected product copies
   useEffect(() => {
@@ -264,8 +310,8 @@ export default function BarcodePrintModal({
     try {
       const info = await connectNiimbotBluetooth();
       setNiimbotConn(info);
-      setNiimbotDpiState(info.dpi);
-      setDirectPrintStatus(`เชื่อมต่อสำเร็จ: ${info.deviceName} (${info.dpi} DPI) พร้อมสั่งปริ้นทันที!`);
+      setNiimbotDpi(niimbotDpiState);
+      setDirectPrintStatus(`เชื่อมต่อสำเร็จ: ${info.deviceName} (${niimbotDpiState} DPI) พร้อมสั่งปริ้นทันที!`);
     } catch (err: any) {
       setDirectPrintStatus('');
       setDirectPrintError(err?.message || 'ไม่สามารถเชื่อมต่อ Bluetooth ได้');
@@ -278,8 +324,8 @@ export default function BarcodePrintModal({
     try {
       const info = await connectNiimbotSerial();
       setNiimbotConn(info);
-      setNiimbotDpiState(info.dpi);
-      setDirectPrintStatus(`เชื่อมต่อสาย USB สำเร็จ: ${info.deviceName} พร้อมสั่งปริ้นทันที!`);
+      setNiimbotDpi(niimbotDpiState);
+      setDirectPrintStatus(`เชื่อมต่อสาย USB สำเร็จ: ${info.deviceName} (${niimbotDpiState} DPI) พร้อมสั่งปริ้นทันที!`);
     } catch (err: any) {
       setDirectPrintStatus('');
       setDirectPrintError(err?.message || 'ไม่สามารถเชื่อมต่อสาย USB ได้');
@@ -1306,10 +1352,10 @@ export default function BarcodePrintModal({
                         <button
                           key={lvl}
                           type="button"
-                          onClick={() => setNiimbotDensity(lvl)}
+                          onClick={() => handleSetNiimbotDensity(lvl)}
                           className={`w-6 h-6 rounded-lg font-bold transition ${
                             niimbotDensity === lvl
-                              ? 'bg-amber-400 text-slate-950 shadow'
+                              ? 'bg-amber-400 text-slate-950 shadow ring-1 ring-amber-300'
                               : 'bg-white/10 text-slate-300 hover:bg-white/20'
                           }`}
                         >
@@ -1324,24 +1370,21 @@ export default function BarcodePrintModal({
                         <button
                           key={dpiVal}
                           type="button"
-                          onClick={() => {
-                            setNiimbotDpiState(dpiVal);
-                            setNiimbotDpi(dpiVal);
-                          }}
-                          className={`px-2 py-0.5 rounded-lg font-bold transition ${
+                          onClick={() => handleSetNiimbotDpi(dpiVal)}
+                          className={`px-2.5 py-0.5 rounded-lg font-bold transition ${
                             niimbotDpiState === dpiVal
-                              ? 'bg-purple-500 text-white shadow'
+                              ? 'bg-purple-500 text-white shadow ring-1 ring-purple-300'
                               : 'bg-white/10 text-slate-300 hover:bg-white/20'
                           }`}
                         >
-                          {dpiVal} DPI {dpiVal === 203 ? '(B21 มาตรฐาน)' : '(B2 Pro)'}
+                          {dpiVal} DPI
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <span className="text-[11px] text-amber-300/90">
-                    💡 NIIMBOT B21 มาตรฐานคือ 203 DPI (8 จุด/มม.) • หากเปิดแอป NIIMBOT บนคอมอยู่ ให้กดตัดการเชื่อมต่อในแอปก่อน
+                  <span className="text-[11px] text-amber-300/90 font-medium">
+                    ⚙️ ตั้งค่า: ความร้อน {niimbotDensity} • ความละเอียด {niimbotDpiState} DPI (จำค่าถาวร)
                   </span>
                 </div>
 
@@ -1365,22 +1408,22 @@ export default function BarcodePrintModal({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => handleTestPrintNiimbot(203)}
+                      onClick={() => handleTestPrintNiimbot(300)}
                       disabled={isDirectPrinting}
                       className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
-                      title="สั่งพิมพ์แผ่นทดสอบที่ 203 DPI (แนะนำสำหรับ B21) ปริ้นครบยันบรรทัดล่างสุด"
+                      title="สั่งพิมพ์แผ่นทดสอบที่ 300 DPI ปริ้นครบยันบรรทัดล่างสุด"
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span>พิมพ์เทส 203 DPI</span>
+                      <span>พิมพ์เทส 300 DPI</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleTestPrintNiimbot(300)}
+                      onClick={() => handleTestPrintNiimbot(203)}
                       disabled={isDirectPrinting}
                       className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-xs border border-white/20 transition active:scale-95 disabled:opacity-50"
-                      title="ลองพิมพ์ที่ 300 DPI เพื่อดูความละเอียด"
+                      title="ลองพิมพ์ที่ 203 DPI"
                     >
-                      <span>พิมพ์เทส 300 DPI</span>
+                      <span>พิมพ์เทส 203 DPI</span>
                     </button>
                     <button
                       type="button"
