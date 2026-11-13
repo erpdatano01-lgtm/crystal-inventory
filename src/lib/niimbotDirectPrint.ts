@@ -38,6 +38,8 @@ export interface NiimbotConnectionInfo {
     deviceName: string;
     transport: NiimbotTransportType | null;
     dpi: 203 | 300;
+    modelId?: number;
+    protocolVersion?: number;
 }
 
 export interface NiimbotPrintQueueItem {
@@ -68,6 +70,42 @@ let activeSerial: ActiveSerialConnection | null = null;
 let currentDeviceName = '';
 let currentTransport: NiimbotTransportType | null = null;
 let currentDpi: 203 | 300 = 300; // Default to 300 DPI as configured
+
+// Detected hardware capabilities from printer handshake
+let detectedProtocolVersion = 400; // Default to modern V4 (B21 Pro / B2 Pro)
+let detectedModelId = 785; // Default B21 Pro
+let detectedDpi: 203 | 300 = 300;
+let detectedPrintheadDots = 576;
+
+const MAX_TRACE_LOGS = 80;
+function logTrace(msg: string) {
+    if (typeof window !== 'undefined') {
+        const win = window as any;
+        if (!win.__niimbotLastTrace) {
+            win.__niimbotLastTrace = [];
+        }
+        win.__niimbotLastTrace.push(`[${new Date().toISOString().slice(11, 19)}] ${msg}`);
+        if (win.__niimbotLastTrace.length > MAX_TRACE_LOGS) {
+            win.__niimbotLastTrace.shift();
+        }
+    }
+}
+
+function isV4Protocol(): boolean {
+    const nameLower = (currentDeviceName || '').toLowerCase();
+    return (
+        detectedProtocolVersion >= 300 ||
+        detectedModelId === 785 || // B21 Pro
+        detectedModelId === 6912 || // B2 Pro
+        detectedModelId === 4097 || // B1 Pro
+        detectedModelId === 528 || // D11_H
+        detectedModelId === 2560 || // M2_H
+        nameLower.includes('pro') ||
+        nameLower.includes('b21') ||
+        nameLower.includes('b2') ||
+        currentDpi === 300
+    );
+}
 
 // Incoming packet buffer and resolvers for BLE / Serial notifications
 let rxBuffer: number[] = [];
@@ -118,6 +156,9 @@ function handleIncomingBytes(bytes: Uint8Array) {
 
             const pkt: ParsedNiimbotPacket = { cmd, data };
             lastReceivedPackets.set(cmd, pkt);
+            if (cmd !== 0x86 && cmd !== 0xdc) {
+                logTrace(`RX: cmd=0x${cmd.toString(16)} len=${len} data=[${Array.from(data.slice(0, 8)).map((b) => '0x' + b.toString(16)).join(',')}]`);
+            }
             const listeners = [...packetListeners];
             for (const fn of listeners) {
                 try {
@@ -230,6 +271,8 @@ export function getNiimbotConnectionInfo(): NiimbotConnectionInfo {
         deviceName: isBleAlive || isSerialAlive ? currentDeviceName : '',
         transport: currentTransport,
         dpi: currentDpi,
+        modelId: isBleAlive || isSerialAlive ? detectedModelId : undefined,
+        protocolVersion: isBleAlive || isSerialAlive ? detectedProtocolVersion : undefined,
     };
 }
 
@@ -381,13 +424,75 @@ export async function connectNiimbotBluetooth(): Promise<NiimbotConnectionInfo> 
         currentDpi = 300;
     }
 
-    // Handshake sequence from cPrinterControl::connectBluetoothPrinter:
-    // 1. openConnect (0xC1 [0x01]) -> expects 0xC2 (printer beeps!)
-    await sendCommandWaitAck(0xc1, [0x01], 0xc2, 450);
-    // 2. Request printer info / protocol support (0x40 [0x01])
-    await sendCommandWaitAck(0x40, [0x01], 0x41, 250);
+    await performNiimbotHandshake();
 
     return getNiimbotConnectionInfo();
+}
+
+/**
+ * Handshake sequence from cPrinterControl::connectBluetoothPrinter & cPrinterV6:
+ * Queries protocol version, model ID, and printhead geometry.
+ */
+async function performNiimbotHandshake(): Promise<void> {
+    logTrace(`performNiimbotHandshake: start (${currentTransport}, name=${currentDeviceName})`);
+
+    // 1. openConnect (0xC1 [0x01]) -> expects 0xC2 (printer beeps!)
+    try {
+        const connAck = await sendCommandWaitAck(0xc1, [0x01], 0xc2, 500);
+        logTrace(`openConnect 0xC1 ACK: ${connAck ? '0x' + connAck.cmd.toString(16) : 'timeout'}`);
+    } catch {
+        // ignore
+    }
+
+    // 2. Protocol version query (0xA5 [0x01] -> 0xB5)
+    // Byte 11 * 100 + Byte 12 gives protocol version (>= 300 = V4/V5)
+    try {
+        const protoPkt = await sendCommandWaitAck(0xa5, [0x01], 0xb5, 350);
+        if (protoPkt && protoPkt.data.length >= 13) {
+            const protoVer = protoPkt.data[11] * 100 + protoPkt.data[12];
+            if (protoVer > 0) {
+                detectedProtocolVersion = protoVer;
+                logTrace(`detectedProtocolVersion: ${protoVer}`);
+            }
+        }
+    } catch {
+        // ignore
+    }
+
+    // 3. Model ID query (0x40 [0x08] -> 0x48)
+    // 785 = B21 Pro, 6912 = B2 Pro, 4097 = B1 Pro, 4096 = B1, 768 = B21
+    try {
+        const modelPkt = await sendCommandWaitAck(0x40, [0x08], 0x48, 350);
+        if (modelPkt && modelPkt.data.length >= 2) {
+            const modelId = (modelPkt.data[0] << 8) | modelPkt.data[1];
+            if (modelId > 0) {
+                detectedModelId = modelId;
+                logTrace(`detectedModelId: ${modelId}`);
+            }
+        }
+    } catch {
+        // ignore
+    }
+
+    // 4. Printhead info query (0xDC [0x03] -> 0xDE)
+    // Bytes 4..5 = printhead dot width, Byte 6 = DPI flag (0x03 = 300 DPI, 0x02 = 203 DPI)
+    try {
+        const headPkt = await sendCommandWaitAck(0xdc, [0x03], 0xde, 350);
+        if (headPkt && headPkt.data.length >= 7) {
+            const widthDots = (headPkt.data[4] << 8) | headPkt.data[5];
+            const dpiFlag = headPkt.data[6];
+            if (widthDots > 0) detectedPrintheadDots = widthDots;
+            if (dpiFlag === 0x03) {
+                detectedDpi = 300;
+                currentDpi = 300;
+            } else if (dpiFlag === 0x02) {
+                detectedDpi = 203;
+            }
+            logTrace(`printhead: width=${widthDots}, dpiFlag=${dpiFlag}`);
+        }
+    } catch {
+        // ignore
+    }
 }
 
 /**
@@ -435,8 +540,7 @@ export async function connectNiimbotSerial(): Promise<NiimbotConnectionInfo> {
     currentDeviceName = 'NIIMBOT B21 (USB)';
     currentTransport = 'serial';
 
-    // Send Connect handshake packet (0xC1, [0x01])
-    await sendCommandWaitAck(0xc1, [0x01], 0xc2, 350);
+    await performNiimbotHandshake();
 
     return getNiimbotConnectionInfo();
 }
@@ -477,6 +581,11 @@ export async function disconnectNiimbot(): Promise<void> {
 }
 
 async function sendRawPacket(packet: Uint8Array): Promise<void> {
+    const cmd = packet[2];
+    if (cmd !== 0x85 && cmd !== 0x84) {
+        logTrace(`TX: cmd=0x${cmd.toString(16)} len=${packet[3]}`);
+    }
+
     if (currentTransport === 'serial' && activeSerial?.writer) {
         await activeSerial.writer.write(packet);
         return;
@@ -790,32 +899,42 @@ async function startNiimbotPrintJob(totalPages: number): Promise<void> {
     const hi = (totalPages >> 8) & 0xff;
     const lo = totalPages & 0xff;
 
-    const candidatePayloads: number[][] = [
-        // 1. cPrinterV5 (8 bytes) - primary protocol for NIIMBOT B2 Pro
-        [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-        // 2. cPrinterV6 (9 bytes) - newer firmware variant
-        [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-        // 3. cPrinterV4 (7 bytes)
-        [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00],
-        // 4. cPrinterV3 (1 byte)
-        [0x01],
-    ];
+    // cPrinterV6 / V4 / D110M_V4 (B21 Pro, B2 Pro, B1 Pro):
+    // 9 bytes: [pages_hi, pages_lo, 0, 0, 0, 0, 0 (singleColor), speed=1, 0]
+    // V5: 8 bytes: [pages_hi, pages_lo, 0, 0, 0, 0, 0, 0]
+    // V4 legacy: 7 bytes: [pages_hi, pages_lo, 0, 0, 0, 0, 0]
+    // V3: 1 byte: [0x01]
+    const candidatePayloads: number[][] = isV4Protocol()
+        ? [
+              [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00],
+              [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+              [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00],
+              [0x01],
+          ]
+        : [
+              [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+              [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00],
+              [hi, lo, 0x00, 0x00, 0x00, 0x00, 0x00],
+              [0x01],
+          ];
 
     for (const payload of candidatePayloads) {
-        const ack = await sendCommandWaitAck(0x01, payload, 0x02, 350);
-        if (ack && ack.data.length > 0 && ack.data[0] !== 0) {
-            return; // Printer accepted StartPrint!
+        const ack = await sendCommandWaitAck(0x01, payload, [0x02, 0xdb], 400);
+        if (ack && ack.cmd === 0x02 && ack.data.length > 0 && ack.data[0] !== 0) {
+            logTrace(`startNiimbotPrintJob accepted: len=${payload.length}`);
+            return;
         }
     }
 
-    // If notifications were not received (e.g. write-only characteristic), send V5 8-byte payload and wait briefly
+    // If notifications were not received (e.g. write-only characteristic), send first candidate payload and wait briefly
+    logTrace(`startNiimbotPrintJob fallback send len=${candidatePayloads[0].length}`);
     await sendRawPacket(buildNiimbotPacket(0x01, candidatePayloads[0]));
-    await sleep(100);
+    await sleep(80);
 }
 
 /**
  * Stream a single encoded page to the NIIMBOT B2 Pro printer
- * Matches cPrinterV5::commitJob + packageOneColorData + cPrinterV5::sendPrintData
+ * Matches cPrinterV6/V5 + packageOneColorData
  */
 async function sendNiimbotPage(
     encoded: {
@@ -847,39 +966,78 @@ async function sendNiimbotPage(
         effectiveHeight = Math.min(30, heightDots);
     }
 
-    // 2. PageStart / jcSetPagePrint (0x03, [0x01]) -> expects 0x04
-    await sendCommandWaitAck(0x03, [0x01], 0x04, 300);
-
-    // 3. SetPageSize / jcSetPageInfo (0x13, [rows_hi, rows_lo, cols_hi, cols_lo, copies_hi, copies_lo]) -> expects 0x14
-    // In Cb21Printer::commitJob (@ 0x84896), page height sent to jcSetPageHigh is the full physical page height (heightDots)
     const reportedPageHeight = Math.max(heightDots, effectiveHeight);
-    const pageInfoAck = await sendCommandWaitAck(
-        0x13,
-        [
+    const useV4 = isV4Protocol();
+    logTrace(`sendNiimbotPage: w=${widthDots}, h=${heightDots}, eff=${effectiveHeight}, v4=${useV4}, copies=${copies}`);
+
+    if (useV4) {
+        // B21 Pro Workaround:
+        // 1. The B21 Pro drops the first BLE packet after PrintStart (0x01).
+        // Send a one-way PrintStatus (0xA3 [0x01]) packet to safely absorb the hardware drop, then pause 35ms.
+        // DO NOT send PageStart (0x03) as V4 / D110M_V4 firmware does not use 0x03.
+        await sendRawPacket(buildNiimbotPacket(0xa3, [0x01]));
+        await sleep(35);
+
+        // 2. SetPageSize / jcSetPageInfo (0x13):
+        // 13 bytes for V4 / D110M_V4 / B21 Pro:
+        // [rows_hi, rows_lo, cols_hi, cols_lo, copies_hi, copies_lo, 0, 0, 0, 0, 0, 0, 0]
+        const basePageInfo = [
             (reportedPageHeight >> 8) & 0xff,
             reportedPageHeight & 0xff,
             (widthDots >> 8) & 0xff,
             widthDots & 0xff,
             (copies >> 8) & 0xff,
             copies & 0xff,
-        ],
-        0x14,
-        350
-    );
+        ];
+        const payload13 = [...basePageInfo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let pageAck = await sendCommandWaitAck(0x13, payload13, [0x14, 0xdb], 450);
+        logTrace(`SetPageSize 13-byte ACK: ${pageAck ? '0x' + pageAck.cmd.toString(16) + ' [' + Array.from(pageAck.data) + ']' : 'timeout'}`);
 
-    // Fallback to 4-byte SetPageSize if printer NACKed 6-byte payload
-    if (pageInfoAck && pageInfoAck.data.length > 0 && pageInfoAck.data[0] === 0) {
-        await sendCommandWaitAck(
+        // Fallback: If 13-byte was rejected or timed out, try 45-byte (official PC SDK cPrinterV6 with 32 zero bytes) or 6-byte (V5)
+        if (!pageAck || pageAck.cmd === 0xdb || (pageAck.data.length > 0 && pageAck.data[0] === 0)) {
+            const payload45 = new Uint8Array(45);
+            payload45.set(payload13, 0);
+            pageAck = await sendCommandWaitAck(0x13, payload45, [0x14, 0xdb], 400);
+            logTrace(`SetPageSize 45-byte ACK: ${pageAck ? '0x' + pageAck.cmd.toString(16) : 'timeout'}`);
+
+            if (!pageAck || pageAck.cmd === 0xdb || (pageAck.data.length > 0 && pageAck.data[0] === 0)) {
+                pageAck = await sendCommandWaitAck(0x13, basePageInfo, [0x14, 0xdb], 350);
+                logTrace(`SetPageSize 6-byte ACK: ${pageAck ? '0x' + pageAck.cmd.toString(16) : 'timeout'}`);
+            }
+        }
+    } else {
+        // 2. Legacy PageStart / jcSetPagePrint (0x03, [0x01]) -> expects 0x04
+        await sendCommandWaitAck(0x03, [0x01], 0x04, 300);
+
+        // 3. SetPageSize / jcSetPageInfo (0x13, 6-byte)
+        const pageInfoAck = await sendCommandWaitAck(
             0x13,
             [
                 (reportedPageHeight >> 8) & 0xff,
                 reportedPageHeight & 0xff,
                 (widthDots >> 8) & 0xff,
                 widthDots & 0xff,
+                (copies >> 8) & 0xff,
+                copies & 0xff,
             ],
             0x14,
-            300
+            350
         );
+
+        // Fallback to 4-byte SetPageSize if printer NACKed 6-byte payload
+        if (pageInfoAck && pageInfoAck.data.length > 0 && pageInfoAck.data[0] === 0) {
+            await sendCommandWaitAck(
+                0x13,
+                [
+                    (reportedPageHeight >> 8) & 0xff,
+                    reportedPageHeight & 0xff,
+                    (widthDots >> 8) & 0xff,
+                    widthDots & 0xff,
+                ],
+                0x14,
+                300
+            );
+        }
     }
 
     // 4. Package bitmap rows into run-length packets (exact match to Cb21Printer::commitJob in libjcPrinterSdk.dylib)
@@ -959,24 +1117,29 @@ async function sendNiimbotPage(
         }
     }
 
-    // 5. Send packets sequentially with paced delay (matches Cb21Printer::commitJob loop in libjcPrinterSdk.dylib)
-    // Pacing at 6ms (BLE) / 2ms (USB) gives printer MCU time to burn each line without buffer overruns or 0x86 stalls
+    logTrace(`sendNiimbotPage: packaged ${packets.length} packets for rows 0..${effectiveHeight - 1}`);
+
+    // 5. Send packets sequentially with paced delay
+    // 10ms (BLE) / 2ms (USB) guarantees macOS CoreBluetooth doesn't drop packets during burst
+    const paceMs = currentTransport === 'bluetooth' ? 10 : 2;
     for (const pkt of packets) {
         await sendRawPacket(pkt);
-        await sleep(currentTransport === 'bluetooth' ? 6 : 2);
+        await sleep(paceMs);
     }
 
     // 6. PageEnd / jcSetPageTerminal (0xE3, [0x01]) -> expects 0xE4
     // Allow printhead line-buffer to finish burning bottom rows before sending page terminal
     await sleep(160);
-    await sendCommandWaitAck(0xe3, [0x01], 0xe4, 500);
+    // V4 hardware feed and burn can take up to 2-3 seconds, allow up to 10000ms
+    const pageEndAck = await sendCommandWaitAck(0xe3, [0x01], [0xe4, 0xdb], 10000);
+    logTrace(`PageEnd 0xE3 ACK: ${pageEndAck ? '0x' + pageEndAck.cmd.toString(16) : 'timeout'}`);
 
     // 7. Wait for physical printhead to finish feeding/printing copies (poll 0xA3 -> 0xB3 as in cPrinterV5::commitJob @ 0x101004)
-    const maxWaitIterations = Math.min(25, 6 * copies);
+    const maxWaitIterations = Math.min(30, 8 * copies);
     for (let poll = 0; poll < maxWaitIterations; poll++) {
         await sleep(180);
-        const statusPkt = await sendCommandWaitAck(0xa3, [0x01], 0xb3, 220);
-        if (statusPkt && statusPkt.data.length >= 2) {
+        const statusPkt = await sendCommandWaitAck(0xa3, [0x01], [0xb3, 0xdb], 250);
+        if (statusPkt && statusPkt.cmd === 0xb3 && statusPkt.data.length >= 2) {
             const printedCopies = (statusPkt.data[0] << 8) | statusPkt.data[1];
             if (printedCopies >= copies) {
                 break;
@@ -1030,11 +1193,11 @@ export async function printDirectToNiimbotB2Pro(
 
     options?.onProgress?.(0, totalPages, 'กำลังเตรียมหัวพิมพ์ NIIMBOT B2 Pro...');
 
-    // 1. Set Print Density (0x21 -> 0x22) & Label Type (0x23 = 1 Gap Paper -> 0x24)
-    await sendCommandWaitAck(0x21, [density], 0x22, 300);
-    await sendCommandWaitAck(0x23, [0x01], 0x24, 300);
+    // 1. Set Print Density (0x21 -> 0x31/0x22) & Label Type (0x23 = 1 Gap Paper -> 0x33/0x24)
+    await sendCommandWaitAck(0x21, [density], [0x31, 0x22], 350);
+    await sendCommandWaitAck(0x23, [0x01], [0x33, 0x24], 350);
 
-    // 2. StartJob / jcSetPrintAllTime (0x01 -> 0x02) with V5 8-byte payload (and automatic V6/V4/V3 fallback)
+    // 2. StartJob / jcSetPrintAllTime (0x01 -> 0x02) with V4 9-byte / V5 8-byte payload
     await startNiimbotPrintJob(totalPages);
 
     let printedSoFar = 0;
@@ -1062,7 +1225,16 @@ export async function printDirectToNiimbotB2Pro(
 
     // 3. PrintEnd / jcSetPrintTerminal (0xF3, [0x01] -> expects 0xF4)
     await sleep(100);
-    await sendCommandWaitAck(0xf3, [0x01], 0xf4, 400);
+    const printEndAck = await sendCommandWaitAck(0xf3, [0x01], [0xf4, 0xdb], 600);
+    logTrace(`PrintEnd 0xF3 ACK: ${printEndAck ? '0x' + printEndAck.cmd.toString(16) : 'timeout'}`);
+
+    // B21 Pro post-print guard: send one-way Heartbeat (0xDC, [0x01]) to absorb trailing BLE drop
+    try {
+        await sendRawPacket(buildNiimbotPacket(0xdc, [0x01]));
+        await sleep(40);
+    } catch {
+        // ignore
+    }
 }
 
 /**
@@ -1186,12 +1358,19 @@ export async function printNiimbotRulerTest(options?: {
         rows.push(rowBytes);
     }
 
-    options?.onProgress?.('กำลังส่งพิมพ์ไม้บรรทัดวัดระยะ...');
-    await sendCommandWaitAck(0x21, [density], 0x22, 300);
-    await sendCommandWaitAck(0x23, [0x01], 0x24, 300);
+    options?.onProgress?.('กำลังส่งพิมพ์ไม้บรรทัดวัดระยะ (300 DPI)...');
+    await sendCommandWaitAck(0x21, [density], [0x31, 0x22], 350);
+    await sendCommandWaitAck(0x23, [0x01], [0x33, 0x24], 350);
     await startNiimbotPrintJob(1);
     await sendNiimbotPage({ widthDots, heightDots, bytesPerRow, rows }, 1);
     await sleep(100);
-    await sendCommandWaitAck(0xf3, [0x01], 0xf4, 400);
+    const rulerEndAck = await sendCommandWaitAck(0xf3, [0x01], [0xf4, 0xdb], 600);
+    logTrace(`Ruler PrintEnd 0xF3 ACK: ${rulerEndAck ? '0x' + rulerEndAck.cmd.toString(16) : 'timeout'}`);
+    try {
+        await sendRawPacket(buildNiimbotPacket(0xdc, [0x01]));
+        await sleep(40);
+    } catch {
+        // ignore
+    }
     options?.onProgress?.('พิมพ์ไม้บรรทัดสำเร็จ!');
 }
