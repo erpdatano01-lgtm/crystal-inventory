@@ -674,50 +674,70 @@ function drawNiimbotLabelRegion(
 
     // Padding calibrated to fill the physical sticker edge-to-edge cleanly
     const sidePadDots = Math.round((isTiny ? 0.08 : 0.12) * dotsPerCm);
-    const topPadDots = Math.round((isTiny ? 0.03 : 0.08) * dotsPerCm);
-    const bottomMarginDots = Math.max(isTiny ? 4 : 8, Math.round((isTiny ? 0.03 : 0.05) * dotsPerCm));
+    const topPadDots = Math.round((isTiny ? 0.025 : 0.06) * dotsPerCm);
+    const bottomMarginDots = Math.max(isTiny ? 4 : 8, Math.round((isTiny ? 0.025 : 0.04) * dotsPerCm));
     const printableBottomDots = heightDots - bottomMarginDots;
 
     const bottomRowFontH = Math.max(
         config.showPrice && priceText ? priceFontPx : 0,
         config.showWeightAndDim && specsLine ? metaFontPx : 0
     );
-    const bottomY = printableBottomDots - bottomRowFontH;
     const dividerGap = Math.max(2, Math.round((isTiny ? 0.02 : 0.03) * dotsPerCm));
-    const dividerY = bottomY - dividerGap;
+    const barcodeGapDots = Math.max(2, Math.round((isTiny ? 0.025 : 0.04) * dotsPerCm));
 
     const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
     const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
     const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
-    const barcodeGapDots = Math.max(2, Math.round((isTiny ? 0.025 : 0.04) * dotsPerCm));
 
-    const totalTextH = storeLineH + skuLineH + nameLineH;
-    const maxAvailableBarcodeH = hasBottomLine
-        ? dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots
-        : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
+    let barcodeH = 0;
+    let barcodeY = 0;
+    let skuY = 0;
+    let dividerY = 0;
+    let bottomY = 0;
 
-    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.42 : 0.45) * dotsPerCm);
-    const barcodeHeightDots = Math.max(isTiny ? 25 : 30, Math.min(targetBarcodeH, Math.max(20, maxAvailableBarcodeH)));
+    if (hasBottomLine) {
+        bottomY = printableBottomDots - bottomRowFontH;
+        dividerY = bottomY - dividerGap;
+        const totalTextH = storeLineH + nameLineH + skuLineH;
+        const availableBarcodeH = dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots;
+        barcodeH = Math.max(isTiny ? 25 : 30, availableBarcodeH);
+
+        let curY = topPadDots;
+        if (config.showStoreName) curY += storeLineH;
+        if (config.showStoneName) curY += nameLineH;
+        barcodeY = curY + (curY > topPadDots ? barcodeGapDots : 0);
+        skuY = barcodeY + barcodeH + barcodeGapDots;
+    } else {
+        skuY = printableBottomDots - skuLineH;
+        const totalTextH = storeLineH + nameLineH;
+        const availableBarcodeH = skuY - barcodeGapDots - topPadDots - totalTextH - (storeLineH || nameLineH ? barcodeGapDots : 0);
+        barcodeH = Math.max(isTiny ? 25 : 30, availableBarcodeH);
+
+        let curY = topPadDots;
+        if (config.showStoreName) curY += storeLineH;
+        if (config.showStoneName) curY += nameLineH;
+        barcodeY = curY + (curY > topPadDots ? barcodeGapDots : 0);
+    }
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    let currentY = topPadDots;
     const innerW = widthDots - sidePadDots * 2;
+    let textY = topPadDots;
 
     // Optional: Store Name (only if explicitly checked by user, placed above stone name)
     if (config.showStoreName) {
         ctx.font = `900 ${storeFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText('VIVIDA CRYSTAL', widthDots / 2, currentY, innerW);
-        currentY += storeLineH;
+        ctx.fillText('VIVIDA CRYSTAL', widthDots / 2, textY, innerW);
+        textY += storeLineH;
     }
 
     // 1. Stone Name (Primary header at the very top of label)
     if (config.showStoneName) {
         ctx.font = `800 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText(product.stone_type || product.name, widthDots / 2, currentY, innerW);
-        currentY += nameLineH;
+        ctx.fillText(product.stone_type || product.name, widthDots / 2, textY, innerW);
+        textY += nameLineH;
     }
 
     // 2. Crisp Code 128 Barcode Bars
@@ -730,50 +750,42 @@ function drawNiimbotLabelRegion(
     encoded.bars.forEach((bar) => {
         const x1 = Math.round(barcodeStartX + bar.x * moduleW);
         const x2 = Math.round(barcodeStartX + (bar.x + bar.width) * moduleW);
-        ctx.fillRect(x1, currentY, Math.max(1, x2 - x1), barcodeHeightDots);
+        ctx.fillRect(x1, barcodeY, Math.max(1, x2 - x1), barcodeH);
     });
-    currentY += barcodeHeightDots + barcodeGapDots;
 
-    // 3. SKU Line (Directly below barcode bars)
+    // 3. SKU Line
     if (config.showSkuText) {
         ctx.font = `900 ${skuFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-        ctx.fillText(product.sku, widthDots / 2, currentY, innerW);
-        currentY += skuLineH;
+        ctx.fillText(product.sku, widthDots / 2, skuY, innerW);
     }
 
     // 4. Weight / Dimensions & Selling Price with Divider Line
-    // Anchor divider and bottom line at the bottom of the label to fill the entire sticker,
-    // eliminating the old empty bottom void
-    const sequentialDividerY = currentY + dividerGap;
-    const actualDividerY = Math.max(sequentialDividerY, dividerY);
-    const actualBottomY = actualDividerY === dividerY ? bottomY : actualDividerY + dividerGap + 1;
-
     if (hasBottomLine) {
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(sidePadDots, actualDividerY);
-        ctx.lineTo(widthDots - sidePadDots, actualDividerY);
+        ctx.moveTo(sidePadDots, dividerY);
+        ctx.lineTo(widthDots - sidePadDots, dividerY);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
             ctx.textAlign = 'left';
             ctx.font = `700 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(specsLine, sidePadDots, actualBottomY, innerW * 0.62);
+            ctx.fillText(specsLine, sidePadDots, bottomY, innerW * 0.62);
 
             ctx.textAlign = 'right';
             ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
             ctx.fillText(
                 priceText,
                 widthDots - sidePadDots,
-                actualBottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
+                bottomY - Math.round((priceFontPx - metaFontPx) * 0.25)
             );
         } else {
             ctx.textAlign = 'center';
             const textToDraw = config.showPrice && priceText ? priceText : specsLine;
             const fPx = config.showPrice && priceText ? priceFontPx : metaFontPx;
             ctx.font = `800 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-            ctx.fillText(textToDraw, widthDots / 2, actualBottomY, innerW);
+            ctx.fillText(textToDraw, widthDots / 2, bottomY, innerW);
         }
     }
 
@@ -833,15 +845,14 @@ function encodeSheetToNiimbotRows(
 
         if (slotCount === 2) {
             // Physical 40x30 mm split roll has:
-            // - Top sticker: 0..14.5 mm
-            // - Inter-label die cut gap: ~14.5..14.8 mm
-            // - Bottom sticker: 14.8..29.4 mm
-            // Now that the printer prints all 30 mm without premature cutoff,
-            // make the layout fill the entire sticker edge-to-edge!
+            // - Top sticker: 0..14.8 mm
+            // - Inter-label die cut line: ~14.8..15.0 mm
+            // - Bottom sticker: 15.0..29.8 mm
+            // Fills each sticker completely edge-to-edge leaving < 0.5 mm bottom margin!
             const slotTopY = i === 0
-                ? Math.round(0.02 * dotsPerCm) // 0.2 mm from top
-                : Math.round((slotHCm - 0.02) * dotsPerCm); // 14.8 mm (clears middle die-cut gap)
-            const slotHDots = Math.round((slotHCm - 0.04) * dotsPerCm); // 14.6 mm effective sticker height
+                ? Math.round(0.01 * dotsPerCm) // 0.1 mm from top
+                : Math.round(1.50 * dotsPerCm); // 15.0 mm (clears middle die-cut cut)
+            const slotHDots = Math.round((slotHCm - 0.02) * dotsPerCm); // 14.8 mm effective sticker height
             const slotHCmEffective = slotHDots / dotsPerCm;
 
             ctx.translate(0, slotTopY);

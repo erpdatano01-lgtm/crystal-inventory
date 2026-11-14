@@ -271,8 +271,7 @@ export default function BarcodePrintModal({
       (config.showStoneName ? 1 : 0) +
       (config.showWeightAndDim || config.showPrice ? 1 : 0);
 
-    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.42 : 0.45;
-    const paddingCm = isTiny ? 0.03 : 0.08;
+    const paddingCm = isTiny ? 0.025 : 0.06;
 
     // Fit barcode into the space left after text lines (prevents overflow on short labels e.g. 1.5 cm)
     const ptToCm = (pt: number) => pt * 0.0352778;
@@ -283,11 +282,10 @@ export default function BarcodePrintModal({
       (config.showWeightAndDim || config.showPrice
         ? ptToCm(Math.max(metaFontPt, priceFontPt)) * 1.15 + 0.03
         : 0);
-    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.03;
-    const targetBarcodeCm = Math.round(hCm * ratio * 100) / 100;
+    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.02;
     const barcodeHeightCm = Math.max(
       0.35,
-      Math.round(Math.min(targetBarcodeCm, availableBarcodeCm) * 100) / 100
+      Math.round(availableBarcodeCm * 100) / 100
     );
 
     return {
@@ -819,41 +817,62 @@ export default function BarcodePrintModal({
 
       // Padding calibrated to fill the physical sticker edge-to-edge cleanly
       const padPx = Math.round((isTiny ? 0.08 : 0.12) * pxPerCm);
-      const topPadPx = Math.round((isTiny ? 0.03 : 0.08) * pxPerCm);
-      const bottomMarginPx = Math.max(isTiny ? 4 : 8, Math.round((isTiny ? 0.03 : 0.05) * pxPerCm));
+      const topPadPx = Math.round((isTiny ? 0.025 : 0.06) * pxPerCm);
+      const bottomMarginPx = Math.max(isTiny ? 4 : 8, Math.round((isTiny ? 0.025 : 0.04) * pxPerCm));
       const printableBottomPx = canvasH - bottomMarginPx;
-      const bottomY = printableBottomPx - bottomRowFontPx;
+
       const dividerGap = Math.max(2, Math.round((isTiny ? 0.02 : 0.03) * pxPerCm));
-      const dividerY = bottomY - dividerGap;
+      const barcodeGap = Math.max(2, Math.round((isTiny ? 0.025 : 0.04) * pxPerCm));
 
       const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
       const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
       const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
-      const barcodeGap = Math.max(2, Math.round((isTiny ? 0.025 : 0.04) * pxPerCm));
 
-      const totalTextH = storeLineH + skuLineH + nameLineH;
-      const maxAvailableBarcodeH = hasBottomLine
-        ? dividerY - dividerGap - topPadPx - totalTextH - barcodeGap
-        : printableBottomPx - topPadPx - totalTextH - barcodeGap;
+      let barcodeH = 0;
+      let barcodeY = 0;
+      let skuY = 0;
+      let dividerY = 0;
+      let bottomY = 0;
 
-      const targetBarcodeH = Math.round(metrics.barcodeHeightCm * pxPerCm);
-      const barcodeH = Math.max(isTiny ? 25 : 30, Math.min(targetBarcodeH, Math.max(20, maxAvailableBarcodeH)));
+      if (hasBottomLine) {
+        bottomY = printableBottomPx - bottomRowFontPx;
+        dividerY = bottomY - dividerGap;
+        const totalTextH = storeLineH + nameLineH + skuLineH;
+        const availableBarcodeH = dividerY - dividerGap - topPadPx - totalTextH - barcodeGap;
+        barcodeH = Math.max(isTiny ? 25 : 30, availableBarcodeH);
 
-      let currentY = topPadPx;
+        let curY = topPadPx;
+        if (config.showStoreName) curY += storeLineH;
+        if (config.showStoneName) curY += nameLineH;
+        barcodeY = curY + (curY > topPadPx ? barcodeGap : 0);
+        skuY = barcodeY + barcodeH + barcodeGap;
+      } else {
+        skuY = printableBottomPx - skuLineH;
+        const totalTextH = storeLineH + nameLineH;
+        const availableBarcodeH = skuY - barcodeGap - topPadPx - totalTextH - (storeLineH || nameLineH ? barcodeGap : 0);
+        barcodeH = Math.max(isTiny ? 25 : 30, availableBarcodeH);
+
+        let curY = topPadPx;
+        if (config.showStoreName) curY += storeLineH;
+        if (config.showStoneName) curY += nameLineH;
+        barcodeY = curY + (curY > topPadPx ? barcodeGap : 0);
+      }
+
       const innerW = canvasW - padPx * 2;
+      let textY = topPadPx;
 
       // Optional: Store Name (only if enabled, placed above stone name)
       if (config.showStoreName) {
         ctx.font = `800 ${storeFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText('VIVIDA CRYSTAL', canvasW / 2, currentY, innerW);
-        currentY += storeLineH;
+        ctx.fillText('VIVIDA CRYSTAL', canvasW / 2, textY, innerW);
+        textY += storeLineH;
       }
 
       // 1. Stone Name (Primary header at top)
       if (config.showStoneName) {
         ctx.font = `700 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, currentY, innerW);
-        currentY += nameLineH;
+        ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, textY, innerW);
+        textY += nameLineH;
       }
 
       // 2. Barcode Bars (Crisp integer pixel coordinates)
@@ -866,45 +885,39 @@ export default function BarcodePrintModal({
       encoded.bars.forEach((bar) => {
         const x1 = Math.round(barcodeStartX + bar.x * moduleW);
         const x2 = Math.round(barcodeStartX + (bar.x + bar.width) * moduleW);
-        ctx.fillRect(x1, currentY, Math.max(1, x2 - x1), barcodeH);
+        ctx.fillRect(x1, barcodeY, Math.max(1, x2 - x1), barcodeH);
       });
-      currentY += barcodeH + barcodeGap;
 
       // 3. SKU Line (Directly below barcode bars)
       if (config.showSkuText) {
         ctx.font = `900 ${skuFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-        ctx.fillText(targetProduct.sku, canvasW / 2, currentY, innerW);
-        currentY += skuLineH;
+        ctx.fillText(targetProduct.sku, canvasW / 2, skuY, innerW);
       }
 
       // 4. Bottom Meta & Price Line with Divider
-      const sequentialDividerY = currentY + dividerGap;
-      const actualDividerY = Math.max(sequentialDividerY, dividerY);
-      const actualBottomY = actualDividerY === dividerY ? bottomY : actualDividerY + dividerGap + 1;
-
       if (hasBottomLine) {
         // Divider line (pure black for sharp thermal printing)
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padPx, actualDividerY);
-        ctx.lineTo(canvasW - padPx, actualDividerY);
+        ctx.moveTo(padPx, dividerY);
+        ctx.lineTo(canvasW - padPx, dividerY);
         ctx.stroke();
 
         if (config.showWeightAndDim && config.showPrice && specsLine && priceText) {
           ctx.textAlign = 'left';
           ctx.font = `600 ${metaFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillText(specsLine, padPx, actualBottomY, innerW * 0.62);
+          ctx.fillText(specsLine, padPx, bottomY, innerW * 0.62);
 
           ctx.textAlign = 'right';
           ctx.font = `900 ${priceFontPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillText(priceText, canvasW - padPx, actualBottomY - Math.round((priceFontPx - metaFontPx) * 0.3));
+          ctx.fillText(priceText, canvasW - padPx, bottomY - Math.round((priceFontPx - metaFontPx) * 0.3));
         } else {
           ctx.textAlign = 'center';
           const textToDraw = config.showPrice && priceText ? priceText : specsLine;
           const fPx = config.showPrice && priceText ? priceFontPx : metaFontPx;
           ctx.font = `800 ${fPx}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillText(textToDraw, canvasW / 2, actualBottomY, innerW);
+          ctx.fillText(textToDraw, canvasW / 2, bottomY, innerW);
         }
       }
       };
@@ -914,9 +927,9 @@ export default function BarcodePrintModal({
         ctx.save();
         if (config.splitSheet && slots.length === 2) {
           const slotTopPx = i === 0
-            ? Math.round(0.02 * pxPerCm)
-            : Math.round((slotHCm - 0.02) * pxPerCm);
-          const slotHPx = Math.round((slotHCm - 0.04) * pxPerCm);
+            ? Math.round(0.01 * pxPerCm)
+            : Math.round(1.50 * pxPerCm);
+          const slotHPx = Math.round((slotHCm - 0.02) * pxPerCm);
           const slotHCmEffective = slotHPx / pxPerCm;
           ctx.translate(0, slotTopPx);
           ctx.beginPath();
