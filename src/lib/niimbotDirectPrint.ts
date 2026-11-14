@@ -646,13 +646,13 @@ function drawNiimbotLabelRegion(
     const minDim = Math.min(wCm, hCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
-    // Proportional metrics tuned to guarantee all lines (Stone Name, Barcode, SKU, Divider, Specs)
-    // fill the label nicely without leaving an empty bottom void or pushing into the gap sensor.
-    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.0 : 2.5) * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(5.5, Math.round(minDim * (isTiny ? 2.8 : 3.0) * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(5.2, Math.round(minDim * (isTiny ? 2.7 : 3.3) * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.2 : 2.4) * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(5.4, Math.round(minDim * (isTiny ? 2.8 : 3.4) * scaleFactor * 10) / 10);
+    // Proportional metrics tuned to fill the entire sticker fully
+    // without leaving an empty bottom void
+    const storeFontPt = Math.max(4.8, Math.round(minDim * (isTiny ? 2.4 : 2.7) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(6.0, Math.round(minDim * (isTiny ? 3.4 : 3.6) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.6, Math.round(minDim * (isTiny ? 3.0 : 3.5) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.5 : 2.6) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.2 : 3.6) * scaleFactor * 10) / 10);
 
     const ptToPx = (pt: number) => Math.max(8, Math.round(pt * 0.0352778 * dotsPerCm));
     const storeFontPx = ptToPx(storeFontPt);
@@ -672,10 +672,10 @@ function drawNiimbotLabelRegion(
         (config.showWeightAndDim && specsLine) || (config.showPrice && priceText)
     );
 
-    // Side & vertical padding calibrated so content stays well inside the physical sticker cut
-    const sidePadDots = Math.round((isTiny ? 0.1 : 0.15) * dotsPerCm);
-    const topPadDots = Math.round((isTiny ? 0.04 : 0.12) * dotsPerCm);
-    const bottomMarginDots = Math.max(isTiny ? 6 : 12, Math.round(Math.min(0.255, hCm * (isTiny ? 0.05 : 0.085)) * dotsPerCm));
+    // Padding calibrated to fill the physical sticker edge-to-edge cleanly
+    const sidePadDots = Math.round((isTiny ? 0.08 : 0.12) * dotsPerCm);
+    const topPadDots = Math.round((isTiny ? 0.03 : 0.08) * dotsPerCm);
+    const bottomMarginDots = Math.max(isTiny ? 4 : 8, Math.round((isTiny ? 0.03 : 0.05) * dotsPerCm));
     const printableBottomDots = heightDots - bottomMarginDots;
 
     const bottomRowFontH = Math.max(
@@ -696,8 +696,8 @@ function drawNiimbotLabelRegion(
         ? dividerY - dividerGap - topPadDots - totalTextH - barcodeGapDots
         : printableBottomDots - topPadDots - totalTextH - barcodeGapDots;
 
-    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.28 : 0.38) * dotsPerCm);
-    const barcodeHeightDots = Math.max(isTiny ? 16 : 18, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+    const targetBarcodeH = Math.round(hCm * (isTiny ? 0.42 : 0.45) * dotsPerCm);
+    const barcodeHeightDots = Math.max(isTiny ? 25 : 30, Math.min(targetBarcodeH, Math.max(20, maxAvailableBarcodeH)));
 
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
@@ -742,10 +742,11 @@ function drawNiimbotLabelRegion(
     }
 
     // 4. Weight / Dimensions & Selling Price with Divider Line
+    // Anchor divider and bottom line at the bottom of the label to fill the entire sticker,
+    // eliminating the old empty bottom void
     const sequentialDividerY = currentY + dividerGap;
-    const sequentialBottomY = sequentialDividerY + dividerGap + 1;
-    const actualDividerY = isTiny ? sequentialDividerY : Math.min(sequentialDividerY, dividerY);
-    const actualBottomY = isTiny ? sequentialBottomY : Math.min(sequentialBottomY, bottomY);
+    const actualDividerY = Math.max(sequentialDividerY, dividerY);
+    const actualBottomY = actualDividerY === dividerY ? bottomY : actualDividerY + dividerGap + 1;
 
     if (hasBottomLine) {
         ctx.strokeStyle = '#000000';
@@ -832,15 +833,15 @@ function encodeSheetToNiimbotRows(
 
         if (slotCount === 2) {
             // Physical 40x30 mm split roll has:
-            // - Top sticker: 0..14 mm
-            // - Inter-label die cut gap: ~14..14.5 mm
-            // - Bottom sticker: 14.5..28.5 mm
-            // Starting Slot 1 at 14.4 mm and balancing layout ensures the content fills ~11.5 mm of each sticker,
-            // avoiding empty bottom voids while safely finishing before the hardware gap sensor cutoff!
+            // - Top sticker: 0..14.5 mm
+            // - Inter-label die cut gap: ~14.5..14.8 mm
+            // - Bottom sticker: 14.8..29.4 mm
+            // Now that the printer prints all 30 mm without premature cutoff,
+            // make the layout fill the entire sticker edge-to-edge!
             const slotTopY = i === 0
-                ? Math.round(0.04 * dotsPerCm) // 0.4 mm from top
-                : Math.round((slotHCm - 0.06) * dotsPerCm); // 14.4 mm (clears middle gap!)
-            const slotHDots = Math.round((slotHCm - (i === 0 ? 0.08 : 0.12)) * dotsPerCm);
+                ? Math.round(0.02 * dotsPerCm) // 0.2 mm from top
+                : Math.round((slotHCm - 0.02) * dotsPerCm); // 14.8 mm (clears middle die-cut gap)
+            const slotHDots = Math.round((slotHCm - 0.04) * dotsPerCm); // 14.6 mm effective sticker height
             const slotHCmEffective = slotHDots / dotsPerCm;
 
             ctx.translate(0, slotTopY);

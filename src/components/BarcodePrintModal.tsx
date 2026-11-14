@@ -259,11 +259,11 @@ export default function BarcodePrintModal({
     const minDim = Math.min(wCm, hCm);
     const isTiny = hCm <= 1.8 || wCm <= 2.8;
 
-    const storeFontPt = Math.max(4.5, Math.round(minDim * (isTiny ? 2.0 : 2.5) * scaleFactor * 10) / 10);
-    const nameFontPt = Math.max(5.5, Math.round(minDim * (isTiny ? 2.8 : 3.0) * scaleFactor * 10) / 10);
-    const skuFontPt = Math.max(5.2, Math.round(minDim * (isTiny ? 2.7 : 3.3) * scaleFactor * 10) / 10);
-    const metaFontPt = Math.max(4.6, Math.round(minDim * (isTiny ? 2.2 : 2.4) * scaleFactor * 10) / 10);
-    const priceFontPt = Math.max(5.4, Math.round(minDim * (isTiny ? 2.8 : 3.4) * scaleFactor * 10) / 10);
+    const storeFontPt = Math.max(4.8, Math.round(minDim * (isTiny ? 2.4 : 2.7) * scaleFactor * 10) / 10);
+    const nameFontPt = Math.max(6.0, Math.round(minDim * (isTiny ? 3.4 : 3.6) * scaleFactor * 10) / 10);
+    const skuFontPt = Math.max(5.6, Math.round(minDim * (isTiny ? 3.0 : 3.5) * scaleFactor * 10) / 10);
+    const metaFontPt = Math.max(5.0, Math.round(minDim * (isTiny ? 2.5 : 2.6) * scaleFactor * 10) / 10);
+    const priceFontPt = Math.max(5.8, Math.round(minDim * (isTiny ? 3.2 : 3.6) * scaleFactor * 10) / 10);
 
     const activeInfoLines =
       (config.showStoreName ? 1 : 0) +
@@ -271,22 +271,22 @@ export default function BarcodePrintModal({
       (config.showStoneName ? 1 : 0) +
       (config.showWeightAndDim || config.showPrice ? 1 : 0);
 
-    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.28 : 0.4;
-    const paddingCm = isTiny ? 0.06 : 0.15;
+    const ratio = activeInfoLines <= 1 ? 0.58 : activeInfoLines === 2 ? 0.46 : isTiny ? 0.42 : 0.45;
+    const paddingCm = isTiny ? 0.03 : 0.08;
 
     // Fit barcode into the space left after text lines (prevents overflow on short labels e.g. 1.5 cm)
     const ptToCm = (pt: number) => pt * 0.0352778;
     const textStackCm =
-      (config.showStoreName ? ptToCm(storeFontPt) * 1.05 : 0) +
-      (config.showSkuText ? ptToCm(skuFontPt) * 1.05 : 0) +
-      (config.showStoneName ? ptToCm(nameFontPt) * 1.1 : 0) +
+      (config.showStoreName ? ptToCm(storeFontPt) * 1.15 : 0) +
+      (config.showSkuText ? ptToCm(skuFontPt) * 1.15 : 0) +
+      (config.showStoneName ? ptToCm(nameFontPt) * 1.15 : 0) +
       (config.showWeightAndDim || config.showPrice
-        ? ptToCm(Math.max(metaFontPt, priceFontPt)) * 1.05 + 0.05
+        ? ptToCm(Math.max(metaFontPt, priceFontPt)) * 1.15 + 0.03
         : 0);
-    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.04;
-    const targetBarcodeCm = isTiny ? 0.38 : Math.max(0.45, Math.round(hCm * ratio * 100) / 100);
+    const availableBarcodeCm = hCm - paddingCm * 2 - textStackCm - 0.03;
+    const targetBarcodeCm = Math.round(hCm * ratio * 100) / 100;
     const barcodeHeightCm = Math.max(
-      0.32,
+      0.35,
       Math.round(Math.min(targetBarcodeCm, availableBarcodeCm) * 100) / 100
     );
 
@@ -792,7 +792,6 @@ export default function BarcodePrintModal({
       const drawLabelRegion = (labelProduct: Product, canvasH: number, labelHCm: number) => {
       const targetProduct = labelProduct;
       const isTiny = labelHCm <= 1.8 || config.widthCm <= 2.8;
-      const padPx = Math.round((isTiny ? 0.1 : 0.14) * pxPerCm);
 
       ctx.fillStyle = '#000000';
       ctx.textAlign = 'center';
@@ -818,28 +817,29 @@ export default function BarcodePrintModal({
       const bottomRowFontPx = Math.max(priceFontPx, metaFontPx);
       const hasBottomLine = Boolean(bottomRowFontPx > 0);
 
-      // Safe bottom margin (8.5% = ~2.5mm on a 30mm label) ensures the bottom line prints flush
-      // against the physical bottom edge without sensor cutoff
-      const bottomMarginPx = Math.max(16, Math.round(Math.min(0.255, labelHCm * 0.085) * pxPerCm));
+      // Padding calibrated to fill the physical sticker edge-to-edge cleanly
+      const padPx = Math.round((isTiny ? 0.08 : 0.12) * pxPerCm);
+      const topPadPx = Math.round((isTiny ? 0.03 : 0.08) * pxPerCm);
+      const bottomMarginPx = Math.max(isTiny ? 4 : 8, Math.round((isTiny ? 0.03 : 0.05) * pxPerCm));
       const printableBottomPx = canvasH - bottomMarginPx;
       const bottomY = printableBottomPx - bottomRowFontPx;
-      const dividerGap = Math.max(4, Math.round(0.035 * pxPerCm));
+      const dividerGap = Math.max(2, Math.round((isTiny ? 0.02 : 0.03) * pxPerCm));
       const dividerY = bottomY - dividerGap;
 
       const storeLineH = config.showStoreName ? Math.round(storeFontPx * 1.15) : 0;
       const skuLineH = config.showSkuText ? Math.round(skuFontPx * 1.15) : 0;
       const nameLineH = config.showStoneName ? Math.round(nameFontPx * 1.15) : 0;
-      const barcodeGap = Math.max(4, Math.round(0.04 * pxPerCm));
+      const barcodeGap = Math.max(2, Math.round((isTiny ? 0.025 : 0.04) * pxPerCm));
 
       const totalTextH = storeLineH + skuLineH + nameLineH;
       const maxAvailableBarcodeH = hasBottomLine
-        ? dividerY - dividerGap - padPx - totalTextH - barcodeGap
-        : printableBottomPx - padPx - totalTextH - barcodeGap;
+        ? dividerY - dividerGap - topPadPx - totalTextH - barcodeGap
+        : printableBottomPx - topPadPx - totalTextH - barcodeGap;
 
       const targetBarcodeH = Math.round(metrics.barcodeHeightCm * pxPerCm);
-      const barcodeH = Math.max(30, Math.min(targetBarcodeH, maxAvailableBarcodeH));
+      const barcodeH = Math.max(isTiny ? 25 : 30, Math.min(targetBarcodeH, Math.max(20, maxAvailableBarcodeH)));
 
-      let currentY = padPx;
+      let currentY = topPadPx;
       const innerW = canvasW - padPx * 2;
 
       // Optional: Store Name (only if enabled, placed above stone name)
@@ -879,9 +879,8 @@ export default function BarcodePrintModal({
 
       // 4. Bottom Meta & Price Line with Divider
       const sequentialDividerY = currentY + dividerGap;
-      const sequentialBottomY = sequentialDividerY + dividerGap + 1;
-      const actualDividerY = isTiny ? sequentialDividerY : Math.min(sequentialDividerY, dividerY);
-      const actualBottomY = isTiny ? sequentialBottomY : Math.min(sequentialBottomY, bottomY);
+      const actualDividerY = Math.max(sequentialDividerY, dividerY);
+      const actualBottomY = actualDividerY === dividerY ? bottomY : actualDividerY + dividerGap + 1;
 
       if (hasBottomLine) {
         // Divider line (pure black for sharp thermal printing)
@@ -915,9 +914,9 @@ export default function BarcodePrintModal({
         ctx.save();
         if (config.splitSheet && slots.length === 2) {
           const slotTopPx = i === 0
-            ? Math.round(0.04 * pxPerCm)
-            : Math.round((slotHCm - 0.06) * pxPerCm);
-          const slotHPx = Math.round((slotHCm - (i === 0 ? 0.08 : 0.12)) * pxPerCm);
+            ? Math.round(0.02 * pxPerCm)
+            : Math.round((slotHCm - 0.02) * pxPerCm);
+          const slotHPx = Math.round((slotHCm - 0.04) * pxPerCm);
           const slotHCmEffective = slotHPx / pxPerCm;
           ctx.translate(0, slotTopPx);
           ctx.beginPath();
