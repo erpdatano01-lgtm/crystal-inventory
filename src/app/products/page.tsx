@@ -83,6 +83,30 @@ export default function ProductsPage() {
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
+  // Read ?lot= parameter from URL on load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const paramLot = new URLSearchParams(window.location.search).get('lot');
+      if (paramLot) setSelectedLotId(paramLot);
+    }
+  }, []);
+
+  // Compute Active Lot stats for instant progress tracking
+  const activeLot = useMemo(() => {
+    if (!selectedLotId) return null;
+    return lots.find((l) => l.id === selectedLotId) || null;
+  }, [selectedLotId, lots]);
+
+  const activeLotStats = useMemo(() => {
+    if (!selectedLotId) return null;
+    const lotProds = products.filter((p) => p.lot_id === selectedLotId);
+    const count = lotProds.length;
+    const totalWeight = lotProds.reduce((sum, p) => sum + (Number(p.weight_grams) || 0), 0);
+    const totalCost = lotProds.reduce((sum, p) => sum + (Number(p.cost_price) || 0), 0);
+    const totalSelling = lotProds.reduce((sum, p) => sum + (Number(p.selling_price) || 0), 0);
+    return { count, totalWeight, totalCost, totalSelling };
+  }, [selectedLotId, products]);
+
   // Toast Notification state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -505,6 +529,104 @@ export default function ProductsPage() {
             )}
           </div>
         </div>
+
+        {/* ACTIVE LOT PROGRESS CARD */}
+        {activeLot && activeLotStats && (
+          <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 mb-5 shadow-lg border border-purple-500/30">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📦</span>
+                  <h3 className="font-mono text-base font-bold text-amber-300">
+                    ล็อต: {activeLot.lot_code}
+                  </h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/40 text-purple-200">
+                    ทุนเปิดล็อต: ฿{activeLot.total_cost.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  {activeLot.notes || 'ความคืบหน้าการลงรายการหินในล็อตนี้'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/products/new"
+                  className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-purple-600/30"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  + ลงหินเพิ่มในล็อตนี้
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLotId('')}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-xl text-xs transition"
+                  title="ปิดมุมมองล็อตนี้"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-3 border-t border-white/10 text-xs">
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-slate-400 block text-[11px]">ลงแล้วในคลัง</span>
+                <span className="font-mono font-bold text-lg text-white">
+                  {activeLotStats.count}
+                </span>
+                <span className="text-slate-400 text-xs"> ชิ้น</span>
+              </div>
+
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-slate-400 block text-[11px]">น้ำหนักที่ลงแล้ว</span>
+                <span className="font-mono font-bold text-lg text-cyan-300">
+                  {activeLotStats.totalWeight.toLocaleString()}
+                </span>
+                <span className="text-slate-400 text-xs">
+                  {activeLot.total_weight_grams ? ` / ${activeLot.total_weight_grams.toLocaleString()}g` : ' g'}
+                </span>
+                {activeLot.total_weight_grams && (
+                  <span className={`block text-[10px] mt-0.5 ${
+                    activeLot.total_weight_grams > activeLotStats.totalWeight ? 'text-amber-300' : 'text-emerald-400'
+                  }`}>
+                    {activeLot.total_weight_grams > activeLotStats.totalWeight
+                      ? `ขาดอีก ${(activeLot.total_weight_grams - activeLotStats.totalWeight).toLocaleString()}g (${Math.round((activeLotStats.totalWeight / activeLot.total_weight_grams) * 100)}%)`
+                      : '✓ ครบน้ำหนักล็อตแล้ว'}
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-slate-400 block text-[11px]">ต้นทุนจัดสรรแล้ว</span>
+                <span className="font-mono font-bold text-lg text-emerald-400">
+                  ฿{activeLotStats.totalCost.toLocaleString()}
+                </span>
+                <span className="text-slate-400 text-xs">
+                  {activeLot.total_cost ? ` / ฿${activeLot.total_cost.toLocaleString()}` : ''}
+                </span>
+                {activeLot.total_cost > 0 && (
+                  <span className={`block text-[10px] mt-0.5 ${
+                    activeLot.total_cost > activeLotStats.totalCost ? 'text-slate-400' : 'text-emerald-400'
+                  }`}>
+                    {activeLot.total_cost > activeLotStats.totalCost
+                      ? `เหลือทุน ฿${(activeLot.total_cost - activeLotStats.totalCost).toLocaleString()}`
+                      : '✓ จัดสรรทุนครบ'}
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-slate-400 block text-[11px]">มูลค่าขายรวม (คาดการณ์)</span>
+                <span className="font-mono font-bold text-lg text-amber-300">
+                  ฿{activeLotStats.totalSelling.toLocaleString()}
+                </span>
+                <span className="block text-[10px] text-emerald-400 mt-0.5">
+                  กำไรคาดหวัง ฿{(activeLotStats.totalSelling - activeLotStats.totalCost).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* PRODUCTS LIST */}
         {loading ? (

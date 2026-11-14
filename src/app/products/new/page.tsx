@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ImageUploader from '@/components/ImageUploader';
@@ -50,6 +50,7 @@ export default function NewProductPage() {
   const router = useRouter();
 
   const [lots, setLots] = useState<StockLot[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [existingSkus, setExistingSkus] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -110,6 +111,7 @@ export default function NewProductPage() {
           }
         }
         setLots(l);
+        setAllProducts(p);
         const skus = p.map((prod) => prod.sku);
         setExistingSkus(skus);
 
@@ -232,6 +234,19 @@ export default function NewProductPage() {
 
   // Selected lot details for reference
   const selectedLot = lots.find((l) => l.id === lotId);
+  const lotProducts = useMemo(() => {
+    if (!lotId) return [];
+    return allProducts.filter((p) => p.lot_id === lotId);
+  }, [lotId, allProducts]);
+  const lotProductCount = lotProducts.length;
+  const lotTotalWeight = lotProducts.reduce(
+    (sum: number, p: Product) => sum + (Number(p.weight_grams) || 0),
+    0
+  );
+  const lotAllocatedCost = lotProducts.reduce(
+    (sum: number, p: Product) => sum + (Number(p.cost_price) || 0),
+    0
+  );
 
   // Profit calculation
   const numCost = parseFloat(costPrice) || 0;
@@ -390,6 +405,71 @@ export default function NewProductPage() {
                     </option>
                   ))}
                 </select>
+
+                {/* Real-time Lot Progress Card */}
+                {selectedLot && (
+                  <div className="mt-2.5 p-3 bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-200 rounded-xl space-y-2 text-xs shadow-sm">
+                    <div className="flex items-center justify-between font-bold text-purple-900">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        ความคืบหน้าการลงหินล็อต {selectedLot.lot_code}
+                      </span>
+                      <Link
+                        href={`/products?lot=${selectedLot.id}`}
+                        target="_blank"
+                        className="text-[11px] text-purple-700 hover:text-purple-900 underline font-semibold flex items-center gap-0.5"
+                      >
+                        ดูรายการในล็อต ({lotProductCount} ชิ้น) ↗
+                      </Link>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+                      <div className="bg-white p-2 rounded-lg border border-purple-100 shadow-xs">
+                        <span className="text-slate-500 block text-[10px]">ลงแล้วในระบบ</span>
+                        <span className="font-bold text-purple-800 text-sm">{lotProductCount}</span>
+                        <span className="text-slate-400 text-[10px]"> ชิ้น</span>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-lg border border-purple-100 shadow-xs">
+                        <span className="text-slate-500 block text-[10px]">น้ำหนักที่ลงแล้ว</span>
+                        <span className="font-bold text-indigo-800 text-sm">
+                          {lotTotalWeight.toLocaleString()}
+                        </span>
+                        <span className="text-slate-400 text-[10px]">
+                          {selectedLot.total_weight_grams ? ` / ${selectedLot.total_weight_grams.toLocaleString()}g` : ' g'}
+                        </span>
+                        {selectedLot.total_weight_grams && (
+                          <span className={`block text-[9px] font-medium mt-0.5 ${
+                            selectedLot.total_weight_grams > lotTotalWeight ? 'text-amber-600' : 'text-emerald-600'
+                          }`}>
+                            {selectedLot.total_weight_grams > lotTotalWeight
+                              ? `ขาดอีก ${(selectedLot.total_weight_grams - lotTotalWeight).toLocaleString()}g`
+                              : '✓ ครบน้ำหนักล็อตแล้ว'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="bg-white p-2 rounded-lg border border-purple-100 shadow-xs">
+                        <span className="text-slate-500 block text-[10px]">ทุนที่กระจายแล้ว</span>
+                        <span className="font-bold text-emerald-700 text-sm">
+                          ฿{lotAllocatedCost.toLocaleString()}
+                        </span>
+                        <span className="text-slate-400 text-[10px]">
+                          {selectedLot.total_cost ? ` / ฿${selectedLot.total_cost.toLocaleString()}` : ''}
+                        </span>
+                        {selectedLot.total_cost > 0 && (
+                          <span className={`block text-[9px] font-medium mt-0.5 ${
+                            selectedLot.total_cost > lotAllocatedCost ? 'text-slate-500' : 'text-emerald-600'
+                          }`}>
+                            {selectedLot.total_cost > lotAllocatedCost
+                              ? `เหลือทุน ฿${(selectedLot.total_cost - lotAllocatedCost).toLocaleString()}`
+                              : '✓ ทุนครบแล้ว'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Stone Shape dropdown (triggers smart SKU) */}

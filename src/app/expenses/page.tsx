@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import ImageUploader from '@/components/ImageUploader';
 import {
   fetchExpenses,
   fetchStockLots,
+  fetchProducts,
   createExpenseWithOptionalLot,
   deleteExpense,
   resetTestData,
@@ -13,6 +15,7 @@ import {
 import {
   Expense,
   StockLot,
+  Product,
   ExpenseCategory,
   EXPENSE_CATEGORIES_CONFIG,
 } from '@/types';
@@ -39,6 +42,7 @@ import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [lots, setLots] = useState<StockLot[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSheetsModal, setShowSheetsModal] = useState(false);
@@ -90,9 +94,14 @@ export default function ExpensesPage() {
     async function load() {
       setLoading(true);
       try {
-        const [e, l] = await Promise.all([fetchExpenses(), fetchStockLots()]);
+        const [e, l, p] = await Promise.all([
+          fetchExpenses(),
+          fetchStockLots(),
+          fetchProducts(),
+        ]);
         setExpenses(e);
         setLots(l);
+        setProducts(p);
       } finally {
         setLoading(false);
       }
@@ -567,11 +576,19 @@ export default function ExpensesPage() {
                           >
                             {catConfig.label}
                           </span>
-                          {linkedLot && (
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                              🔗 {linkedLot.lot_code}
-                            </span>
-                          )}
+                          {linkedLot && (() => {
+                            const lotProds = products.filter((p) => p.lot_id === linkedLot.id);
+                            return (
+                              <Link
+                                href={`/products?lot=${linkedLot.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200 inline-flex items-center gap-1 transition"
+                                title={`คลิกเพื่อดูสินค้าในล็อตนี้ (ลงแล้ว ${lotProds.length} ชิ้น)`}
+                              >
+                                📦 {linkedLot.lot_code} (ลงแล้ว {lotProds.length} ชิ้น) ↗
+                              </Link>
+                            );
+                          })()}
                         </div>
 
                         <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
@@ -720,9 +737,28 @@ export default function ExpensesPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 block mb-0.5">รหัสล็อตสินค้าที่ผูก</span>
-                    <span className="font-semibold text-purple-700 text-sm font-mono">
-                      {lots.find((l) => l.expense_id === activeDetailExpense.id)?.lot_code || 'ไม่ได้เปิดล็อต'}
-                    </span>
+                    {(() => {
+                      const linkedLot = lots.find((l) => l.expense_id === activeDetailExpense.id);
+                      if (!linkedLot) return <span className="font-semibold text-slate-400 text-sm">ไม่ได้เปิดล็อต</span>;
+                      const lotProds = products.filter((p) => p.lot_id === linkedLot.id);
+                      const lotWeight = lotProds.reduce((sum, p) => sum + (Number(p.weight_grams) || 0), 0);
+                      const lotCost = lotProds.reduce((sum, p) => sum + (Number(p.cost_price) || 0), 0);
+                      return (
+                        <div className="space-y-1">
+                          <Link
+                            href={`/products?lot=${linkedLot.id}`}
+                            className="font-bold text-purple-700 hover:text-purple-900 text-sm font-mono inline-flex items-center gap-1 hover:underline"
+                          >
+                            📦 {linkedLot.lot_code} ↗
+                          </Link>
+                          <div className="text-[11px] text-slate-500 space-y-0.5 mt-1">
+                            <div>• ลงสินค้าแล้ว: <strong className="text-purple-800">{lotProds.length} ชิ้น</strong></div>
+                            <div>• น้ำหนักที่ลงแล้ว: <strong className="text-indigo-800">{lotWeight.toLocaleString()}g</strong> {linkedLot.total_weight_grams ? ` / ${linkedLot.total_weight_grams.toLocaleString()}g` : ''}</div>
+                            <div>• ทุนที่จัดสรรแล้ว: <strong className="text-emerald-700">฿{lotCost.toLocaleString()}</strong> / ฿{linkedLot.total_cost.toLocaleString()}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 

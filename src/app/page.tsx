@@ -349,32 +349,35 @@ export default function DashboardPage() {
                   ยังไม่มีรหัสล็อตหิน
                 </p>
               ) : (
-                lots.slice(0, 4).map((lot) => (
-                  <div
-                    key={lot.id}
-                    className="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1 text-xs"
-                  >
-                    <div className="flex items-center justify-between font-bold">
-                      <span className="font-mono text-purple-800">{lot.lot_code}</span>
-                      <span className="text-slate-900">
-                        ฿{lot.total_cost.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>น้ำหนัก: {lot.total_weight_grams ? `${lot.total_weight_grams} g` : '-'}</span>
-                      {lot.drive_lot_folder_url && (
-                        <a
-                          href={lot.drive_lot_folder_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-purple-600 hover:underline flex items-center gap-0.5"
-                        >
-                          Google Drive <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))
+                lots.slice(0, 4).map((lot) => {
+                  const lotProds = products.filter((p) => p.lot_id === lot.id);
+                  const lotWeight = lotProds.reduce((sum, p) => sum + (Number(p.weight_grams) || 0), 0);
+                  return (
+                    <Link
+                      key={lot.id}
+                      href={`/products?lot=${lot.id}`}
+                      className="block p-3 bg-slate-50 hover:bg-purple-50/60 border border-slate-100 hover:border-purple-200 rounded-2xl space-y-1.5 text-xs transition group"
+                    >
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="font-mono text-purple-800 group-hover:text-purple-900 flex items-center gap-1">
+                          📦 {lot.lot_code}
+                        </span>
+                        <span className="text-slate-900 font-semibold">
+                          ฿{lot.total_cost.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>
+                          ลงแล้ว: <strong className="text-purple-700">{lotProds.length} ชิ้น</strong>
+                          {lot.total_weight_grams ? ` • ${lotWeight.toLocaleString()} / ${lot.total_weight_grams.toLocaleString()}g` : ''}
+                        </span>
+                        <span className="text-purple-600 font-medium group-hover:underline">
+                          ดูสินค้า ↗
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })
               )}
             </div>
           </div>
