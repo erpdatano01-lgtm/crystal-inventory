@@ -197,6 +197,29 @@ export default function NewProductPage() {
           loadedStones
         );
         setSku(initialSku);
+
+        // Check URL params for ?mode=freebie or ?type=freebie
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          if (
+            params.get('mode') === 'freebie' ||
+            params.get('type') === 'freebie' ||
+            params.get('freebie') === 'true'
+          ) {
+            setIsFreebie(true);
+            setSellingPrice('0');
+            setMinPrice('0');
+            const giftSku = generateGiftSku(skus, {
+              isStone: true,
+              stoneType: initialStone,
+              shapeId: initialShape,
+              customShapes: loadedShapes,
+              customStones: loadedStones,
+            });
+            setSku(giftSku);
+            setName(`${initialStone} ${initialShape} (ของแถม)`);
+          }
+        }
       } finally {
         setLoading(false);
       }
@@ -524,31 +547,81 @@ export default function NewProductPage() {
           className="bg-white p-4 sm:p-8 rounded-3xl border border-slate-200/80 shadow-md space-y-6"
         >
           {/* PRODUCT MODE SELECTOR: Standard Sale vs Freebie Gift */}
-          <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => handleModeChange(false)}
-              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
-                !isFreebie
-                  ? 'bg-white text-purple-800 shadow-md ring-2 ring-purple-600/20'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Gem className="w-4 h-4 text-purple-600" />
-              <span>สินค้าปกติสำหรับจำหน่าย</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeChange(true)}
-              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
-                isFreebie
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-200 ring-2 ring-emerald-500/30'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Gift className="w-4 h-4" />
-              <span>🎁 ลงเป็นของแถม (Freebie)</span>
-            </button>
+          <div className="space-y-1.5">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500 block">
+              เลือกรูปแบบสินค้าที่ต้องการลงสต็อก:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <button
+                type="button"
+                onClick={() => handleModeChange(false)}
+                className={`p-4 rounded-3xl border-2 text-left transition-all flex items-start gap-3.5 shadow-sm cursor-pointer ${
+                  !isFreebie
+                    ? 'bg-gradient-to-br from-purple-50 via-white to-indigo-50/50 border-purple-500 ring-4 ring-purple-500/15 shadow-md'
+                    : 'bg-slate-50 border-slate-200 hover:border-purple-200 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                    !isFreebie ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  <Gem className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-black ${!isFreebie ? 'text-purple-950' : 'text-slate-700'}`}>
+                      💎 สินค้าปกติสำหรับจำหน่าย
+                    </span>
+                    {!isFreebie && (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-600 text-white shadow-2xs">
+                        เลือกอยู่ ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    หินตั้งราคาขายปกติ คำนวณต้นทุน กำไร และส่วนลด
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleModeChange(true)}
+                className={`p-4 rounded-3xl border-2 text-left transition-all flex items-start gap-3.5 shadow-sm cursor-pointer ${
+                  isFreebie
+                    ? 'bg-gradient-to-br from-emerald-50 via-white to-teal-50/50 border-emerald-500 ring-4 ring-emerald-500/15 shadow-md'
+                    : 'bg-slate-50 border-slate-200 hover:border-emerald-200 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                    isFreebie ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  <Gift className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-black ${isFreebie ? 'text-emerald-950' : 'text-slate-700'}`}>
+                      🎁 ลงเป็นของแถม (Freebie)
+                    </span>
+                    {isFreebie ? (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
+                        เลือกอยู่ ✓
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        ราคา ฿0
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    หินแถมในล็อต, ถุงผ้า, ฐานไม้, เสจ • พิมพ์บาร์โค้ด FREE GIFT
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* FREEBIE CONFIGURATION BANNER (When isFreebie is true) */}

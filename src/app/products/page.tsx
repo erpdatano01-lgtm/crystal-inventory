@@ -174,6 +174,7 @@ export default function ProductsPage() {
       lot_id: product.lot_id,
       status: product.status,
       item_type: product.item_type || 'UNIQUE',
+      is_freebie: Boolean(product.is_freebie || product.selling_price === 0 || product.sku?.startsWith('GIFT-') || product.sku?.startsWith('FREE-')),
       name: product.name,
       stone_type: product.stone_type,
       weight_grams: product.weight_grams,
@@ -418,6 +419,16 @@ export default function ProductsPage() {
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Google Sheets</span>
             </button>
+
+            {/* Link to Add Freebie directly */}
+            <Link
+              href="/products/new?mode=freebie"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 active:scale-95 transition"
+              title="ลงทะเบียนของแถม (หินแถม, ถุงผ้า, ฐานไม้, สติกเกอร์)"
+            >
+              <Gift className="w-4 h-4" />
+              <span>🎁 + ลงของแถม (Freebie)</span>
+            </Link>
 
             {/* Link to Add Product */}
             <Link
@@ -1372,6 +1383,36 @@ export default function ProductsPage() {
                       <option value="UNIQUE">ชิ้นเดี่ยว (Unique Item - 1 SKU ต่อ 1 ชิ้น)</option>
                       <option value="BULK">เหมาล็อต / มีหลายชิ้น (Bulk Item)</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">
+                      สถานะเป็นของแถม (Freebie Gift)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((f) => ({ ...f, is_freebie: false }))}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          !editForm.is_freebie
+                            ? 'bg-white text-purple-700 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        💎 สินค้าขายปกติ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((f) => ({ ...f, is_freebie: true, selling_price: 0 }))}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          editForm.is_freebie
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        🎁 ของแถม (฿0)
+                      </button>
+                    </div>
                   </div>
 
                   <div className="sm:col-span-2">
