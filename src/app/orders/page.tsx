@@ -127,13 +127,9 @@ export default function OrdersPage() {
   const filteredOrderPickerProducts = useMemo(() => {
     let list = availableProducts;
     if (orderItemFilter === 'FREEBIE') {
-      list = list.filter(
-        (p) => Boolean(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))
-      );
+      list = list.filter((p) => p.sku?.startsWith('GIFT'));
     } else if (orderItemFilter === 'SALE') {
-      list = list.filter(
-        (p) => !Boolean(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))
-      );
+      list = list.filter((p) => !p.sku?.startsWith('GIFT'));
     }
 
     if (!orderItemSearch.trim()) return list;
@@ -149,12 +145,7 @@ export default function OrdersPage() {
   // Handle adding an item to order
   const handleSelectItem = (prod: Product) => {
     if (selectedItems.some((i) => i.product_id === prod.id)) return;
-    const isFreebie = Boolean(
-      prod.is_freebie ||
-      prod.sku?.startsWith('GIFT-') ||
-      prod.sku?.startsWith('FREE-') ||
-      prod.grade_origin?.includes('[FREEBIE]')
-    );
+    const isFreebie = Boolean(prod.sku?.startsWith('GIFT'));
     const newItem: OrderItem = {
       product_id: prod.id,
       sku: prod.sku,
@@ -542,7 +533,7 @@ export default function OrdersPage() {
                         <td className="py-3.5 px-4">
                           <div className="space-y-1">
                             {ord.items.map((it, idx) => {
-                              const isGift = Boolean(it.is_freebie || it.sku.startsWith('GIFT-') || it.sku.startsWith('FREE-'));
+                              const isGift = Boolean(it.sku?.startsWith('GIFT'));
                               return (
                                 <div key={idx} className="flex items-center gap-1.5 text-xs">
                                   <span className="font-mono text-purple-600 font-semibold">
@@ -761,7 +752,7 @@ export default function OrdersPage() {
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        💎 สินค้าขาย ({availableProducts.filter((p) => !(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))).length})
+                        💎 สินค้าขาย ({availableProducts.filter((p) => !p.sku?.startsWith('GIFT')).length})
                       </button>
                       <button
                         type="button"
@@ -772,7 +763,7 @@ export default function OrdersPage() {
                             : 'text-emerald-700 hover:text-emerald-900'
                         }`}
                       >
-                        🎁 ของแถม ({availableProducts.filter((p) => p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]')).length})
+                        🎁 ของแถม ({availableProducts.filter((p) => p.sku?.startsWith('GIFT')).length})
                       </button>
                       <button
                         type="button"
@@ -807,7 +798,7 @@ export default function OrdersPage() {
                       ) : (
                         filteredOrderPickerProducts.map((p) => {
                           const isPicked = selectedItems.some((i) => i.product_id === p.id);
-                          const isGift = Boolean(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'));
+                          const isGift = Boolean(p.sku?.startsWith('GIFT'));
                           return (
                             <button
                               key={p.id}
@@ -882,7 +873,7 @@ export default function OrdersPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {selectedItems.map((item) => {
-                            const isGift = Boolean(item.is_freebie || item.sku.startsWith('GIFT-') || item.sku.startsWith('FREE-'));
+                            const isGift = Boolean(item.sku?.startsWith('GIFT'));
                             return (
                               <tr key={item.product_id} className={isGift ? 'bg-emerald-50/40' : 'bg-white'}>
                                 <td className="py-2.5 px-3">

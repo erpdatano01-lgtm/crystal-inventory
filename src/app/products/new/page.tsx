@@ -475,7 +475,7 @@ export default function NewProductPage() {
         storage_location: storageLocation.trim() || null,
       });
 
-      alert(`บันทึก${isFreebie ? 'ของแถม (FREE GIFT)' : 'สินค้า'} ${sku} เข้าสต็อกสำเร็จ! พร้อมพิมพ์บาร์โค้ดได้ทันที`);
+      alert(`บันทึก${isFreebie ? 'ของแถม' : 'สินค้า'} ${sku} เข้าสต็อกสำเร็จ! พร้อมพิมพ์บาร์โค้ดได้ทันที`);
       router.push('/products');
     } catch (err: any) {
       console.error(err);
@@ -604,7 +604,7 @@ export default function NewProductPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className={`text-sm font-black ${isFreebie ? 'text-emerald-950' : 'text-slate-700'}`}>
-                      🎁 ลงเป็นของแถม (Freebie)
+                      🎁 ลงเป็นของแถม
                     </span>
                     {isFreebie ? (
                       <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
@@ -630,7 +630,7 @@ export default function NewProductPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5 uppercase tracking-wider">
                   <Gift className="w-4 h-4 text-emerald-600" />
-                  ประเภทของแถม (Freebie Source & Category)
+                  ประเภทของแถม
                 </span>
                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
                   ราคาขาย ฿0 • พิมพ์บาร์โค้ด FREE GIFT
@@ -650,7 +650,7 @@ export default function NewProductPage() {
                 >
                   <Gem className="w-5 h-5 text-emerald-600 shrink-0" />
                   <div>
-                    <div className="text-xs sm:text-sm font-bold">1. หินของแถม (Crystal Freebie)</div>
+                    <div className="text-xs sm:text-sm font-bold">1. หินของแถม</div>
                     <div className="text-[11px] text-slate-500 font-normal">หินกลิ้ง/เกรดรอง คัดจากล็อต หรือซื้อแยก</div>
                   </div>
                 </button>

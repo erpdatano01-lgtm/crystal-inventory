@@ -174,7 +174,7 @@ export default function ProductsPage() {
       lot_id: product.lot_id,
       status: product.status,
       item_type: product.item_type || 'UNIQUE',
-      is_freebie: Boolean(product.is_freebie || product.sku?.startsWith('GIFT-') || product.sku?.startsWith('FREE-') || product.grade_origin?.includes('[FREEBIE]')),
+      is_freebie: Boolean(product.sku?.startsWith('GIFT')),
       name: product.name,
       stone_type: product.stone_type,
       weight_grams: product.weight_grams,
@@ -290,12 +290,7 @@ export default function ProductsPage() {
         return false;
       }
 
-      const isFree = Boolean(
-        p.is_freebie ||
-        p.sku?.startsWith('GIFT-') ||
-        p.sku?.startsWith('FREE-') ||
-        p.grade_origin?.includes('[FREEBIE]')
-      );
+      const isFree = Boolean(p.sku?.startsWith('GIFT'));
 
       if (productTypeFilter === 'FREEBIE') {
         if (!isFree) return false;
@@ -432,7 +427,7 @@ export default function ProductsPage() {
               title="ลงทะเบียนของแถม (หินแถม, ถุงผ้า, ฐานไม้, สติกเกอร์)"
             >
               <Gift className="w-4 h-4" />
-              <span>🎁 + ลงของแถม (Freebie)</span>
+              <span>🎁 + ลงของแถม</span>
             </Link>
 
             {/* Link to Add Product */}
@@ -468,7 +463,7 @@ export default function ProductsPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))).length})
+              💎 สินค้าขาย ({products.filter((p) => !p.sku?.startsWith('GIFT')).length})
             </button>
             <button
               onClick={() => setProductTypeFilter('FREEBIE')}
@@ -478,7 +473,7 @@ export default function ProductsPage() {
                   : 'text-emerald-700 hover:text-emerald-900'
               }`}
             >
-              🎁 ของแถม ({products.filter((p) => p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]')).length})
+              🎁 ของแถม ({products.filter((p) => p.sku?.startsWith('GIFT')).length})
             </button>
           </div>
 
@@ -790,7 +785,7 @@ export default function ProductsPage() {
                     <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400">ราคาขาย</span>
-                        {p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]') ? (
+                        {p.sku?.startsWith('GIFT') ? (
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1">
                             <Gift className="w-3 h-3 text-emerald-600" />
                             <span>FREE GIFT (ของแถม)</span>
@@ -974,7 +969,7 @@ export default function ProductsPage() {
                       )}
 
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        {p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]') ? (
+                        {p.sku?.startsWith('GIFT') ? (
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Gift className="w-3 h-3 text-emerald-600" />
                             <span>FREE GIFT</span>
@@ -1392,12 +1387,18 @@ export default function ProductsPage() {
 
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">
-                      สถานะเป็นของแถม (Freebie Gift)
+                      สถานะของแถม
                     </label>
                     <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
                       <button
                         type="button"
-                        onClick={() => setEditForm((f) => ({ ...f, is_freebie: false }))}
+                        onClick={() =>
+                          setEditForm((f) => ({
+                            ...f,
+                            is_freebie: false,
+                            sku: (f.sku || '').replace(/^GIFT-/, ''),
+                          }))
+                        }
                         className={`py-2 text-xs font-bold rounded-lg transition ${
                           !editForm.is_freebie
                             ? 'bg-white text-purple-700 shadow-2xs'
@@ -1408,7 +1409,14 @@ export default function ProductsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditForm((f) => ({ ...f, is_freebie: true, selling_price: 0 }))}
+                        onClick={() =>
+                          setEditForm((f) => ({
+                            ...f,
+                            is_freebie: true,
+                            sku: f.sku?.startsWith('GIFT-') ? f.sku : `GIFT-${f.sku || ''}`,
+                            selling_price: 0,
+                          }))
+                        }
                         className={`py-2 text-xs font-bold rounded-lg transition ${
                           editForm.is_freebie
                             ? 'bg-emerald-600 text-white shadow-2xs'

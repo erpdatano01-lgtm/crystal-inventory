@@ -21,11 +21,7 @@ export async function GET() {
 
   const normalized = (data || []).map((p: any) => ({
     ...p,
-    is_freebie:
-      p.is_freebie === true ||
-      p.sku?.startsWith('GIFT-') ||
-      p.sku?.startsWith('FREE-') ||
-      p.grade_origin?.includes('[FREEBIE]'),
+    is_freebie: Boolean(p.sku?.startsWith('GIFT')),
   }));
 
   return NextResponse.json(normalized);
@@ -60,12 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isFreebie = Boolean(
-      body.is_freebie ||
-      cleanSku.startsWith('GIFT-') ||
-      cleanSku.startsWith('FREE-') ||
-      body.grade_origin?.includes('[FREEBIE]')
-    );
+    const isFreebie = cleanSku.startsWith('GIFT');
 
     const productPayload: any = {
       sku: cleanSku,
@@ -210,7 +201,10 @@ export async function PATCH(request: NextRequest) {
       if (updErr) {
         return NextResponse.json({ error: updErr.message }, { status: 400 });
       }
-      return NextResponse.json(updated);
+      return NextResponse.json({
+        ...updated,
+        is_freebie: Boolean(updated?.sku?.startsWith('GIFT')),
+      });
     }
 
     // --- CASE 2: Status-only change (original flow, no ?id query param) ---
