@@ -394,6 +394,67 @@ export function generateSmartSku(
   return candidate;
 }
 
+// Gift SKU Generator:
+// 1. Crystal gift: GIFT-[SHAPE]-[STONE]-[001] (e.g., GIFT-TUM-ROQ-001)
+// 2. Accessory gift: GIFT-[CATEGORY]-[001] (e.g., GIFT-POUCH-001, GIFT-STAND-001)
+export function generateGiftSku(
+  existingSkus: string[],
+  options: {
+    isStone?: boolean;
+    stoneType?: string;
+    shapeId?: string;
+    categoryCode?: string;
+    customShapes?: StoneShapeItem[];
+    customStones?: StoneTypeItem[];
+  }
+): string {
+  const {
+    isStone = false,
+    stoneType = 'Rose Quartz',
+    shapeId = 'Tumbled',
+    categoryCode = 'GIFT',
+    customShapes,
+    customStones,
+  } = options;
+
+  let prefix = '';
+  if (isStone) {
+    const shapesList = customShapes && customShapes.length > 0 ? customShapes : getStoneShapes();
+    const stonesList = customStones && customStones.length > 0 ? customStones : getStoneTypes();
+
+    const matchedStone = stonesList.find((s) => s.id === stoneType || s.label.includes(stoneType));
+    const stoneCode = matchedStone ? matchedStone.code : suggestAbbreviation(stoneType) || 'CRY';
+
+    const matchedShape = shapesList.find((sh) => sh.id === shapeId || sh.label.includes(shapeId));
+    const shapeCode = matchedShape ? matchedShape.code : suggestAbbreviation(shapeId) || 'TUM';
+
+    prefix = `GIFT-${shapeCode.toUpperCase()}-${stoneCode.toUpperCase()}-`;
+  } else {
+    const cat = (categoryCode || 'GIFT').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    prefix = `GIFT-${cat}-`;
+  }
+
+  const upperSet = new Set(existingSkus.map((s) => s.trim().toUpperCase()));
+
+  const numbers = existingSkus
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => s.startsWith(prefix))
+    .map((s) => {
+      const parts = s.split('-');
+      const numStr = parts[parts.length - 1];
+      return parseInt(numStr, 10);
+    })
+    .filter((n) => !isNaN(n));
+
+  let nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+  let candidate = `${prefix}${String(nextNum).padStart(3, '0')}`;
+  while (upperSet.has(candidate.toUpperCase())) {
+    nextNum += 1;
+    candidate = `${prefix}${String(nextNum).padStart(3, '0')}`;
+  }
+  return candidate;
+}
+
 // Delete product
 export async function deleteProduct(id: string): Promise<boolean> {
   try {

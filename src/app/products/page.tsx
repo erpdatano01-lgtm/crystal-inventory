@@ -43,6 +43,7 @@ import {
   Pencil,
   Save,
   Printer,
+  Gift,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 import BarcodePrintModal from '@/components/BarcodePrintModal';
@@ -81,6 +82,7 @@ export default function ProductsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedLotId, setSelectedLotId] = useState<string>('');
   const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [productTypeFilter, setProductTypeFilter] = useState<'ALL' | 'SALE' | 'FREEBIE'>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   // Read ?lot= parameter from URL on load
@@ -287,9 +289,17 @@ export default function ProductsPage() {
         return false;
       }
 
+      if (productTypeFilter === 'FREEBIE') {
+        const isFree = p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-');
+        if (!isFree) return false;
+      } else if (productTypeFilter === 'SALE') {
+        const isFree = p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-');
+        if (isFree) return false;
+      }
+
       return true;
     });
-  }, [products, searchQuery, selectedStatus, selectedLotId, selectedLocation]);
+  }, [products, searchQuery, selectedStatus, selectedLotId, selectedLocation, productTypeFilter]);
 
   // Copy Video Link to Clipboard with Toast
   const handleCopyVideoUrl = (p: Product) => {
@@ -422,6 +432,40 @@ export default function ProductsPage() {
 
         {/* Search, Filter & Layout bar */}
         <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
+          {/* Product Type Tabs: All vs Sale vs Freebie */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl w-full sm:w-auto">
+            <button
+              onClick={() => setProductTypeFilter('ALL')}
+              className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
+                productTypeFilter === 'ALL'
+                  ? 'bg-white text-purple-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              ทั้งหมด ({products.length})
+            </button>
+            <button
+              onClick={() => setProductTypeFilter('SALE')}
+              className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
+                productTypeFilter === 'SALE'
+                  ? 'bg-white text-purple-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-'))).length})
+            </button>
+            <button
+              onClick={() => setProductTypeFilter('FREEBIE')}
+              className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
+                productTypeFilter === 'FREEBIE'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-emerald-700 hover:text-emerald-900'
+              }`}
+            >
+              🎁 ของแถม ({products.filter((p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-')).length})
+            </button>
+          </div>
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             {/* Search input */}
             <div className="relative flex-1">
@@ -730,7 +774,12 @@ export default function ProductsPage() {
                     <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400">ราคาขาย</span>
-                        {!p.selling_price || p.selling_price <= 0 ? (
+                        {p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') ? (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                            <Gift className="w-3 h-3 text-emerald-600" />
+                            <span>FREE GIFT (ของแถม)</span>
+                          </span>
+                        ) : !p.selling_price || p.selling_price <= 0 ? (
                           <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg">
                             🟡 รอตั้งราคา
                           </span>
@@ -909,7 +958,12 @@ export default function ProductsPage() {
                       )}
 
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        {!p.selling_price || p.selling_price <= 0 ? (
+                        {p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') ? (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            <Gift className="w-3 h-3 text-emerald-600" />
+                            <span>FREE GIFT</span>
+                          </span>
+                        ) : !p.selling_price || p.selling_price <= 0 ? (
                           <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg inline-block">
                             🟡 รอตั้งราคา
                           </span>

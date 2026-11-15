@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS products (
     name TEXT NOT NULL,
     stone_type TEXT NOT NULL,
     item_type TEXT NOT NULL CHECK (item_type IN ('UNIQUE', 'BULK')),
+    is_freebie BOOLEAN DEFAULT FALSE,
     weight_grams NUMERIC(10, 2),
     dimensions TEXT,
     grade_origin TEXT,
@@ -104,3 +105,15 @@ CREATE TRIGGER trigger_update_products_timestamp
 BEFORE UPDATE ON products
 FOR EACH ROW
 EXECUTE PROCEDURE update_products_timestamp();
+
+-- ====================================================================
+-- MIGRATION: Support for Freebie Gifts & Accessories
+-- ====================================================================
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_freebie BOOLEAN DEFAULT FALSE;
+DO $$ 
+BEGIN 
+  IF EXISTS (SELECT 1 FROM information_schema.constraint_column_usage WHERE table_name = 'expenses' AND constraint_name = 'expenses_category_check') THEN
+    ALTER TABLE expenses DROP CONSTRAINT expenses_category_check;
+    ALTER TABLE expenses ADD CONSTRAINT expenses_category_check CHECK (category IN ('STOCK_LOT', 'PACKAGING', 'SHIPPING', 'BOOTH_MARKETING', 'FREEBIE_GIFT', 'OTHER'));
+  END IF;
+END $$;

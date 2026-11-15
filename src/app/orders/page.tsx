@@ -40,6 +40,8 @@ import {
   Sparkles,
   X,
   FileSpreadsheet,
+  Gift,
+  Gem,
 } from 'lucide-react';
 
 export default function OrdersPage() {
@@ -70,6 +72,8 @@ export default function OrdersPage() {
   const [shippingFee, setShippingFee] = useState<number>(0);
   const [orderSlipUrls, setOrderSlipUrls] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
+  const [orderItemFilter, setOrderItemFilter] = useState<'SALE' | 'FREEBIE' | 'ALL'>('SALE');
+  const [orderItemSearch, setOrderItemSearch] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load data
@@ -119,21 +123,63 @@ export default function OrdersPage() {
 
   const netProfit = grossProfit - totalOperatingExpenses;
 
+  // Filter available products for order creation modal
+  const filteredOrderPickerProducts = useMemo(() => {
+    let list = availableProducts;
+    if (orderItemFilter === 'FREEBIE') {
+      list = list.filter(
+        (p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-')
+      );
+    } else if (orderItemFilter === 'SALE') {
+      list = list.filter(
+        (p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-'))
+      );
+    }
+
+    if (!orderItemSearch.trim()) return list;
+    const q = orderItemSearch.toLowerCase();
+    return list.filter(
+      (p) =>
+        p.sku.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        p.stone_type.toLowerCase().includes(q)
+    );
+  }, [availableProducts, orderItemFilter, orderItemSearch]);
+
   // Handle adding an item to order
   const handleSelectItem = (prod: Product) => {
     if (selectedItems.some((i) => i.product_id === prod.id)) return;
+    const isFreebie = Boolean(
+      prod.is_freebie ||
+      prod.selling_price === 0 ||
+      prod.sku?.startsWith('GIFT-') ||
+      prod.sku?.startsWith('FREE-')
+    );
     const newItem: OrderItem = {
       product_id: prod.id,
       sku: prod.sku,
       name: prod.name,
       stone_type: prod.stone_type,
-      unit_price: Number(prod.selling_price) || 0,
+      unit_price: isFreebie ? 0 : (Number(prod.selling_price) || 0),
       cost_price: Number(prod.cost_price) || 0,
       qty: 1,
+      is_freebie: isFreebie,
       weight_grams: prod.weight_grams,
       r2_thumbnail_url: prod.r2_thumbnail_url,
     };
     setSelectedItems((prev) => [...prev, newItem]);
+  };
+
+  const handleUpdateItemQty = (productId: string, delta: number) => {
+    setSelectedItems((prev) =>
+      prev.map((it) => {
+        if (it.product_id === productId) {
+          const nextQty = Math.max(1, it.qty + delta);
+          return { ...it, qty: nextQty };
+        }
+        return it;
+      })
+    );
   };
 
   const handleRemoveItem = (productId: string) => {
@@ -495,17 +541,25 @@ export default function OrdersPage() {
 
                         <td className="py-3.5 px-4">
                           <div className="space-y-1">
-                            {ord.items.map((it, idx) => (
-                              <div key={idx} className="flex items-center gap-1.5 text-xs">
-                                <span className="font-mono text-purple-600 font-semibold">
-                                  {it.sku}
-                                </span>
-                                <span className="text-slate-700 truncate max-w-[140px]">
-                                  {it.name}
-                                </span>
-                                <span className="text-slate-400 font-medium">x{it.qty}</span>
-                              </div>
-                            ))}
+                            {ord.items.map((it, idx) => {
+                              const isGift = Boolean(it.is_freebie || it.unit_price === 0 || it.sku.startsWith('GIFT-'));
+                              return (
+                                <div key={idx} className="flex items-center gap-1.5 text-xs">
+                                  <span className="font-mono text-purple-600 font-semibold">
+                                    {it.sku}
+                                  </span>
+                                  {isGift && (
+                                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">
+                                      ของแถม
+                                    </span>
+                                  )}
+                                  <span className="text-slate-700 truncate max-w-[140px]">
+                                    {it.name}
+                                  </span>
+                                  <span className="text-slate-400 font-medium">x{it.qty}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </td>
 
@@ -686,24 +740,74 @@ export default function OrdersPage() {
                 {/* 2. Select Items from Stock */}
                 <div className="space-y-3 pt-3 border-t border-slate-100">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      2. เลือกหินจากสต็อกเพื่อขาย ({availableProducts.length} ชิ้นพร้อมขาย)
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <span>2. เลือกสินค้า & ของแถมลงในบิล</span>
+                      <span className="text-[11px] font-normal text-slate-500">
+                        ({availableProducts.length} ชิ้นพร้อมจำหน่าย)
+                      </span>
                     </h4>
                   </div>
 
-                  {/* Pick dropdown */}
-                  <div className="p-3 bg-purple-50/60 rounded-2xl border border-purple-200/80 space-y-2">
-                    <p className="text-xs font-semibold text-purple-900">
-                      คลิกเลือกหินที่ต้องการใส่ลงในบิลนี้:
-                    </p>
-                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                      {availableProducts.length === 0 ? (
-                        <p className="text-xs text-slate-400 py-2 text-center">
-                          ไม่มีหินสถานะพร้อมจำหน่ายในสต็อก (หรือขายหมดแล้ว)
+                  {/* Pick dropdown with Category tabs & search */}
+                  <div className="p-3 bg-purple-50/60 rounded-2xl border border-purple-200/80 space-y-2.5">
+                    {/* Filter Tabs */}
+                    <div className="flex items-center gap-1.5 p-1 bg-white/80 rounded-xl border border-purple-200">
+                      <button
+                        type="button"
+                        onClick={() => setOrderItemFilter('SALE')}
+                        className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition ${
+                          orderItemFilter === 'SALE'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        💎 สินค้าขาย ({availableProducts.filter((p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-'))).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOrderItemFilter('FREEBIE')}
+                        className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition ${
+                          orderItemFilter === 'FREEBIE'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'text-emerald-700 hover:text-emerald-900'
+                        }`}
+                      >
+                        🎁 ของแถม ({availableProducts.filter((p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-')).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOrderItemFilter('ALL')}
+                        className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition ${
+                          orderItemFilter === 'ALL'
+                            ? 'bg-slate-700 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        ทั้งหมด ({availableProducts.length})
+                      </button>
+                    </div>
+
+                    {/* Search box in order picker */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={orderItemSearch}
+                        onChange={(e) => setOrderItemSearch(e.target.value)}
+                        placeholder="พิมพ์ค้นหา SKU หรือชื่อสินค้า/ของแถม..."
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                      {filteredOrderPickerProducts.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-3 text-center">
+                          ไม่พบรายการที่ตรงกับการค้นหา
                         </p>
                       ) : (
-                        availableProducts.map((p) => {
+                        filteredOrderPickerProducts.map((p) => {
                           const isPicked = selectedItems.some((i) => i.product_id === p.id);
+                          const isGift = Boolean(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-'));
                           return (
                             <button
                               key={p.id}
@@ -713,32 +817,47 @@ export default function OrdersPage() {
                               className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition ${
                                 isPicked
                                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  : isGift
+                                  ? 'bg-emerald-50/70 hover:bg-emerald-100/90 border border-emerald-200 shadow-2xs'
                                   : 'bg-white hover:bg-purple-100/70 border border-slate-200 shadow-2xs'
                               }`}
                             >
-                              <div className="flex items-center gap-2">
-                                {p.r2_thumbnail_url && (
+                              <div className="flex items-center gap-2 truncate">
+                                {p.r2_thumbnail_url ? (
                                   <img
                                     src={p.r2_thumbnail_url}
                                     alt=""
-                                    className="w-7 h-7 rounded-lg object-cover"
+                                    className="w-7 h-7 rounded-lg object-cover shrink-0"
                                   />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center shrink-0 text-slate-500">
+                                    {isGift ? <Gift className="w-3.5 h-3.5 text-emerald-600" /> : <Gem className="w-3.5 h-3.5 text-purple-600" />}
+                                  </div>
                                 )}
-                                <div>
-                                  <span className="font-mono font-bold text-purple-700 mr-2">
-                                    {p.sku}
-                                  </span>
-                                  <span className="font-semibold text-slate-800">{p.name}</span>
+                                <div className="truncate">
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="font-mono font-bold text-purple-700">
+                                      {p.sku}
+                                    </span>
+                                    {isGift && (
+                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        ของแถม
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-semibold text-slate-800 text-[11px] truncate block">{p.name}</span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900">
-                                  ฿{Number(p.selling_price).toLocaleString()}
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                <span className={`font-bold ${isGift ? 'text-emerald-700' : 'text-slate-900'}`}>
+                                  {isGift ? 'FREE GIFT (฿0)' : `฿${Number(p.selling_price).toLocaleString()}`}
                                 </span>
                                 {isPicked ? (
-                                  <span className="text-[10px] text-slate-400">เลือกแล้ว</span>
+                                  <span className="text-[10px] text-slate-400 font-medium">เลือกแล้ว</span>
                                 ) : (
-                                  <span className="text-[10px] text-purple-600 font-bold">+ เพิ่ม</span>
+                                  <span className={`text-[10px] font-bold ${isGift ? 'text-emerald-700' : 'text-purple-600'}`}>
+                                    + เพิ่ม
+                                  </span>
                                 )}
                               </div>
                             </button>
@@ -750,42 +869,81 @@ export default function OrdersPage() {
 
                   {/* Selected Items Table in Form */}
                   {selectedItems.length > 0 && (
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
                       <table className="w-full text-xs">
                         <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                           <tr>
-                            <th className="py-2 px-3">หินที่เลือก</th>
+                            <th className="py-2 px-3 text-left">รายการที่เลือก ({selectedItems.length})</th>
+                            <th className="py-2 px-2 text-center w-24">จำนวน</th>
                             <th className="py-2 px-3 text-right">ราคาขาย</th>
                             <th className="py-2 px-3 text-right">ราคาทุน</th>
-                            <th className="py-2 px-2 text-center">ลบ</th>
+                            <th className="py-2 px-2 text-center w-8">ลบ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {selectedItems.map((item) => (
-                            <tr key={item.product_id}>
-                              <td className="py-2.5 px-3">
-                                <span className="font-mono font-bold text-purple-700 mr-1.5">
-                                  {item.sku}
-                                </span>
-                                <span className="text-slate-800">{item.name}</span>
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                                ฿{item.unit_price.toLocaleString()}
-                              </td>
-                              <td className="py-2.5 px-3 text-right text-slate-400">
-                                ฿{item.cost_price.toLocaleString()}
-                              </td>
-                              <td className="py-2.5 px-2 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveItem(item.product_id)}
-                                  className="text-red-500 hover:text-red-700 p-1"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {selectedItems.map((item) => {
+                            const isGift = Boolean(item.is_freebie || item.unit_price === 0 || item.sku.startsWith('GIFT-'));
+                            return (
+                              <tr key={item.product_id} className={isGift ? 'bg-emerald-50/40' : 'bg-white'}>
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono font-bold text-purple-700">
+                                      {item.sku}
+                                    </span>
+                                    {isGift && (
+                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        🎁 ของแถม
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-slate-800 text-[11px] block">{item.name}</span>
+                                </td>
+                                <td className="py-2.5 px-2 text-center">
+                                  <div className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded-lg border border-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItemQty(item.product_id, -1)}
+                                      className="text-slate-600 hover:text-black font-bold px-1 text-xs"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="font-bold text-slate-800 text-xs min-w-4 text-center">
+                                      {item.qty}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItemQty(item.product_id, 1)}
+                                      className="text-slate-600 hover:text-black font-bold px-1 text-xs"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-bold">
+                                  {isGift ? (
+                                    <span className="text-emerald-700 font-bold">฿0 (แถมฟรี)</span>
+                                  ) : (
+                                    <span className="text-slate-900">
+                                      ฿{(item.unit_price * item.qty).toLocaleString()}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right text-slate-400 text-[11px]">
+                                  ฿{(item.cost_price * item.qty).toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItem(item.product_id)}
+                                    className="text-rose-500 hover:text-rose-700 p-1"
+                                    title="ลบรายการ"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

@@ -11,6 +11,7 @@ import {
   fetchProducts,
   createProduct,
   generateSmartSku,
+  generateGiftSku,
 } from '@/lib/inventoryService';
 import {
   StockLot,
@@ -43,6 +44,9 @@ import {
   AlertCircle,
   Copy,
   X,
+  Gift,
+  Package,
+  Tag,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -53,6 +57,12 @@ export default function NewProductPage() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [existingSkus, setExistingSkus] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Freebie Gift states
+  const [isFreebie, setIsFreebie] = useState<boolean>(false);
+  const [freebieKind, setFreebieKind] = useState<'CRYSTAL' | 'ACCESSORY'>('CRYSTAL');
+  const [costZeroFromLot, setCostZeroFromLot] = useState<boolean>(true);
+  const [accessoryPreset, setAccessoryPreset] = useState<string>('POUCH');
 
   // Form states
   const [shapes, setShapes] = useState<StoneShapeItem[]>([]);
@@ -194,11 +204,130 @@ export default function NewProductPage() {
     load();
   }, []);
 
+  // Non-stone accessory preset definitions
+  const ACCESSORY_PRESETS: Record<
+    string,
+    { label: string; name: string; skuCode: string; icon: string; defaultCost: number }
+  > = {
+    POUCH: {
+      label: 'ถุงผ้ากำมะหยี่',
+      name: 'ถุงผ้ากำมะหยี่ใส่อัญมณี (Velvet Pouch)',
+      skuCode: 'POUCH',
+      icon: '🟣',
+      defaultCost: 3,
+    },
+    STAND: {
+      label: 'ฐานไม้ตั้งหิน',
+      name: 'ฐานไม้ธรรมชาติสำหรับวางหิน (Wood Stand)',
+      skuCode: 'STAND',
+      icon: '🪵',
+      defaultCost: 15,
+    },
+    SAGE: {
+      label: 'ไม้หอม / ไวท์เสจ',
+      name: 'ไม้หอมพาโลซานโต / ไวท์เสจชำระล้างพลังงาน (Sage/Palo Santo)',
+      skuCode: 'SAGE',
+      icon: '🌿',
+      defaultCost: 20,
+    },
+    STICKER: {
+      label: 'สติกเกอร์ & การ์ด',
+      name: 'ชุดสติกเกอร์และโปสการ์ดขอบคุณ (Thank You Card & Stickers)',
+      skuCode: 'STICKER',
+      icon: '🏷️',
+      defaultCost: 2,
+    },
+    CUSTOM: {
+      label: 'ของแถมอื่นๆ',
+      name: 'ของสมนาคุณพิเศษจากทางร้าน (Special Gift)',
+      skuCode: 'GIFT',
+      icon: '🎁',
+      defaultCost: 0,
+    },
+  };
+
+  const applyAccessoryPreset = (presetKey: string) => {
+    setAccessoryPreset(presetKey);
+    const p = ACCESSORY_PRESETS[presetKey] || ACCESSORY_PRESETS.CUSTOM;
+    setName(p.name);
+    setCostPrice(String(p.defaultCost));
+    setSellingPrice('0');
+    setMinPrice('0');
+    setItemType('BULK');
+    setQtyOnHand((prev) => (prev <= 1 ? 50 : prev));
+    setStorageLocation('Gift Box / เคาน์เตอร์');
+    const newSku = generateGiftSku(existingSkus, {
+      isStone: false,
+      categoryCode: p.skuCode,
+    });
+    setSku(newSku);
+  };
+
+  const handleModeChange = (freebieMode: boolean) => {
+    setIsFreebie(freebieMode);
+    if (freebieMode) {
+      setSellingPrice('0');
+      setMinPrice('0');
+      if (freebieKind === 'ACCESSORY') {
+        applyAccessoryPreset(accessoryPreset);
+      } else {
+        const giftSku = generateGiftSku(existingSkus, {
+          isStone: true,
+          stoneType,
+          shapeId: stoneShape,
+          customShapes: shapes,
+          customStones: stones,
+        });
+        setSku(giftSku);
+        if (costZeroFromLot && lotId) {
+          setCostPrice('0');
+        }
+      }
+    } else {
+      const regSku = generateSmartSku(stoneType, existingSkus, stoneShape, shapes, stones);
+      setSku(regSku);
+      setSellingPrice('');
+      setMinPrice('');
+      if (itemType === 'BULK' && qtyOnHand === 50) {
+        setItemType('UNIQUE');
+        setQtyOnHand(1);
+      }
+    }
+  };
+
+  const handleFreebieKindChange = (kind: 'CRYSTAL' | 'ACCESSORY') => {
+    setFreebieKind(kind);
+    if (kind === 'ACCESSORY') {
+      applyAccessoryPreset(accessoryPreset);
+    } else {
+      const giftSku = generateGiftSku(existingSkus, {
+        isStone: true,
+        stoneType,
+        shapeId: stoneShape,
+        customShapes: shapes,
+        customStones: stones,
+      });
+      setSku(giftSku);
+      setName(`${stoneType} ${stoneShape} (ของแถม)`);
+      if (costZeroFromLot && lotId) {
+        setCostPrice('0');
+      }
+    }
+  };
+
   // When stoneShape changes, auto-generate new SKU and auto-sync storage location
   const handleStoneShapeChange = (newShape: string) => {
     const prevShape = stoneShape;
     setStoneShape(newShape);
-    const newSku = generateSmartSku(stoneType, existingSkus, newShape, shapes, stones);
+    const newSku = isFreebie
+      ? generateGiftSku(existingSkus, {
+          isStone: true,
+          stoneType,
+          shapeId: newShape,
+          customShapes: shapes,
+          customStones: stones,
+        })
+      : generateSmartSku(stoneType, existingSkus, newShape, shapes, stones);
     setSku(newSku);
 
     // Keep storageLocation separated by shape if empty or previously matching a shape
@@ -214,12 +343,20 @@ export default function NewProductPage() {
   // When stoneType changes, auto-generate new SKU if not customized
   const handleStoneTypeChange = (newType: string) => {
     setStoneType(newType);
-    const newSku = generateSmartSku(newType, existingSkus, stoneShape, shapes, stones);
+    const newSku = isFreebie
+      ? generateGiftSku(existingSkus, {
+          isStone: true,
+          stoneType: newType,
+          shapeId: stoneShape,
+          customShapes: shapes,
+          customStones: stones,
+        })
+      : generateSmartSku(newType, existingSkus, stoneShape, shapes, stones);
     setSku(newSku);
 
     // Also suggest name if empty
     if (!name || name.includes('Cluster') || name.includes('Point') || name.includes('Sphere')) {
-      setName(`${newType} ${stoneShape}`);
+      setName(isFreebie ? `${newType} ${stoneShape} (ของแถม)` : `${newType} ${stoneShape}`);
     }
   };
 
@@ -269,25 +406,43 @@ export default function NewProductPage() {
       return;
     }
     if (isDuplicateSku) {
-      const suggested = generateSmartSku(stoneType, existingSkus, stoneShape, shapes, stones);
+      const suggested = isFreebie
+        ? generateGiftSku(existingSkus, {
+            isStone: freebieKind === 'CRYSTAL',
+            stoneType,
+            shapeId: stoneShape,
+            categoryCode: accessoryPreset,
+            customShapes: shapes,
+            customStones: stones,
+          })
+        : generateSmartSku(stoneType, existingSkus, stoneShape, shapes, stones);
       alert(`รหัส SKU "${sku.trim()}" มีอยู่ในคลังแล้ว กรุณาใช้รหัสอื่น (เช่น ${suggested})`);
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const finalCost = isFreebie && costZeroFromLot && lotId ? 0 : numCost;
+      const finalSelling = isFreebie ? 0 : numSelling;
+      const finalMinPrice = isFreebie ? 0 : (minPrice ? parseFloat(minPrice) : null);
+      const finalStoneType = isFreebie && freebieKind === 'ACCESSORY' ? 'Accessory' : stoneType;
+      const finalGrade = isFreebie
+        ? [gradeOrigin.trim(), '[FREEBIE]'].filter(Boolean).join(' ')
+        : (gradeOrigin.trim() || null);
+
       await createProduct({
         sku: sku.trim(),
         lot_id: lotId || null,
         name: name.trim(),
-        stone_type: stoneType,
+        stone_type: finalStoneType,
         item_type: itemType,
+        is_freebie: isFreebie,
         weight_grams: weightGrams ? parseFloat(weightGrams) : null,
         dimensions: dimensions.trim() || null,
-        grade_origin: gradeOrigin.trim() || null,
-        cost_price: numCost,
-        selling_price: numSelling,
-        min_price: minPrice ? parseFloat(minPrice) : null,
+        grade_origin: finalGrade,
+        cost_price: finalCost,
+        selling_price: finalSelling,
+        min_price: finalMinPrice,
         qty_on_hand: itemType === 'UNIQUE' ? 1 : Math.max(1, qtyOnHand),
         status,
         r2_thumbnail_url: thumbnailImages.length > 0 ? thumbnailImages[0] : null,
@@ -297,7 +452,7 @@ export default function NewProductPage() {
         storage_location: storageLocation.trim() || null,
       });
 
-      alert(`บันทึกสินค้า ${sku} เข้าสต็อกและเพิ่มประวัติ stock_movements (INITIAL_STOCK) สำเร็จ!`);
+      alert(`บันทึก${isFreebie ? 'ของแถม (FREE GIFT)' : 'สินค้า'} ${sku} เข้าสต็อกสำเร็จ! พร้อมพิมพ์บาร์โค้ดได้ทันที`);
       router.push('/products');
     } catch (err: any) {
       console.error(err);
@@ -368,6 +523,110 @@ export default function NewProductPage() {
           onSubmit={handleSubmit}
           className="bg-white p-4 sm:p-8 rounded-3xl border border-slate-200/80 shadow-md space-y-6"
         >
+          {/* PRODUCT MODE SELECTOR: Standard Sale vs Freebie Gift */}
+          <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => handleModeChange(false)}
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
+                !isFreebie
+                  ? 'bg-white text-purple-800 shadow-md ring-2 ring-purple-600/20'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Gem className="w-4 h-4 text-purple-600" />
+              <span>สินค้าปกติสำหรับจำหน่าย</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange(true)}
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
+                isFreebie
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-200 ring-2 ring-emerald-500/30'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Gift className="w-4 h-4" />
+              <span>🎁 ลงเป็นของแถม (Freebie)</span>
+            </button>
+          </div>
+
+          {/* FREEBIE CONFIGURATION BANNER (When isFreebie is true) */}
+          {isFreebie && (
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300 rounded-3xl space-y-3.5 shadow-xs animate-in fade-in slide-in-from-top-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Gift className="w-4 h-4 text-emerald-600" />
+                  ประเภทของแถม (Freebie Source & Category)
+                </span>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
+                  ราคาขาย ฿0 • พิมพ์บาร์โค้ด FREE GIFT
+                </span>
+              </div>
+
+              {/* Freebie Kind Selector: Crystal vs Accessory */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleFreebieKindChange('CRYSTAL')}
+                  className={`p-3 rounded-2xl border text-left transition flex items-center gap-3 ${
+                    freebieKind === 'CRYSTAL'
+                      ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/30 shadow-xs text-emerald-950 font-bold'
+                      : 'bg-white/60 border-emerald-200 text-emerald-800 hover:bg-white'
+                  }`}
+                >
+                  <Gem className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold">1. หินของแถม (Crystal Freebie)</div>
+                    <div className="text-[11px] text-slate-500 font-normal">หินกลิ้ง/เกรดรอง คัดจากล็อต หรือซื้อแยก</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleFreebieKindChange('ACCESSORY')}
+                  className={`p-3 rounded-2xl border text-left transition flex items-center gap-3 ${
+                    freebieKind === 'ACCESSORY'
+                      ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/30 shadow-xs text-emerald-950 font-bold'
+                      : 'bg-white/60 border-emerald-200 text-emerald-800 hover:bg-white'
+                  }`}
+                >
+                  <Package className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold">2. ของแถมทั่วไป / บรรจุภัณฑ์</div>
+                    <div className="text-[11px] text-slate-500 font-normal">ถุงผ้ากำมะหยี่, ฐานไม้, เสจ, สติกเกอร์</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Quick Presets for Accessory */}
+              {freebieKind === 'ACCESSORY' && (
+                <div className="space-y-2 pt-1 border-t border-emerald-200/60">
+                  <span className="text-[11px] font-semibold text-emerald-900 block">
+                    เลือกเทมเพลตของแถมสำเร็จรูป (กดแล้วกรอกชื่อและ SKU บาร์โค้ดให้อัตโนมัติ):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(ACCESSORY_PRESETS).map(([k, p]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => applyAccessoryPreset(k)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs ${
+                          accessoryPreset === k
+                            ? 'bg-emerald-700 text-white ring-2 ring-emerald-400'
+                            : 'bg-white text-emerald-900 border border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        <span>{p.icon}</span>
+                        <span>{p.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* SECTION 1: LOT REFERENCE & SKU GENERATION */}
           <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-50/80 via-white to-indigo-50/80 border border-purple-200 rounded-3xl space-y-4">
             <div className="flex items-center justify-between">
@@ -405,6 +664,25 @@ export default function NewProductPage() {
                     </option>
                   ))}
                 </select>
+
+                {/* Freebie Option from Lot: Cost 0 THB vs Apportioned */}
+                {isFreebie && selectedLot && (
+                  <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs shadow-2xs">
+                    <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-950">
+                      <input
+                        type="checkbox"
+                        checked={costZeroFromLot}
+                        onChange={(e) => {
+                          setCostZeroFromLot(e.target.checked);
+                          if (e.target.checked) setCostPrice('0');
+                        }}
+                        className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                      />
+                      <span>คิดต้นทุน ฿0 (หินหลักแบกทุนแล้ว)</span>
+                    </label>
+                    <span className="text-[10px] text-emerald-700">✓ ตัดยอด นน. ในล็อต</span>
+                  </div>
+                )}
 
                 {/* Real-time Lot Progress Card */}
                 {selectedLot && (
@@ -764,9 +1042,13 @@ export default function NewProductPage() {
               <div>
                 <div className="min-h-6 flex flex-wrap items-center justify-between gap-1 mb-1">
                   <label className="text-xs font-semibold text-slate-700">
-                    ราคาขาย (฿)
+                    {isFreebie ? 'ราคาขาย (ของแถม)' : 'ราคาขาย (฿)'}
                   </label>
-                  {!sellingPrice || parseFloat(sellingPrice) <= 0 ? (
+                  {isFreebie ? (
+                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300 whitespace-nowrap shrink-0">
+                      🎁 FREE GIFT
+                    </span>
+                  ) : !sellingPrice || parseFloat(sellingPrice) <= 0 ? (
                     <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 whitespace-nowrap shrink-0">
                       🟡 รอตั้งราคา
                     </span>
@@ -779,11 +1061,14 @@ export default function NewProductPage() {
                 <input
                   type="number"
                   step="any"
-                  placeholder="0.00 (ใส่ทีหลังได้)"
-                  value={sellingPrice}
+                  disabled={isFreebie}
+                  placeholder={isFreebie ? '0' : '0.00 (ใส่ทีหลังได้)'}
+                  value={isFreebie ? '0' : sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value)}
                   className={`w-full h-11 px-3 sm:px-3.5 text-base sm:text-sm placeholder:text-xs rounded-xl focus:ring-2 outline-none font-bold transition ${
-                    !sellingPrice || parseFloat(sellingPrice) <= 0
+                    isFreebie
+                      ? 'bg-emerald-50/70 border border-emerald-300 text-emerald-800 cursor-not-allowed'
+                      : !sellingPrice || parseFloat(sellingPrice) <= 0
                       ? 'bg-amber-50 border-2 border-amber-400 text-amber-900 focus:ring-amber-400 placeholder:text-amber-500'
                       : 'bg-white border border-purple-400 text-purple-800 focus:ring-purple-500'
                   }`}
@@ -799,10 +1084,15 @@ export default function NewProductPage() {
                 <input
                   type="number"
                   step="any"
+                  disabled={isFreebie}
                   placeholder="0.00"
-                  value={minPrice}
+                  value={isFreebie ? '0' : minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-full h-11 px-3 sm:px-3.5 text-base sm:text-sm placeholder:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold text-amber-800"
+                  className={`w-full h-11 px-3 sm:px-3.5 text-base sm:text-sm placeholder:text-sm rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-semibold ${
+                    isFreebie
+                      ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-white border border-slate-300 text-amber-800'
+                  }`}
                 />
               </div>
 
@@ -825,9 +1115,16 @@ export default function NewProductPage() {
 
             {/* Profit summary badge */}
             <div className="flex items-center justify-between text-xs font-medium bg-white p-3 rounded-2xl border border-slate-200">
-              <span className="text-slate-500">กำไรต่อชิ้นคาดการณ์:</span>
+              <span className="text-slate-500">
+                {isFreebie ? 'สถานะราคาและการลงบัญชี:' : 'กำไรต่อชิ้นคาดการณ์:'}
+              </span>
               <div className="flex items-center gap-2">
-                {numSelling > 0 ? (
+                {isFreebie ? (
+                  <span className="font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                    <Gift className="w-4 h-4 text-emerald-600" />
+                    ของแถมสำหรับแจกลูกค้า (฿0) • พิมพ์บาร์โค้ดแสดง "FREE GIFT" แปะได้ทันที
+                  </span>
+                ) : numSelling > 0 ? (
                   <>
                     <span className={`font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       ฿{profit.toLocaleString()}

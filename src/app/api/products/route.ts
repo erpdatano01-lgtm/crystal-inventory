@@ -19,7 +19,17 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data || []);
+  const normalized = (data || []).map((p: any) => ({
+    ...p,
+    is_freebie:
+      p.is_freebie === true ||
+      p.selling_price === 0 ||
+      p.sku?.startsWith('GIFT-') ||
+      p.sku?.startsWith('FREE-') ||
+      p.grade_origin?.includes('[FREEBIE]'),
+  }));
+
+  return NextResponse.json(normalized);
 }
 
 // POST: create product + initial stock movement
@@ -51,17 +61,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const productPayload = {
+    const isFreebie = Boolean(
+      body.is_freebie ||
+      body.selling_price === 0 ||
+      cleanSku.startsWith('GIFT-') ||
+      cleanSku.startsWith('FREE-')
+    );
+
+    const productPayload: any = {
       sku: cleanSku,
       lot_id: body.lot_id || null,
       name: body.name,
       stone_type: body.stone_type,
       item_type: body.item_type || 'UNIQUE',
+      is_freebie: isFreebie,
       weight_grams: body.weight_grams ?? null,
       dimensions: body.dimensions || null,
       grade_origin: body.grade_origin || null,
       cost_price: body.cost_price ?? 0,
-      selling_price: body.selling_price ?? 0,
+      selling_price: isFreebie ? 0 : (body.selling_price ?? 0),
       min_price: body.min_price ?? null,
       qty_on_hand: body.qty_on_hand ?? 1,
       status: body.status || 'AVAILABLE',
@@ -72,15 +90,35 @@ export async function POST(request: NextRequest) {
       storage_location: body.storage_location || null,
     };
 
-    // 1. Insert product
-    const { data: product, error: prodErr } = await supabaseAdmin
+    // 1. Insert product (with graceful fallback if DB doesn't have is_freebie column yet)
+    let product: any = null;
+    const { data: insertedProd, error: prodErr } = await supabaseAdmin
       .from('products')
       .insert([productPayload])
       .select()
       .single();
 
     if (prodErr) {
-      return NextResponse.json({ error: prodErr.message }, { status: 400 });
+      if (prodErr.code === '42703' || prodErr.message?.includes('is_freebie')) {
+        // Fallback without is_freebie column, tag grade_origin
+        delete productPayload.is_freebie;
+        if (isFreebie && !productPayload.grade_origin?.includes('[FREEBIE]')) {
+          productPayload.grade_origin = [productPayload.grade_origin, '[FREEBIE]'].filter(Boolean).join(' ');
+        }
+        const { data: retryData, error: retryErr } = await supabaseAdmin
+          .from('products')
+          .insert([productPayload])
+          .select()
+          .single();
+        if (retryErr) {
+          return NextResponse.json({ error: retryErr.message }, { status: 400 });
+        }
+        product = { ...retryData, is_freebie: isFreebie };
+      } else {
+        return NextResponse.json({ error: prodErr.message }, { status: 400 });
+      }
+    } else {
+      product = insertedProd;
     }
 
     // 2. Insert initial stock movement
@@ -140,7 +178,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const allowedFields = [
-        'sku', 'lot_id', 'status', 'item_type',
+        'sku', 'lot_id', 'status', 'item_type', 'is_freebie',
         'name', 'stone_type', 'weight_grams', 'dimensions', 'grade_origin',
         'cost_price', 'selling_price', 'min_price', 'qty_on_hand',
         'storage_location', 'drive_video_url', 'drive_media_folder_url',
@@ -151,12 +189,24 @@ export async function PATCH(request: NextRequest) {
         if (key in body) updatePayload[key] = body[key];
       }
 
-      const { data: updated, error: updErr } = await supabaseAdmin
+      let { data: updated, error: updErr } = await supabaseAdmin
         .from('products')
         .update(updatePayload)
         .eq('id', idFromQuery)
         .select()
         .single();
+
+      if (updErr && (updErr.code === '42703' || updErr.message?.includes('is_freebie'))) {
+        delete updatePayload.is_freebie;
+        const retryRes = await supabaseAdmin
+          .from('products')
+          .update(updatePayload)
+          .eq('id', idFromQuery)
+          .select()
+          .single();
+        updated = retryRes.data;
+        updErr = retryRes.error;
+      }
 
       if (updErr) {
         return NextResponse.json({ error: updErr.message }, { status: 400 });

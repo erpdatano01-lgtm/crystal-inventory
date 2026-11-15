@@ -18,7 +18,16 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data || []);
+  const normalized = (data || []).map((e: any) => ({
+    ...e,
+    category:
+      e.category === 'FREEBIE_GIFT' ||
+      (typeof e.title === 'string' && (e.title.includes('[ของแถม]') || e.title.includes('[Freebie]')))
+        ? 'FREEBIE_GIFT'
+        : e.category,
+  }));
+
+  return NextResponse.json(normalized);
 }
 
 // POST: create expense with optional stock_lot
@@ -33,16 +42,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid expense data' }, { status: 400 });
     }
 
-    // 1. Insert expense
-    const { data: savedExpense, error: expErr } = await supabaseAdmin
+    // 1. Insert expense (with fallback for check constraint if FREEBIE_GIFT not yet in DB enum)
+    let savedExpense = null;
+    let { data: expData, error: expErr } = await supabaseAdmin
       .from('expenses')
       .insert([expense])
       .select()
       .single();
 
+    if (expErr && expense.category === 'FREEBIE_GIFT' && (expErr.code === '23514' || expErr.message?.includes('category'))) {
+      const fallbackExpense = {
+        ...expense,
+        category: 'PACKAGING',
+        title: expense.title.startsWith('[ของแถม]') ? expense.title : `[ของแถม] ${expense.title}`,
+      };
+      const retryRes = await supabaseAdmin
+        .from('expenses')
+        .insert([fallbackExpense])
+        .select()
+        .single();
+      expData = retryRes.data;
+      expErr = retryRes.error;
+    }
+
     if (expErr) {
       return NextResponse.json({ error: expErr.message }, { status: 400 });
     }
+    savedExpense = expData;
 
     // 2. Insert stock_lot if requested
     let savedLot = null;

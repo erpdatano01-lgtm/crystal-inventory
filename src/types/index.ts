@@ -7,6 +7,7 @@ export type ExpenseCategory =
   | 'PACKAGING'
   | 'SHIPPING'
   | 'BOOTH_MARKETING'
+  | 'FREEBIE_GIFT'
   | 'OTHER';
 
 export interface Expense {
@@ -51,6 +52,7 @@ export interface Product {
   name: string;
   stone_type: string;
   item_type: ItemType;
+  is_freebie?: boolean;
   weight_grams?: number | null;
   dimensions?: string | null;
   grade_origin?: string | null;
@@ -106,6 +108,7 @@ export interface OrderItem {
   unit_price: number;
   cost_price: number;
   qty: number;
+  is_freebie?: boolean;
   weight_grams?: number | null;
   r2_thumbnail_url?: string | null;
 }
@@ -240,6 +243,11 @@ export const EXPENSE_CATEGORIES_CONFIG: Record<
     label: 'ออกบูธ / ยิงแอดการตลาด (Marketing)',
     color: '#ec4899',
     badgeClass: 'bg-pink-100 text-pink-800 border-pink-200',
+  },
+  FREEBIE_GIFT: {
+    label: 'ของแถม / ของสมนาคุณ (Free Gifts & Packaging)',
+    color: '#10b981',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   },
   OTHER: {
     label: 'ค่าใช้จ่ายอื่นๆ (Other)',

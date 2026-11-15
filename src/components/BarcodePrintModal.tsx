@@ -69,6 +69,7 @@ export default function BarcodePrintModal({
   const [config, setConfig] = useState<BarcodeLabelConfig>(() => getSavedBarcodeConfig());
   const [copiesMap, setCopiesMap] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [pickerCategory, setPickerCategory] = useState<'ALL' | 'SALE' | 'FREEBIE'>('ALL');
   const [showAllSelector, setShowAllSelector] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
 
@@ -231,15 +232,26 @@ export default function BarcodePrintModal({
   }, [config.printerProfile]);
 
   const filteredPickerProducts = useMemo(() => {
-    if (!searchTerm.trim()) return products;
+    let list = products;
+    if (pickerCategory === 'FREEBIE') {
+      list = list.filter(
+        (p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-')
+      );
+    } else if (pickerCategory === 'SALE') {
+      list = list.filter(
+        (p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-'))
+      );
+    }
+
+    if (!searchTerm.trim()) return list;
     const q = searchTerm.toLowerCase();
-    return products.filter(
+    return list.filter(
       (p) =>
         p.sku.toLowerCase().includes(q) ||
         p.name.toLowerCase().includes(q) ||
         p.stone_type.toLowerCase().includes(q)
     );
-  }, [products, searchTerm]);
+  }, [products, searchTerm, pickerCategory]);
 
   const setProductCopies = (id: string, count: number) => {
     setCopiesMap((prev) => {
@@ -498,13 +510,22 @@ export default function BarcodePrintModal({
 
     const buildCardHtml = (product: Product, extraClass = '') => {
       const svgMarkup = generateBarcodeSvgString(product.sku);
+      const isFreebie =
+        product.is_freebie ||
+        product.selling_price === 0 ||
+        product.sku?.startsWith('GIFT-') ||
+        product.sku?.startsWith('FREE-');
       const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
       const dimText = product.dimensions ? product.dimensions : '';
       const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
-      const priceText =
-        product.selling_price && product.selling_price > 0
-          ? `฿${product.selling_price.toLocaleString()}`
-          : '';
+      const priceText = isFreebie
+        ? 'FREE GIFT'
+        : product.selling_price && product.selling_price > 0
+        ? `฿${product.selling_price.toLocaleString()}`
+        : '';
+      const displayName = isFreebie
+        ? product.name || product.stone_type
+        : product.stone_type || product.name;
 
       return `
           <div class="label-card ${extraClass}">
@@ -515,7 +536,7 @@ export default function BarcodePrintModal({
             }
             ${
               config.showStoneName
-                ? `<div class="name-line">${product.stone_type || product.name}</div>`
+                ? `<div class="name-line">${displayName}</div>`
                 : ''
             }
             <div class="barcode-box">
@@ -802,13 +823,22 @@ export default function BarcodePrintModal({
       const skuFontPx = config.showSkuText ? ptToPx(metrics.skuFontPt) : 0;
       const nameFontPx = config.showStoneName ? ptToPx(metrics.nameFontPt) : 0;
 
+      const isFreebie =
+        targetProduct.is_freebie ||
+        targetProduct.selling_price === 0 ||
+        targetProduct.sku?.startsWith('GIFT-') ||
+        targetProduct.sku?.startsWith('FREE-');
       const weightText = targetProduct.weight_grams ? `${targetProduct.weight_grams}g` : '';
       const dimText = targetProduct.dimensions || '';
       const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
-      const priceText =
-        targetProduct.selling_price && targetProduct.selling_price > 0
-          ? `฿${targetProduct.selling_price.toLocaleString()}`
-          : '';
+      const priceText = isFreebie
+        ? 'FREE GIFT'
+        : targetProduct.selling_price && targetProduct.selling_price > 0
+        ? `฿${targetProduct.selling_price.toLocaleString()}`
+        : '';
+      const displayName = isFreebie
+        ? targetProduct.name || targetProduct.stone_type
+        : targetProduct.stone_type || targetProduct.name;
 
       const priceFontPx = config.showPrice && priceText ? ptToPx(metrics.priceFontPt) : 0;
       const metaFontPx = config.showWeightAndDim && specsLine ? ptToPx(metrics.metaFontPt) : 0;
@@ -871,7 +901,7 @@ export default function BarcodePrintModal({
       // 1. Stone Name (Primary header at top)
       if (config.showStoneName) {
         ctx.font = `700 ${nameFontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        ctx.fillText(targetProduct.stone_type || targetProduct.name, canvasW / 2, textY, innerW);
+        ctx.fillText(displayName, canvasW / 2, textY, innerW);
         textY += nameLineH;
       }
 
@@ -1046,13 +1076,22 @@ export default function BarcodePrintModal({
     }
 
     const slotBarcode = encodeCode128B(slotProduct.sku);
+    const isSlotFreebie =
+      slotProduct.is_freebie ||
+      slotProduct.selling_price === 0 ||
+      slotProduct.sku?.startsWith('GIFT-') ||
+      slotProduct.sku?.startsWith('FREE-');
     const slotWeight = slotProduct.weight_grams ? `${slotProduct.weight_grams}g` : '';
     const slotDim = slotProduct.dimensions || '';
     const slotSpecs = [slotWeight, slotDim].filter(Boolean).join(' • ');
-    const slotPrice =
-      slotProduct.selling_price && slotProduct.selling_price > 0
-        ? `฿${slotProduct.selling_price.toLocaleString()}`
-        : '';
+    const slotPrice = isSlotFreebie
+      ? 'FREE GIFT'
+      : slotProduct.selling_price && slotProduct.selling_price > 0
+      ? `฿${slotProduct.selling_price.toLocaleString()}`
+      : '';
+    const slotDisplayName = isSlotFreebie
+      ? slotProduct.name || slotProduct.stone_type
+      : slotProduct.stone_type || slotProduct.name;
 
     return (
       <div
@@ -1084,7 +1123,7 @@ export default function BarcodePrintModal({
             style={{ fontSize: `${metrics.nameFontPt}pt` }}
             className="font-bold leading-tight truncate w-full text-slate-900"
           >
-            {slotProduct.stone_type || slotProduct.name}
+            {slotDisplayName}
           </div>
         )}
 
@@ -2106,6 +2145,43 @@ export default function BarcodePrintModal({
                 {/* Expandable Product Picker for Batch Printing */}
                 {showAllSelector && (
                   <div className="pt-2 border-t border-slate-200 space-y-2">
+                    {/* Category Filter Tabs */}
+                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setPickerCategory('ALL')}
+                        className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition ${
+                          pickerCategory === 'ALL'
+                            ? 'bg-white text-purple-700 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        ทั้งหมด ({products.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPickerCategory('SALE')}
+                        className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition ${
+                          pickerCategory === 'SALE'
+                            ? 'bg-white text-purple-700 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-'))).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPickerCategory('FREEBIE')}
+                        className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition ${
+                          pickerCategory === 'FREEBIE'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'text-emerald-700 hover:text-emerald-900'
+                        }`}
+                      >
+                        🎁 ของแถม ({products.filter((p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-')).length})
+                      </button>
+                    </div>
+
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -2142,6 +2218,7 @@ export default function BarcodePrintModal({
                     <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
                       {filteredPickerProducts.map((p) => {
                         const isSelected = (copiesMap[p.id] || 0) > 0;
+                        const isGift = p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-');
                         return (
                           <button
                             key={p.id}
@@ -2162,9 +2239,15 @@ export default function BarcodePrintModal({
                               <span className="font-mono font-bold text-[11px]">{p.sku}</span>
                               <span className="truncate">{p.name}</span>
                             </div>
-                            <span className="text-[11px] font-bold text-slate-500 shrink-0 ml-2">
-                              {p.selling_price > 0 ? `฿${p.selling_price.toLocaleString()}` : '-'}
-                            </span>
+                            {isGift ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded-full shrink-0 ml-2">
+                                🎁 FREE GIFT
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-bold text-slate-500 shrink-0 ml-2">
+                                {p.selling_price > 0 ? `฿${p.selling_price.toLocaleString()}` : '-'}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
