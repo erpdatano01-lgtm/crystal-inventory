@@ -235,11 +235,11 @@ export default function BarcodePrintModal({
     let list = products;
     if (pickerCategory === 'FREEBIE') {
       list = list.filter(
-        (p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-')
+        (p) => Boolean(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))
       );
     } else if (pickerCategory === 'SALE') {
       list = list.filter(
-        (p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-'))
+        (p) => !Boolean(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))
       );
     }
 
@@ -510,11 +510,12 @@ export default function BarcodePrintModal({
 
     const buildCardHtml = (product: Product, extraClass = '') => {
       const svgMarkup = generateBarcodeSvgString(product.sku);
-      const isFreebie =
+      const isFreebie = Boolean(
         product.is_freebie ||
-        product.selling_price === 0 ||
         product.sku?.startsWith('GIFT-') ||
-        product.sku?.startsWith('FREE-');
+        product.sku?.startsWith('FREE-') ||
+        product.grade_origin?.includes('[FREEBIE]')
+      );
       const weightText = product.weight_grams ? `${product.weight_grams}g` : '';
       const dimText = product.dimensions ? product.dimensions : '';
       const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
@@ -823,11 +824,12 @@ export default function BarcodePrintModal({
       const skuFontPx = config.showSkuText ? ptToPx(metrics.skuFontPt) : 0;
       const nameFontPx = config.showStoneName ? ptToPx(metrics.nameFontPt) : 0;
 
-      const isFreebie =
+      const isFreebie = Boolean(
         targetProduct.is_freebie ||
-        targetProduct.selling_price === 0 ||
         targetProduct.sku?.startsWith('GIFT-') ||
-        targetProduct.sku?.startsWith('FREE-');
+        targetProduct.sku?.startsWith('FREE-') ||
+        targetProduct.grade_origin?.includes('[FREEBIE]')
+      );
       const weightText = targetProduct.weight_grams ? `${targetProduct.weight_grams}g` : '';
       const dimText = targetProduct.dimensions || '';
       const specsLine = [weightText, dimText].filter(Boolean).join(' • ');
@@ -1076,11 +1078,12 @@ export default function BarcodePrintModal({
     }
 
     const slotBarcode = encodeCode128B(slotProduct.sku);
-    const isSlotFreebie =
+    const isSlotFreebie = Boolean(
       slotProduct.is_freebie ||
-      slotProduct.selling_price === 0 ||
       slotProduct.sku?.startsWith('GIFT-') ||
-      slotProduct.sku?.startsWith('FREE-');
+      slotProduct.sku?.startsWith('FREE-') ||
+      slotProduct.grade_origin?.includes('[FREEBIE]')
+    );
     const slotWeight = slotProduct.weight_grams ? `${slotProduct.weight_grams}g` : '';
     const slotDim = slotProduct.dimensions || '';
     const slotSpecs = [slotWeight, slotDim].filter(Boolean).join(' • ');
@@ -2167,7 +2170,7 @@ export default function BarcodePrintModal({
                             : 'text-slate-500 hover:text-slate-800'
                         }`}
                       >
-                        💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-'))).length})
+                        💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))).length})
                       </button>
                       <button
                         type="button"
@@ -2178,7 +2181,7 @@ export default function BarcodePrintModal({
                             : 'text-emerald-700 hover:text-emerald-900'
                         }`}
                       >
-                        🎁 ของแถม ({products.filter((p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-')).length})
+                        🎁 ของแถม ({products.filter((p) => p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]')).length})
                       </button>
                     </div>
 
@@ -2218,7 +2221,7 @@ export default function BarcodePrintModal({
                     <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
                       {filteredPickerProducts.map((p) => {
                         const isSelected = (copiesMap[p.id] || 0) > 0;
-                        const isGift = p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-');
+                        const isGift = Boolean(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'));
                         return (
                           <button
                             key={p.id}

@@ -23,7 +23,6 @@ export async function GET() {
     ...p,
     is_freebie:
       p.is_freebie === true ||
-      p.selling_price === 0 ||
       p.sku?.startsWith('GIFT-') ||
       p.sku?.startsWith('FREE-') ||
       p.grade_origin?.includes('[FREEBIE]'),
@@ -63,9 +62,9 @@ export async function POST(request: NextRequest) {
 
     const isFreebie = Boolean(
       body.is_freebie ||
-      body.selling_price === 0 ||
       cleanSku.startsWith('GIFT-') ||
-      cleanSku.startsWith('FREE-')
+      cleanSku.startsWith('FREE-') ||
+      body.grade_origin?.includes('[FREEBIE]')
     );
 
     const productPayload: any = {

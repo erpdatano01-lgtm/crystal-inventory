@@ -1422,7 +1422,7 @@ ${trackStr}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-bold text-xs truncate">{item.name}</span>
-                                {Boolean(item.is_freebie || item.unit_price === 0 || item.sku.startsWith('GIFT-') || item.sku.startsWith('FREE-')) && (
+                                {Boolean(item.is_freebie || item.sku.startsWith('GIFT-') || item.sku.startsWith('FREE-')) && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                                     🎁 ของแถม
                                   </span>

@@ -174,7 +174,7 @@ export default function ProductsPage() {
       lot_id: product.lot_id,
       status: product.status,
       item_type: product.item_type || 'UNIQUE',
-      is_freebie: Boolean(product.is_freebie || product.selling_price === 0 || product.sku?.startsWith('GIFT-') || product.sku?.startsWith('FREE-')),
+      is_freebie: Boolean(product.is_freebie || product.sku?.startsWith('GIFT-') || product.sku?.startsWith('FREE-') || product.grade_origin?.includes('[FREEBIE]')),
       name: product.name,
       stone_type: product.stone_type,
       weight_grams: product.weight_grams,
@@ -290,11 +290,16 @@ export default function ProductsPage() {
         return false;
       }
 
+      const isFree = Boolean(
+        p.is_freebie ||
+        p.sku?.startsWith('GIFT-') ||
+        p.sku?.startsWith('FREE-') ||
+        p.grade_origin?.includes('[FREEBIE]')
+      );
+
       if (productTypeFilter === 'FREEBIE') {
-        const isFree = p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-');
         if (!isFree) return false;
       } else if (productTypeFilter === 'SALE') {
-        const isFree = p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-');
         if (isFree) return false;
       }
 
@@ -463,7 +468,7 @@ export default function ProductsPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-'))).length})
+              💎 สินค้าขาย ({products.filter((p) => !(p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]'))).length})
             </button>
             <button
               onClick={() => setProductTypeFilter('FREEBIE')}
@@ -473,7 +478,7 @@ export default function ProductsPage() {
                   : 'text-emerald-700 hover:text-emerald-900'
               }`}
             >
-              🎁 ของแถม ({products.filter((p) => p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-')).length})
+              🎁 ของแถม ({products.filter((p) => p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]')).length})
             </button>
           </div>
 
@@ -785,7 +790,7 @@ export default function ProductsPage() {
                     <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400">ราคาขาย</span>
-                        {p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') ? (
+                        {p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]') ? (
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1">
                             <Gift className="w-3 h-3 text-emerald-600" />
                             <span>FREE GIFT (ของแถม)</span>
@@ -969,7 +974,7 @@ export default function ProductsPage() {
                       )}
 
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        {p.is_freebie || p.selling_price === 0 || p.sku?.startsWith('GIFT-') ? (
+                        {p.is_freebie || p.sku?.startsWith('GIFT-') || p.sku?.startsWith('FREE-') || p.grade_origin?.includes('[FREEBIE]') ? (
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Gift className="w-3 h-3 text-emerald-600" />
                             <span>FREE GIFT</span>
