@@ -162,10 +162,12 @@ export default function OrdersPage() {
   };
 
   const handleUpdateItemQty = (productId: string, delta: number) => {
+    const prod = availableProducts.find((p) => p.id === productId);
+    const maxQty = prod ? Math.max(1, prod.qty_on_hand) : 999;
     setSelectedItems((prev) =>
       prev.map((it) => {
         if (it.product_id === productId) {
-          const nextQty = Math.max(1, it.qty + delta);
+          const nextQty = Math.min(maxQty, Math.max(1, it.qty + delta));
           return { ...it, qty: nextQty };
         }
         return it;
