@@ -808,7 +808,14 @@ export default function ProductsPage() {
                             ทุน: {!p.cost_price || p.cost_price <= 0 ? (
                               <span className="text-amber-700 font-semibold">ยังไม่ระบุ</span>
                             ) : (
-                              `฿${p.cost_price.toLocaleString()}`
+                              <>
+                                ฿{p.cost_price.toLocaleString()}
+                                {p.item_type === 'BULK' && (p.qty_on_hand || 1) > 1 && (
+                                  <span className="text-slate-400 text-[10px] ml-1">
+                                    (฿{(p.cost_price / (p.qty_on_hand || 1)).toFixed(2)}/ชิ้น)
+                                  </span>
+                                )}
+                              </>
                             )}
                           </span>
                           {p.min_price ? (
@@ -964,7 +971,12 @@ export default function ProductsPage() {
 
                       {!isCustomerView && (
                         <td className="py-3 px-4 text-slate-600 font-medium">
-                          ฿{p.cost_price.toLocaleString()}
+                          <div>฿{p.cost_price.toLocaleString()}</div>
+                          {p.item_type === 'BULK' && (p.qty_on_hand || 1) > 1 && (
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              (฿{(p.cost_price / (p.qty_on_hand || 1)).toFixed(2)}/ชิ้น)
+                            </div>
+                          )}
                         </td>
                       )}
 
@@ -1155,6 +1167,11 @@ export default function ProductsPage() {
                         <span className="text-[11px] text-slate-500 block">ราคาทุน</span>
                         <span className="text-lg font-bold text-slate-800">
                           ฿{activeModalProduct.cost_price.toLocaleString()}
+                          {activeModalProduct.item_type === 'BULK' && (activeModalProduct.qty_on_hand || 1) > 1 && (
+                            <span className="text-xs font-normal text-slate-500 ml-1.5">
+                              (เฉลี่ย ฿{(activeModalProduct.cost_price / (activeModalProduct.qty_on_hand || 1)).toFixed(2)}/ชิ้น)
+                            </span>
+                          )}
                         </span>
                       </div>
 
