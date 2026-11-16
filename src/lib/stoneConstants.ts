@@ -32,6 +32,7 @@ export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [
   { id: 'Black Tourmaline', code: 'TOU', label: 'Black Tourmaline (ทัวร์มาลีนดำ)', isDefault: true },
   { id: 'Bloodstone', code: 'BLO', label: 'Bloodstone (บลัดสโตน)', isDefault: true },
   { id: 'Blue Lace Agate', code: 'BLA', label: 'Blue Lace Agate (บลูเลซอาเกต)', isDefault: true },
+  { id: 'Caribbean Calcite', code: 'CAC', label: 'Caribbean Calcite (แคริบเบียนแคลไซต์)', isDefault: true },
   { id: 'Chinese Writing Stone', code: 'CWS', label: 'Chinese Writing Stone (หินอักษรจีน / หินตัวหนังสือจีน)', isDefault: true },
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)', isDefault: true },
   { id: 'Clear Quartz', code: 'QUA', label: 'Clear Quartz (เขี้ยวหนุมาน/ควอตซ์ใส)', isDefault: true },

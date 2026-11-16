@@ -176,6 +176,7 @@ export function suggestAbbreviation(
       ANGELITE: ['ANG', 'AGL', 'ANGL'],
       ARAGONITE: ['ARG', 'ARA', 'ARAG'],
       CALCITE: ['CAL', 'CLC', 'CALC'],
+      'CARIBBEAN CALCITE': ['CAC', 'CBC', 'CARC'],
       CARNELIAN: ['CAR', 'CRN', 'CARN'],
       CELESTITE: ['CEL', 'CLS', 'CELS'],
       CHALCEDONY: ['CHD', 'CHL', 'CHAL'],
