@@ -104,13 +104,24 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // 1. Update all selected products to SOLD status
+    // 1. Update stock and status for selected products
     for (const item of orderData.items) {
+      const { data: curProd } = await supabaseAdmin
+        .from('products')
+        .select('qty_on_hand')
+        .eq('id', item.product_id)
+        .single();
+
+      const currentQty = typeof curProd?.qty_on_hand === 'number' ? curProd.qty_on_hand : 1;
+      const deductQty = item.qty || 1;
+      const newQty = Math.max(0, currentQty - deductQty);
+      const newStatus = newQty === 0 ? 'SOLD' : 'AVAILABLE';
+
       await supabaseAdmin
         .from('products')
         .update({
-          status: 'SOLD',
-          qty_on_hand: 0,
+          status: newStatus,
+          qty_on_hand: newQty,
           updated_at: new Date().toISOString(),
         })
         .eq('id', item.product_id);
@@ -191,10 +202,16 @@ export async function DELETE(request: NextRequest) {
       try {
         if (m.note && m.note.includes(id)) {
           if (restoreStock && m.product_id) {
-            // Restore product to AVAILABLE
+            // Restore product stock to AVAILABLE
+            const { data: curP } = await supabaseAdmin
+              .from('products')
+              .select('qty_on_hand')
+              .eq('id', m.product_id)
+              .single();
+            const restoredQty = (curP?.qty_on_hand ?? 0) + Math.abs(m.change_qty || 1);
             await supabaseAdmin
               .from('products')
-              .update({ status: 'AVAILABLE', qty_on_hand: 1 })
+              .update({ status: 'AVAILABLE', qty_on_hand: restoredQty })
               .eq('id', m.product_id);
           }
           await supabaseAdmin.from('stock_movements').delete().eq('id', m.id);
