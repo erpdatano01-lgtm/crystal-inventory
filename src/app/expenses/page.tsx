@@ -741,8 +741,14 @@ export default function ExpensesPage() {
                       const linkedLot = lots.find((l) => l.expense_id === activeDetailExpense.id);
                       if (!linkedLot) return <span className="font-semibold text-slate-400 text-sm">ไม่ได้เปิดล็อต</span>;
                       const lotProds = products.filter((p) => p.lot_id === linkedLot.id);
-                      const lotWeight = lotProds.reduce((sum, p) => sum + (Number(p.weight_grams) || 0), 0);
-                      const lotCost = lotProds.reduce((sum, p) => sum + (Number(p.cost_price) || 0), 0);
+                      const lotWeight = lotProds.reduce(
+                        (sum, p) => sum + (Number(p.weight_grams) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
+                        0
+                      );
+                      const lotCost = lotProds.reduce(
+                        (sum, p) => sum + (Number(p.cost_price) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
+                        0
+                      );
                       return (
                         <div className="space-y-1">
                           <Link
