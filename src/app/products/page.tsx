@@ -103,18 +103,9 @@ export default function ProductsPage() {
     if (!selectedLotId) return null;
     const lotProds = products.filter((p) => p.lot_id === selectedLotId);
     const count = lotProds.length;
-    const totalWeight = lotProds.reduce(
-      (sum, p) => sum + (Number(p.weight_grams) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
-      0
-    );
-    const totalCost = lotProds.reduce(
-      (sum, p) => sum + (Number(p.cost_price) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
-      0
-    );
-    const totalSelling = lotProds.reduce(
-      (sum, p) => sum + (Number(p.selling_price) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
-      0
-    );
+    const totalWeight = lotProds.reduce((sum, p) => sum + (Number(p.weight_grams) || 0), 0);
+    const totalCost = lotProds.reduce((sum, p) => sum + (Number(p.cost_price) || 0), 0);
+    const totalSelling = lotProds.reduce((sum, p) => sum + (Number(p.selling_price) || 0), 0);
     return { count, totalWeight, totalCost, totalSelling };
   }, [selectedLotId, products]);
 

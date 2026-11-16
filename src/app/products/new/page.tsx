@@ -400,13 +400,11 @@ export default function NewProductPage() {
   }, [lotId, allProducts]);
   const lotProductCount = lotProducts.length;
   const lotTotalWeight = lotProducts.reduce(
-    (sum: number, p: Product) =>
-      sum + (Number(p.weight_grams) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
+    (sum: number, p: Product) => sum + (Number(p.weight_grams) || 0),
     0
   );
   const lotAllocatedCost = lotProducts.reduce(
-    (sum: number, p: Product) =>
-      sum + (Number(p.cost_price) || 0) * (p.item_type === 'BULK' ? (p.qty_on_hand || 1) : 1),
+    (sum: number, p: Product) => sum + (Number(p.cost_price) || 0),
     0
   );
 
