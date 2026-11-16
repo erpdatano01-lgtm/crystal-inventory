@@ -188,6 +188,8 @@ export function suggestAbbreviation(
       CITRINE: ['CIT', 'CTR', 'CITR'],
       CINNABAR: ['CIN', 'CNB', 'CINN'],
       DANBURITE: ['DAN', 'DNB', 'DANB'],
+      'DRAGON BLOOD JASPER': ['DBJ', 'DBL', 'DRG'],
+      'DRAGON BLOOD STONE': ['DBJ', 'DBS', 'DRG'],
       DIOPSIDE: ['DIO', 'DPS', 'DIOP'],
       DIOPTASE: ['DPT', 'DIP', 'DPTS'],
       EMERALD: ['EME', 'EMR', 'EMER'],

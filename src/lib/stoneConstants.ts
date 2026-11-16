@@ -37,6 +37,7 @@ export const DEFAULT_STONE_TYPES: StoneTypeItem[] = [
   { id: 'Citrine', code: 'CIT', label: 'Citrine (ซิทริน)', isDefault: true },
   { id: 'Clear Quartz', code: 'QUA', label: 'Clear Quartz (เขี้ยวหนุมาน/ควอตซ์ใส)', isDefault: true },
   { id: 'Crazy Lace Agate', code: 'CLA', label: 'Crazy Lace Agate (เครซี่เลซอาเกต)', isDefault: true },
+  { id: 'Dragon Blood Jasper', code: 'DBJ', label: 'Dragon Blood Jasper (แจสเปอร์เลือดมังกร)', isDefault: true },
   { id: 'Fluorite', code: 'FLU', label: 'Fluorite (ฟลูออไรต์)', isDefault: true },
   { id: 'Green Tourmaline', code: 'GRT', label: 'Green Tourmaline (ทัวร์มาลีนเขียว)', isDefault: true },
   { id: 'Green Zebra Jasper', code: 'GZJ', label: 'Green Zebra Jasper (แจสเปอร์ลายม้าลายเขียว)', isDefault: true },
