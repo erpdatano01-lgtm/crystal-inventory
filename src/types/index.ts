@@ -113,6 +113,12 @@ export interface OrderItem {
   r2_thumbnail_url?: string | null;
 }
 
+export interface PackedItemLogEntry {
+  sku: string;
+  name?: string;
+  verified_at_second: number;
+}
+
 export interface Order {
   id: string;
   order_no: string; // e.g. INV-202611-001
@@ -131,6 +137,8 @@ export interface Order {
   payment_method: string;
   slip_url?: string | null;
   packing_video_url?: string | null;
+  packed_at?: string | null;
+  packed_items_log?: PackedItemLogEntry[] | null;
   tracking_no?: string | null;
   notes?: string | null;
   status: OrderStatus;
@@ -148,6 +156,7 @@ export interface PackingLog {
   video_url: string;
   duration_seconds: number;
   packed_at: string;
+  packed_items_log?: PackedItemLogEntry[] | null;
   tracking_no?: string | null;
   notes?: string | null;
 }

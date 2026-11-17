@@ -28,13 +28,18 @@ export async function GET() {
     .order('created_at', { ascending: false });
 
   const reconstructedOrders: Order[] = [];
+  const seenOrderKeys = new Set<string>();
 
   for (const m of movements || []) {
     try {
       if (m.note && m.note.startsWith('{')) {
         const parsed = JSON.parse(m.note);
         if (parsed.order_no) {
-          reconstructedOrders.push(parsed);
+          const key = parsed.id || parsed.order_no;
+          if (!seenOrderKeys.has(key)) {
+            seenOrderKeys.add(key);
+            reconstructedOrders.push(parsed);
+          }
           continue;
         }
       }
@@ -170,6 +175,111 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(orderData);
   } catch (err: any) {
     console.error('Create order error:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
+// PATCH: update existing order fields (tracking_no, status, packing_video_url, packed_at, packed_items_log, notes)
+export async function PATCH(request: NextRequest) {
+  try {
+    if (!isSupabaseAdminConfigured || !supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin not configured' }, { status: 503 });
+    }
+
+    const body = await request.json();
+    const {
+      id,
+      order_no,
+      status,
+      tracking_no,
+      packing_video_url,
+      packed_at,
+      packed_items_log,
+      notes,
+      customer_name,
+      customer_phone,
+      customer_address,
+    } = body || {};
+
+    if (!id && !order_no) {
+      return NextResponse.json({ error: 'Missing order id or order_no' }, { status: 400 });
+    }
+
+    const updatePayload: Record<string, any> = {};
+    if (status !== undefined) updatePayload.status = status;
+    if (tracking_no !== undefined) updatePayload.tracking_no = tracking_no;
+    if (packing_video_url !== undefined) updatePayload.packing_video_url = packing_video_url;
+    if (packed_at !== undefined) updatePayload.packed_at = packed_at;
+    if (packed_items_log !== undefined) updatePayload.packed_items_log = packed_items_log;
+    if (notes !== undefined) updatePayload.notes = notes;
+    if (customer_name !== undefined) updatePayload.customer_name = customer_name;
+    if (customer_phone !== undefined) updatePayload.customer_phone = customer_phone;
+    if (customer_address !== undefined) updatePayload.customer_address = customer_address;
+
+    let updatedOrder: Order | null = null;
+
+    // 1. Try updating in orders table if it exists
+    try {
+      let query = supabaseAdmin.from('orders').update(updatePayload);
+      if (id) {
+        query = query.eq('id', id);
+      } else if (order_no) {
+        query = query.eq('order_no', order_no);
+      }
+      const { data: ordData } = await query.select().single();
+      if (ordData) {
+        updatedOrder = ordData as Order;
+      }
+    } catch {
+      // orders table might not have all columns or might not exist
+    }
+
+    // 2. Also update JSON inside stock_movements where reason = 'SOLD'
+    const { data: movements } = await supabaseAdmin
+      .from('stock_movements')
+      .select('*')
+      .eq('reason', 'SOLD');
+
+    for (const m of movements || []) {
+      try {
+        if (m.note && m.note.startsWith('{')) {
+          const parsed = JSON.parse(m.note);
+          const matchId = id && parsed.id === id;
+          const matchOrderNo = order_no && parsed.order_no === order_no;
+          if (matchId || matchOrderNo) {
+            const merged: Order = {
+              ...parsed,
+              ...updatePayload,
+            };
+            updatedOrder = merged;
+            await supabaseAdmin
+              .from('stock_movements')
+              .update({ note: JSON.stringify(merged) })
+              .eq('id', m.id);
+          } else if (id && m.id === id) {
+            // Synthetic legacy order where m.id was used as order.id
+            const merged = {
+              ...parsed,
+              ...updatePayload,
+            };
+            await supabaseAdmin
+              .from('stock_movements')
+              .update({ note: JSON.stringify(merged) })
+              .eq('id', m.id);
+          }
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      order: updatedOrder,
+      updatedFields: updatePayload,
+    });
+  } catch (err: any) {
+    console.error('Update order error:', err);
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

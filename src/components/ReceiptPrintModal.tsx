@@ -1,15 +1,23 @@
 'use client';
 
-import React from 'react';
-import { Order, SALES_CHANNELS_CONFIG, ORDER_STATUS_CONFIG } from '@/types';
-import { Printer, X, Gem, CheckCircle, Truck, Phone, MapPin, Calendar, CreditCard } from 'lucide-react';
+import React, { useMemo } from 'react';
+import Link from 'next/link';
+import { Order, SALES_CHANNELS_CONFIG } from '@/types';
+import { encodeCode128B } from '@/lib/barcodeGenerator';
+import { Printer, X, Gem, CheckCircle, Truck, Phone, MapPin, Calendar, CreditCard, QrCode, Video } from 'lucide-react';
 
 interface ReceiptPrintModalProps {
   order: Order | null;
   onClose: () => void;
+  onOpenShippingLabel?: (order: Order) => void;
 }
 
-export default function ReceiptPrintModal({ order, onClose }: ReceiptPrintModalProps) {
+export default function ReceiptPrintModal({ order, onClose, onOpenShippingLabel }: ReceiptPrintModalProps) {
+  const encodedOrderBarcode = useMemo(() => {
+    if (!order) return null;
+    return encodeCode128B(order.order_no);
+  }, [order]);
+
   if (!order) return null;
 
   const handlePrint = () => {
@@ -20,12 +28,29 @@ export default function ReceiptPrintModal({ order, onClose }: ReceiptPrintModalP
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh]">
         {/* Modal Controls (Hidden when printing) */}
-        <div className="print:hidden p-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="print:hidden p-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-purple-400" />
             <span className="font-bold text-sm">ใบเสร็จรับเงิน / ใบส่งสินค้า ({order.order_no})</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {onOpenShippingLabel && (
+              <button
+                type="button"
+                onClick={() => onOpenShippingLabel(order)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow active:scale-95 transition"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>🏷️ พิมพ์ใบปะหน้าพัสดุ (QR/Barcode)</span>
+              </button>
+            )}
+            <Link
+              href={`/packing?order_no=${encodeURIComponent(order.order_no)}`}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow active:scale-95 transition"
+            >
+              <Video className="w-3.5 h-3.5" />
+              <span>ไปหน้าแพ็กของ</span>
+            </Link>
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs rounded-xl shadow hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
@@ -74,6 +99,19 @@ export default function ReceiptPrintModal({ order, onClose }: ReceiptPrintModalP
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <span>วันที่: {order.order_date}</span>
               </p>
+              {encodedOrderBarcode && (
+                <div className="mt-2 inline-block bg-white border border-slate-200 rounded-lg px-2 py-1">
+                  <svg
+                    viewBox={`0 0 ${encodedOrderBarcode.totalModules} 30`}
+                    className="w-36 h-7"
+                    preserveAspectRatio="none"
+                  >
+                    {encodedOrderBarcode.bars.map((b, i) => (
+                      <rect key={i} x={b.x} y={0} width={b.width} height={30} fill="#0f172a" />
+                    ))}
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
 

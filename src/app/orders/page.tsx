@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import ImageUploader from '@/components/ImageUploader';
 import ReceiptPrintModal from '@/components/ReceiptPrintModal';
+import ShippingLabelModal from '@/components/ShippingLabelModal';
 import {
   fetchProducts,
   fetchExpenses,
@@ -42,6 +44,9 @@ import {
   FileSpreadsheet,
   Gift,
   Gem,
+  QrCode,
+  Video,
+  Zap,
 } from 'lucide-react';
 
 export default function OrdersPage() {
@@ -53,7 +58,11 @@ export default function OrdersPage() {
   // Modals & UI states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPrintOrder, setSelectedPrintOrder] = useState<Order | null>(null);
+  const [selectedLabelOrder, setSelectedLabelOrder] = useState<Order | null>(null);
   const [selectedSlipUrl, setSelectedSlipUrl] = useState<string | null>(null);
+  const [editingTrackingOrder, setEditingTrackingOrder] = useState<Order | null>(null);
+  const [trackingInputVal, setTrackingInputVal] = useState('');
+  const [isUpdatingTracking, setIsUpdatingTracking] = useState(false);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -249,8 +258,8 @@ export default function OrdersPage() {
       setOrderSlipUrls([]);
       setShowCreateModal(false);
 
-      // Open print receipt modal directly
-      setSelectedPrintOrder(created);
+      // Open shipping label modal directly so user can print parcel label or switch to receipt
+      setSelectedLabelOrder(created);
 
       // Reload data
       await loadData();
@@ -258,6 +267,47 @@ export default function OrdersPage() {
       alert(`เกิดข้อผิดพลาด: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Update Tracking No (Flexible post-billing / post-packing tracking update)
+  const handleSaveTrackingNo = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editingTrackingOrder) return;
+    setIsUpdatingTracking(true);
+    try {
+      const cleanTrack = trackingInputVal.trim() || null;
+      const nextStatus: OrderStatus = cleanTrack ? 'SHIPPED' : editingTrackingOrder.status;
+
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingTrackingOrder.id,
+          order_no: editingTrackingOrder.order_no,
+          tracking_no: cleanTrack,
+          status: nextStatus,
+        }),
+      });
+
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === editingTrackingOrder.id || o.order_no === editingTrackingOrder.order_no
+              ? { ...o, tracking_no: cleanTrack, status: nextStatus }
+              : o
+          )
+        );
+        setEditingTrackingOrder(null);
+        setTrackingInputVal('');
+      } else {
+        alert('ไม่สามารถอัปเดตเลขพัสดุได้');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('เกิดข้อผิดพลาดในการบันทึกเลขพัสดุ');
+    } finally {
+      setIsUpdatingTracking(false);
     }
   };
 
@@ -572,23 +622,90 @@ export default function OrdersPage() {
                         </td>
 
                         <td className="py-3.5 px-4 text-center">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusConfig.badgeClass}`}
-                          >
-                            {statusConfig.label}
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusConfig.badgeClass}`}
+                            >
+                              {statusConfig.label}
+                            </span>
+
+                            {/* Flexible Tracking No Badge / Add Button */}
+                            {ord.tracking_no ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTrackingOrder(ord);
+                                  setTrackingInputVal(ord.tracking_no || '');
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-mono text-[10px] font-bold transition"
+                                title="คลิกเพื่อแก้ไขเลขพัสดุ"
+                              >
+                                <Truck className="w-3 h-3 text-blue-600" />
+                                <span>{ord.tracking_no}</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTrackingOrder(ord);
+                                  setTrackingInputVal('');
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-purple-700 border border-dashed border-slate-300 hover:border-purple-300 text-[10px] font-bold transition"
+                                title="ใส่หรือสแกนเลขพัสดุทีหลังได้"
+                              >
+                                <Truck className="w-3 h-3" />
+                                <span>+ ใส่เลขพัสดุ</span>
+                              </button>
+                            )}
+
+                            {/* Packing Video Link if recorded */}
+                            {ord.packing_video_url && (
+                              <a
+                                href={ord.packing_video_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition"
+                                title="เปิดดูคลิปวิดีโอหลักฐานการแพ็กของบิลนี้"
+                              >
+                                <Video className="w-3 h-3" />
+                                <span>ดูคลิปแพ็ก</span>
+                              </a>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            {/* Print Shipping Label Button (QR + Barcode for Packing Station) */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedLabelOrder(ord)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold transition"
+                              title="พิมพ์ใบปะหน้าซองพัสดุ (มี QR & Barcode สำหรับสแกนแพ็กของ)"
+                            >
+                              <QrCode className="w-3.5 h-3.5 text-amber-700" />
+                              <span>ใบปะหน้า</span>
+                            </button>
+
+                            {/* Go to Video Packing Station for this Order */}
+                            <Link
+                              href={`/packing?order_no=${encodeURIComponent(ord.order_no)}`}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition"
+                              title="เปิดหน้าอัดคลิปแพ็กของสำหรับบิลนี้"
+                            >
+                              <Video className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>แพ็กของ</span>
+                            </Link>
+
                             {/* Print Receipt Button */}
                             <button
+                              type="button"
                               onClick={() => setSelectedPrintOrder(ord)}
                               className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition"
-                              title="พิมพ์ใบเสร็จ / บิลส่งของ"
+                              title="พิมพ์ใบเสร็จรับเงิน / บิลส่งของ"
                             >
                               <Printer className="w-3.5 h-3.5" />
-                              <span>พิมพ์บิล</span>
+                              <span>ใบเสร็จ</span>
                             </button>
 
                             {/* View Slip if uploaded */}
@@ -1068,7 +1185,88 @@ export default function OrdersPage() {
         <ReceiptPrintModal
           order={selectedPrintOrder}
           onClose={() => setSelectedPrintOrder(null)}
+          onOpenShippingLabel={(ord) => {
+            setSelectedPrintOrder(null);
+            setSelectedLabelOrder(ord);
+          }}
         />
+
+        {/* Shipping Label & Packing Slip Modal (QR + Code 128 Barcode) */}
+        <ShippingLabelModal
+          order={selectedLabelOrder}
+          onClose={() => setSelectedLabelOrder(null)}
+          onSwitchToReceipt={(ord) => {
+            setSelectedLabelOrder(null);
+            setSelectedPrintOrder(ord);
+          }}
+        />
+
+        {/* Flexible Tracking No. Update Modal */}
+        {editingTrackingOrder && (
+          <div
+            onClick={() => setEditingTrackingOrder(null)}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          >
+            <form
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={handleSaveTrackingNo}
+              className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h4 className="font-black text-slate-900 text-base flex items-center gap-2">
+                    <Truck className="w-5 h-5 text-purple-600" />
+                    <span>อัปเดตเลขพัสดุจัดส่ง (Tracking No.)</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    บิล: <strong className="font-mono text-purple-700">{editingTrackingOrder.order_no}</strong> • {editingTrackingOrder.customer_name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingTrackingOrder(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">
+                  สแกนบาร์โค้ดสลิปขนส่ง หรือพิมพ์เลขพัสดุ:
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="เช่น TH0123456789A, EF123456789TH..."
+                  value={trackingInputVal}
+                  onChange={(e) => setTrackingInputVal(e.target.value)}
+                  className="w-full px-4 py-3 text-sm font-mono font-bold bg-slate-50 border-2 border-purple-200 rounded-2xl focus:bg-white focus:outline-none focus:border-purple-600 transition"
+                />
+                <p className="text-[11px] text-slate-400">
+                  * เมื่อบันทึกเลขพัสดุ ระบบจะปรับสถานะบิลเป็น &quot;จัดส่งแล้ว (SHIPPED)&quot; ให้อัตโนมัติ
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTrackingOrder(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingTracking}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black shadow-md hover:from-purple-700 hover:to-indigo-700 transition disabled:opacity-50"
+                >
+                  {isUpdatingTracking ? 'กำลังบันทึก...' : '💾 บันทึกเลขพัสดุ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Lightbox for Slip Image */}
         {selectedSlipUrl && (
