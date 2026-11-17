@@ -319,17 +319,23 @@ export default function OrdersPage() {
     if (!restore) return;
 
     try {
-      const res = await fetch(`/api/orders?id=${orderId}&restoreStock=true`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(
+        `/api/orders?id=${encodeURIComponent(orderId)}&order_no=${encodeURIComponent(orderNo)}&restoreStock=true`,
+        {
+          method: 'DELETE',
+        }
+      );
       if (res.ok) {
-        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setOrders((prev) => prev.filter((o) => o.id !== orderId && o.order_no !== orderNo));
         await loadData();
         alert(`ลบบิล ${orderNo} และคืนสต็อกเรียบร้อยแล้ว`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`ไม่สามารถลบบิลได้: ${err?.error || 'เกิดข้อผิดพลาดในการลบบิล'}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('เกิดข้อผิดพลาดในการลบบิล');
+      alert(`เกิดข้อผิดพลาดในการลบบิล: ${err?.message || ''}`);
     }
   };
 

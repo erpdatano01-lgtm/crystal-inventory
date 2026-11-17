@@ -237,36 +237,70 @@ export async function PATCH(request: NextRequest) {
     // 2. Also update JSON inside stock_movements where reason = 'SOLD'
     const { data: movements } = await supabaseAdmin
       .from('stock_movements')
-      .select('*')
+      .select('*, products(*)')
       .eq('reason', 'SOLD');
 
     for (const m of movements || []) {
       try {
+        let parsed: any = null;
         if (m.note && m.note.startsWith('{')) {
-          const parsed = JSON.parse(m.note);
-          const matchId = id && parsed.id === id;
-          const matchOrderNo = order_no && parsed.order_no === order_no;
-          if (matchId || matchOrderNo) {
-            const merged: Order = {
-              ...parsed,
-              ...updatePayload,
-            };
-            updatedOrder = merged;
-            await supabaseAdmin
-              .from('stock_movements')
-              .update({ note: JSON.stringify(merged) })
-              .eq('id', m.id);
-          } else if (id && m.id === id) {
-            // Synthetic legacy order where m.id was used as order.id
-            const merged = {
-              ...parsed,
-              ...updatePayload,
-            };
-            await supabaseAdmin
-              .from('stock_movements')
-              .update({ note: JSON.stringify(merged) })
-              .eq('id', m.id);
+          try {
+            parsed = JSON.parse(m.note);
+          } catch {
+            // ignore
           }
+        }
+
+        // If legacy movement without JSON, reconstruct parsed object
+        if (!parsed && id && m.id === id) {
+          const p = m.products;
+          parsed = {
+            id: m.id,
+            order_no: `REC-${new Date(m.created_at).toISOString().slice(2, 7).replace('-', '')}-${m.id.slice(0, 4).toUpperCase()}`,
+            order_date: new Date(m.created_at).toISOString().slice(0, 10),
+            customer_name: 'ลูกค้าทั่วไป (Walk-in)',
+            channel: 'WALK_IN',
+            items: p
+              ? [
+                  {
+                    product_id: p.id,
+                    sku: p.sku,
+                    name: p.name,
+                    stone_type: p.stone_type,
+                    unit_price: Number(p.selling_price) || 0,
+                    cost_price: Number(p.cost_price) || 0,
+                    qty: 1,
+                    weight_grams: p.weight_grams,
+                    r2_thumbnail_url: p.r2_thumbnail_url,
+                  },
+                ]
+              : [],
+            subtotal: Number(p?.selling_price) || 0,
+            discount: 0,
+            shipping_fee: 0,
+            total_amount: Number(p?.selling_price) || 0,
+            total_cost: Number(p?.cost_price) || 0,
+            profit: (Number(p?.selling_price) || 0) - (Number(p?.cost_price) || 0),
+            payment_method: 'โอนเงิน',
+            notes: m.note || null,
+            status: 'PAID',
+            created_at: m.created_at,
+          };
+        }
+
+        const matchId = Boolean(id && ((parsed && parsed.id === id) || m.id === id));
+        const matchOrderNo = Boolean(order_no && parsed && parsed.order_no === order_no);
+
+        if (matchId || matchOrderNo) {
+          const merged: Order = {
+            ...(parsed || {}),
+            ...updatePayload,
+          };
+          updatedOrder = merged;
+          await supabaseAdmin
+            .from('stock_movements')
+            .update({ note: JSON.stringify(merged) })
+            .eq('id', m.id);
         }
       } catch {
         // continue
@@ -293,45 +327,118 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const orderNo = searchParams.get('order_no');
     const restoreStock = searchParams.get('restoreStock') === 'true';
 
-    if (!id) {
-      return NextResponse.json({ error: 'Missing order ID' }, { status: 400 });
+    if (!id && !orderNo) {
+      return NextResponse.json({ error: 'Missing order ID or Order No' }, { status: 400 });
     }
 
-    // Attempt delete from orders table
-    await supabaseAdmin.from('orders').delete().eq('id', id);
+    // 1. Attempt delete from orders table if exists
+    try {
+      if (id) {
+        await supabaseAdmin.from('orders').delete().eq('id', id);
+      }
+      if (orderNo) {
+        await supabaseAdmin.from('orders').delete().eq('order_no', orderNo);
+      }
+    } catch {
+      // Ignore if orders table does not exist
+    }
 
-    // Delete corresponding stock_movements
+    // 2. Delete corresponding stock_movements
     const { data: movements } = await supabaseAdmin
       .from('stock_movements')
       .select('*')
       .eq('reason', 'SOLD');
 
+    let deletedCount = 0;
+
     for (const m of movements || []) {
       try {
-        if (m.note && m.note.includes(id)) {
+        let isMatch = false;
+
+        // Direct movement id match (e.g. synthetic order from status change)
+        if (id && m.id === id) {
+          isMatch = true;
+        }
+
+        // Substring check in note
+        if (!isMatch && id && m.note && m.note.includes(id)) {
+          isMatch = true;
+        }
+        if (!isMatch && orderNo && m.note && m.note.includes(orderNo)) {
+          isMatch = true;
+        }
+
+        // JSON parse check
+        if (!isMatch && m.note && m.note.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(m.note);
+            if (
+              (id && (parsed.id === id || parsed.order_no === id)) ||
+              (orderNo && (parsed.order_no === orderNo || parsed.id === orderNo))
+            ) {
+              isMatch = true;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // Check if synthetic REC order_no generated for this m matches orderNo
+        if (!isMatch && orderNo) {
+          const syntheticOrderNo = `REC-${new Date(m.created_at).toISOString().slice(2, 7).replace('-', '')}-${m.id.slice(0, 4).toUpperCase()}`;
+          if (syntheticOrderNo === orderNo) {
+            isMatch = true;
+          }
+        }
+
+        if (isMatch) {
           if (restoreStock && m.product_id) {
             // Restore product stock to AVAILABLE
             const { data: curP } = await supabaseAdmin
               .from('products')
-              .select('qty_on_hand')
+              .select('id, qty_on_hand')
               .eq('id', m.product_id)
               .single();
-            const restoredQty = (curP?.qty_on_hand ?? 0) + Math.abs(m.change_qty || 1);
+
+            const currentQty = curP?.qty_on_hand ?? 0;
+            const addQty = Math.abs(m.change_qty || 1);
+            const restoredQty = currentQty + addQty;
+
             await supabaseAdmin
               .from('products')
-              .update({ status: 'AVAILABLE', qty_on_hand: restoredQty })
+              .update({
+                status: 'AVAILABLE',
+                qty_on_hand: restoredQty,
+                updated_at: new Date().toISOString(),
+              })
               .eq('id', m.product_id);
           }
-          await supabaseAdmin.from('stock_movements').delete().eq('id', m.id);
+
+          const { error: delErr } = await supabaseAdmin
+            .from('stock_movements')
+            .delete()
+            .eq('id', m.id);
+
+          if (!delErr) {
+            deletedCount++;
+          } else {
+            console.error('Failed to delete stock_movement:', m.id, delErr);
+          }
         }
-      } catch {
-        // continue
+      } catch (innerErr) {
+        console.error('Error processing movement delete:', m.id, innerErr);
       }
     }
 
-    return NextResponse.json({ success: true, deletedId: id });
+    return NextResponse.json({
+      success: true,
+      deletedId: id,
+      deletedOrderNo: orderNo,
+      deletedMovementsCount: deletedCount,
+    });
   } catch (err: any) {
     console.error('Delete order error:', err);
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
