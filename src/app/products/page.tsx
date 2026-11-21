@@ -295,13 +295,9 @@ export default function ProductsPage() {
         return false;
       }
 
-      const isFree = Boolean(p.sku?.startsWith('GIFT'));
-
-      if (productTypeFilter === 'FREEBIE') {
-        if (!isFree) return false;
-      } else if (productTypeFilter === 'SALE') {
-        if (isFree) return false;
-      }
+      // Strict separation: Stone inventory NEVER mixes with freebies/supplies
+      const isFree = Boolean(p.sku?.startsWith('GIFT') || p.is_freebie);
+      if (isFree) return false;
 
       return true;
     });
@@ -448,38 +444,20 @@ export default function ProductsPage() {
 
         {/* Search, Filter & Layout bar */}
         <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-          {/* Product Type Tabs: All vs Sale vs Freebie */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl w-full sm:w-auto">
-            <button
-              onClick={() => setProductTypeFilter('ALL')}
-              className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
-                productTypeFilter === 'ALL'
-                  ? 'bg-white text-purple-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+          {/* Stone Inventory Notice with Separation Link to Freebies */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-purple-50/60 border border-purple-200/60 rounded-2xl w-full">
+            <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-purple-900">
+              <span className="p-1 rounded-lg bg-purple-200 text-purple-800">💎</span>
+              <span>คลังหินธรรมชาติ & คริสตัลเท่านั้น ({products.filter((p) => !p.sku?.startsWith('GIFT') && !p.is_freebie).length} ชิ้น)</span>
+            </div>
+
+            <Link
+              href="/freebies"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95 ml-auto sm:ml-0"
             >
-              ทั้งหมด ({products.length})
-            </button>
-            <button
-              onClick={() => setProductTypeFilter('SALE')}
-              className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
-                productTypeFilter === 'SALE'
-                  ? 'bg-white text-purple-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              💎 สินค้าขาย ({products.filter((p) => !p.sku?.startsWith('GIFT')).length})
-            </button>
-            <button
-              onClick={() => setProductTypeFilter('FREEBIE')}
-              className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
-                productTypeFilter === 'FREEBIE'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-emerald-700 hover:text-emerald-900'
-              }`}
-            >
-              🎁 ของแถม ({products.filter((p) => p.sku?.startsWith('GIFT')).length})
-            </button>
+              <Gift className="w-3.5 h-3.5" />
+              <span>ไปยังคลังของแถม & พรอพ ({products.filter((p) => p.sku?.startsWith('GIFT') || p.is_freebie).length}) →</span>
+            </Link>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

@@ -76,8 +76,8 @@ export default function Navbar() {
           icon: PackageCheck,
         },
         {
-          href: '/products?type=freebie',
-          label: 'คลังของแถม (Freebies)',
+          href: '/freebies',
+          label: 'คลังของแถม & พรอพ',
           mobileLabel: 'คลังของแถม',
           sublabel: 'สต็อกของแถม & อุปกรณ์',
           icon: Gift,

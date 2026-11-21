@@ -1,0 +1,711 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import Navbar from '@/components/Navbar';
+import { fetchProducts } from '@/lib/inventoryService';
+import { Product } from '@/types';
+import {
+  Gift,
+  PackageCheck,
+  Search,
+  LayoutGrid,
+  List,
+  Sparkles,
+  DollarSign,
+  Plus,
+  Minus,
+  Eye,
+  Pencil,
+  Trash2,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Layers,
+  ArrowRight,
+  Save,
+} from 'lucide-react';
+
+export default function FreebiesPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  // Detail Modal
+  const [activeModalItem, setActiveModalItem] = useState<Product | null>(null);
+
+  // Edit Modal
+  const [editingItem, setEditingItem] = useState<Product | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Product>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Updating quantity state
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await fetchProducts();
+        setProducts(data);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  // Filter only freebies and gift items
+  const freebieList = useMemo(() => {
+    return products.filter((p) => Boolean(p.sku?.startsWith('GIFT') || p.is_freebie));
+  }, [products]);
+
+  // Categories
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    freebieList.forEach((p) => {
+      if (p.stone_type) set.add(p.stone_type);
+    });
+    return Array.from(set).sort();
+  }, [freebieList]);
+
+  // Filtered List
+  const filteredList = useMemo(() => {
+    return freebieList.filter((item) => {
+      // Search
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchSku = item.sku.toLowerCase().includes(q);
+        const matchName = item.name.toLowerCase().includes(q);
+        const matchCat = item.stone_type?.toLowerCase().includes(q) || false;
+        if (!matchSku && !matchName && !matchCat) return false;
+      }
+      // Category
+      if (selectedCategory !== 'ALL' && item.stone_type !== selectedCategory) {
+        return false;
+      }
+      return true;
+    });
+  }, [freebieList, searchQuery, selectedCategory]);
+
+  // Summary KPI metrics
+  const totalUnits = useMemo(() => {
+    return freebieList.reduce((sum, item) => sum + (Number(item.qty_on_hand) || 0), 0);
+  }, [freebieList]);
+
+  const totalCostValue = useMemo(() => {
+    return freebieList.reduce(
+      (sum, item) => sum + (Number(item.cost_price) || 0) * (Number(item.qty_on_hand) || 0),
+      0
+    );
+  }, [freebieList]);
+
+  const inStockCount = useMemo(() => {
+    return freebieList.filter((item) => (Number(item.qty_on_hand) || 0) > 0).length;
+  }, [freebieList]);
+
+  // Quick Quantity Changer (+1 / -1)
+  const handleQuickQtyChange = async (item: Product, delta: number) => {
+    const newQty = Math.max(0, (Number(item.qty_on_hand) || 0) + delta);
+    setUpdatingId(item.id);
+    try {
+      const res = await fetch(`/api/products?id=${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qty_on_hand: newQty }),
+      });
+      if (!res.ok) throw new Error('Update failed');
+      setProducts((prev) =>
+        prev.map((p) => (p.id === item.id ? { ...p, qty_on_hand: newQty } : p))
+      );
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาดในการปรับจำนวน: ' + err.message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const openEditModal = (item: Product) => {
+    setEditingItem(item);
+    setEditForm({
+      sku: item.sku,
+      name: item.name,
+      stone_type: item.stone_type,
+      cost_price: item.cost_price,
+      qty_on_hand: item.qty_on_hand,
+      storage_location: item.storage_location,
+    });
+    setActiveModalItem(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingItem) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/products?id=${editingItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      if (!res.ok) throw new Error('Update failed');
+      setProducts((prev) =>
+        prev.map((p) => (p.id === editingItem.id ? { ...p, ...editForm } : p))
+      );
+      setEditingItem(null);
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาดในการบันทึก: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+      <Navbar />
+
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
+        {/* Banner Header with Separation Notice */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white p-6 sm:p-7 rounded-3xl shadow-lg relative overflow-hidden">
+          <div className="relative z-10 space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-xs">
+              <Gift className="w-3.5 h-3.5" />
+              <span>คลังเฉพาะของแถม & พรอพ (แยกต่างหากจากคลังหิน)</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              คลังสต็อกของแถม & อุปกรณ์ (Freebie Stock)
+            </h2>
+            <p className="text-xs sm:text-sm text-emerald-100 max-w-xl">
+              จัดการสต็อกโมเดลแมว, แม่เหล็กตู้เย็น, ของตกแต่งคริสต์มาส, และถุงของแถม
+              พร้อมรูปภาพจากบิล Shopee สำหรับใช้ตัดสต็อกแถมลูกค้า
+            </p>
+          </div>
+
+          <div className="relative z-10 flex items-center gap-3">
+            <Link
+              href="/products"
+              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-2 backdrop-blur-xs shadow-xs"
+            >
+              <span>💎 สลับไปคลังหิน</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+
+        {/* 4 Summary KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                🎁 รายการของแถม
+              </span>
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <Gift className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                {freebieList.length}
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                พร้อมแจก {inStockCount} / หมด {freebieList.length - inStockCount}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                📦 จำนวนชิ้นคงเหลือ
+              </span>
+              <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
+                <Layers className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-teal-700">
+                {totalUnits.toLocaleString()} ชิ้น
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                รวมของแถมและซองแพ็คเกจ
+              </span>
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                💰 มูลค่าต้นทุนสต็อก
+              </span>
+              <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-purple-700">
+                ฿{Math.round(totalCostValue).toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                คำนวณจากทุนบิล Shopee
+              </span>
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                🛍️ หมวดหมู่ของแถม
+              </span>
+              <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-700">
+                {categories.length} หมวด
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                โมเดล, แม่เหล็ก, เทศกาล, ซอง
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Bar & Search */}
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-3.5">
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              onClick={() => setSelectedCategory('ALL')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap shadow-xs ${
+                selectedCategory === 'ALL'
+                  ? 'bg-emerald-700 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              ทั้งหมด ({freebieList.length})
+            </button>
+            {categories.map((cat) => {
+              const count = freebieList.filter((p) => p.stone_type === cat).length;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap shadow-xs ${
+                    selectedCategory === cat
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search & Layout toggle */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1 border-t border-slate-100">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="ค้นหารหัส SKU หรือชื่อของแถม..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 justify-end">
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg text-xs transition ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="มุมมองการ์ด"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-lg text-xs transition ${
+                    viewMode === 'table'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="มุมมองตาราง"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Product List */}
+        {loading ? (
+          <div className="p-16 text-center text-slate-400 bg-white rounded-3xl border border-slate-200/80 shadow-sm">
+            <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-xs font-semibold text-slate-600">กำลังโหลดคลังของแถม...</p>
+          </div>
+        ) : filteredList.length === 0 ? (
+          <div className="p-16 text-center text-slate-400 bg-white rounded-3xl border border-slate-200/80 shadow-sm space-y-2">
+            <Gift className="w-12 h-12 mx-auto text-emerald-300" />
+            <p className="text-sm font-semibold text-slate-700">ไม่พบรายการของแถมในหมวดนี้</p>
+            <p className="text-xs text-slate-400">ลองล้างคำค้นหาหรือเลือกหมวดหมู่อื่น</p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          /* Grid View */
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            {filteredList.map((item) => {
+              const isOutOfStock = (Number(item.qty_on_hand) || 0) <= 0;
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setActiveModalItem(item)}
+                  className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 hover:border-emerald-300 hover:shadow-md transition overflow-hidden flex flex-col justify-between group cursor-pointer"
+                >
+                  <div>
+                    {/* Thumbnail */}
+                    <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">
+                      {item.r2_thumbnail_url ? (
+                        <img
+                          src={item.r2_thumbnail_url}
+                          alt={item.name}
+                          className="w-full h-full object-contain p-2 group-hover:scale-105 transition"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                          <Gift className="w-10 h-10" />
+                        </div>
+                      )}
+                      {/* SKU Badge */}
+                      <div className="absolute top-2 left-2 bg-black/75 backdrop-blur-xs text-white text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg shadow-xs">
+                        {item.sku}
+                      </div>
+
+                      {/* Stock Status Badge */}
+                      <div
+                        className={`absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-xs ${
+                          isOutOfStock
+                            ? 'bg-rose-500 text-white'
+                            : 'bg-emerald-500 text-white'
+                        }`}
+                      >
+                        {isOutOfStock ? 'หมด' : `คงเหลือ ${item.qty_on_hand}`}
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-3 sm:p-3.5 space-y-1">
+                      <h4
+                        className="font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 leading-tight group-hover:text-emerald-800 transition"
+                        title={item.name}
+                      >
+                        {item.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {item.stone_type}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer & Quick Stock Adjuster */}
+                  <div
+                    className="p-3 pt-0 border-t border-slate-100 mt-2 flex items-center justify-between gap-1 text-xs"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div>
+                      <span className="text-[10px] text-slate-400 block leading-none">ทุน</span>
+                      <strong className="text-emerald-700 font-bold text-xs sm:text-sm">
+                        ฿{Number(item.cost_price || 0).toLocaleString()}
+                      </strong>
+                    </div>
+
+                    {/* + / - buttons */}
+                    <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                      <button
+                        type="button"
+                        disabled={updatingId === item.id || isOutOfStock}
+                        onClick={() => handleQuickQtyChange(item, -1)}
+                        className="p-1 text-slate-600 hover:text-rose-600 rounded-lg hover:bg-white transition disabled:opacity-30"
+                        title="ลดสต็อก 1 ชิ้น (แจกแล้ว)"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="font-mono text-xs font-bold px-1 min-w-[20px] text-center text-slate-800">
+                        {item.qty_on_hand}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={updatingId === item.id}
+                        onClick={() => handleQuickQtyChange(item, 1)}
+                        className="p-1 text-slate-600 hover:text-emerald-600 rounded-lg hover:bg-white transition"
+                        title="เพิ่มสต็อก 1 ชิ้น"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Table View */
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th className="py-3 px-4">รูปภาพ</th>
+                    <th className="py-3 px-4">รหัส SKU</th>
+                    <th className="py-3 px-4">ชื่อสินค้าของแถม</th>
+                    <th className="py-3 px-4">หมวดหมู่</th>
+                    <th className="py-3 px-4 text-right">ต้นทุนต่อชิ้น</th>
+                    <th className="py-3 px-4 text-center">จำนวนคงเหลือ</th>
+                    <th className="py-3 px-4 text-center">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredList.map((item) => (
+                    <tr
+                      key={item.id}
+                      onClick={() => setActiveModalItem(item)}
+                      className="hover:bg-slate-50/80 transition cursor-pointer"
+                    >
+                      <td className="py-2.5 px-4">
+                        <img
+                          src={item.r2_thumbnail_url || ''}
+                          alt={item.name}
+                          className="w-10 h-10 rounded-xl object-contain bg-slate-100 border border-slate-200"
+                        />
+                      </td>
+                      <td className="py-2.5 px-4 font-mono font-bold text-slate-800">
+                        {item.sku}
+                      </td>
+                      <td className="py-2.5 px-4 font-semibold text-slate-800 max-w-xs truncate">
+                        {item.name}
+                      </td>
+                      <td className="py-2.5 px-4 text-slate-500">
+                        {item.stone_type}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
+                        ฿{Number(item.cost_price || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickQtyChange(item, -1)}
+                            className="p-1 text-slate-600 hover:text-rose-600 rounded-lg hover:bg-white transition"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="font-mono text-xs font-bold px-1 min-w-[20px] text-center">
+                            {item.qty_on_hand}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickQtyChange(item, 1)}
+                            className="p-1 text-slate-600 hover:text-emerald-600 rounded-lg hover:bg-white transition"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                          title="แก้ไข"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Detail Modal */}
+        {activeModalItem && (
+          <div
+            onClick={() => setActiveModalItem(null)}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 cursor-default"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800">
+                    {activeModalItem.sku}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {activeModalItem.stone_type}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveModalItem(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Image Preview */}
+              <div className="w-full aspect-square bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center p-4">
+                <img
+                  src={activeModalItem.r2_thumbnail_url || ''}
+                  alt={activeModalItem.name}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              <div>
+                <h3 className="font-bold text-slate-900 text-base leading-snug">
+                  {activeModalItem.name}
+                </h3>
+                <div className="flex items-center justify-between mt-3 text-sm">
+                  <span className="text-slate-500">ต้นทุนต่อชิ้น:</span>
+                  <strong className="text-emerald-700 font-extrabold text-base">
+                    ฿{Number(activeModalItem.cost_price || 0).toLocaleString()}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between mt-1 text-sm">
+                  <span className="text-slate-500">คงเหลือในสต็อก:</span>
+                  <strong className="text-slate-900 font-bold font-mono">
+                    {activeModalItem.qty_on_hand} ชิ้น
+                  </strong>
+                </div>
+                {activeModalItem.storage_location && (
+                  <div className="flex items-center justify-between mt-1 text-sm">
+                    <span className="text-slate-500">ตำแหน่งจัดเก็บ:</span>
+                    <span className="text-slate-700 font-medium">
+                      {activeModalItem.storage_location}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  onClick={() => openEditModal(activeModalItem)}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition flex items-center gap-1.5"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>แก้ไขข้อมูล</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editingItem && (
+          <div
+            onClick={() => setEditingItem(null)}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 cursor-default"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h4 className="font-bold text-slate-900 text-sm">แก้ไขรายการของแถม</h4>
+                <button
+                  onClick={() => setEditingItem(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="font-semibold text-slate-600 block mb-1">ชื่อของแถม</label>
+                  <input
+                    type="text"
+                    value={editForm.name || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-600 block mb-1">ต้นทุน (฿)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.cost_price || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, cost_price: parseFloat(e.target.value) }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-slate-600 block mb-1">จำนวนคงเหลือ</label>
+                    <input
+                      type="number"
+                      value={editForm.qty_on_hand ?? ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, qty_on_hand: parseInt(e.target.value, 10) }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-600 block mb-1">หมวดหมู่</label>
+                  <input
+                    type="text"
+                    value={editForm.stone_type || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, stone_type: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEditSave}
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
