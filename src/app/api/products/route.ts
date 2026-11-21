@@ -3,6 +3,8 @@ import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
 import { Product, ProductStatus } from '@/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // GET all products
 export async function GET() {
