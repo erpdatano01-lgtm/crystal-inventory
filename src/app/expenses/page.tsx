@@ -255,9 +255,15 @@ export default function ExpensesPage() {
       .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
   }, [expenses]);
 
+  const freebieExpenseSum = useMemo(() => {
+    return expenses
+      .filter((e) => e.category === 'FREEBIE_GIFT')
+      .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [expenses]);
+
   const otherOperatingSum = useMemo(() => {
     return expenses
-      .filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING')
+      .filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING' && e.category !== 'FREEBIE_GIFT')
       .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
   }, [expenses]);
 
@@ -266,7 +272,7 @@ export default function ExpensesPage() {
   }, [expenses]);
 
   // Tab filter & search state
-  const [selectedCategoryTab, setSelectedCategoryTab] = useState<'ALL' | 'STOCK_LOT' | 'PACKAGING' | 'OTHER'>('ALL');
+  const [selectedCategoryTab, setSelectedCategoryTab] = useState<'ALL' | 'STOCK_LOT' | 'PACKAGING' | 'FREEBIE_GIFT' | 'OTHER'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredExpenses = useMemo(() => {
@@ -274,7 +280,8 @@ export default function ExpensesPage() {
       // Tab filter
       if (selectedCategoryTab === 'STOCK_LOT' && e.category !== 'STOCK_LOT') return false;
       if (selectedCategoryTab === 'PACKAGING' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING') return false;
-      if (selectedCategoryTab === 'OTHER' && (e.category === 'STOCK_LOT' || e.category === 'PACKAGING' || e.category === 'SHIPPING')) return false;
+      if (selectedCategoryTab === 'FREEBIE_GIFT' && e.category !== 'FREEBIE_GIFT') return false;
+      if (selectedCategoryTab === 'OTHER' && (e.category === 'STOCK_LOT' || e.category === 'PACKAGING' || e.category === 'SHIPPING' || e.category === 'FREEBIE_GIFT')) return false;
 
       // Search query
       if (searchQuery.trim()) {
@@ -337,31 +344,31 @@ export default function ExpensesPage() {
           </div>
         </div>
 
-        {/* 4 Summary Cards Separating Stone Cost vs Other Costs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        {/* 5 Summary Cards Separating Stone Cost vs Packaging vs Freebie Gifts vs Props vs Total */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3.5">
           {/* Card 1: ต้นทุนเฉพาะหิน (Stock Lots) */}
           <div
             onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'STOCK_LOT' ? 'ALL' : 'STOCK_LOT')}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+            className={`p-4 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
               selectedCategoryTab === 'STOCK_LOT'
                 ? 'bg-purple-900 text-white border-purple-900 shadow-md ring-2 ring-purple-500'
                 : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-purple-300'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-bold uppercase tracking-wider ${selectedCategoryTab === 'STOCK_LOT' ? 'text-purple-200' : 'text-purple-800'}`}>
-                💎 ต้นทุนเฉพาะหิน (Stone Lots)
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedCategoryTab === 'STOCK_LOT' ? 'text-purple-200' : 'text-purple-800'}`}>
+                💎 ต้นทุนหิน (Stone)
               </span>
-              <div className={`p-2 rounded-xl ${selectedCategoryTab === 'STOCK_LOT' ? 'bg-white/10 text-purple-200' : 'bg-purple-50 text-purple-700'}`}>
-                <Layers className="w-4 h-4" />
+              <div className={`p-1.5 rounded-xl ${selectedCategoryTab === 'STOCK_LOT' ? 'bg-white/10 text-purple-200' : 'bg-purple-50 text-purple-700'}`}>
+                <Layers className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className={`text-xl sm:text-2xl font-black ${selectedCategoryTab === 'STOCK_LOT' ? 'text-white' : 'text-purple-900'}`}>
+              <div className={`text-lg sm:text-xl font-black ${selectedCategoryTab === 'STOCK_LOT' ? 'text-white' : 'text-purple-900'}`}>
                 ฿{stoneExpenseSum.toLocaleString()}
               </div>
-              <span className={`text-[11px] mt-0.5 block ${selectedCategoryTab === 'STOCK_LOT' ? 'text-purple-200' : 'text-slate-400'}`}>
-                {expenses.filter((e) => e.category === 'STOCK_LOT').length} ล็อต (คลิกเพื่อกรอง)
+              <span className={`text-[10px] mt-0.5 block ${selectedCategoryTab === 'STOCK_LOT' ? 'text-purple-200' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category === 'STOCK_LOT').length} ล็อต (คลิกกรอง)
               </span>
             </div>
           </div>
@@ -369,80 +376,107 @@ export default function ExpensesPage() {
           {/* Card 2: ค่าแพ็คเกจจิ้ง & จัดส่ง */}
           <div
             onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'PACKAGING' ? 'ALL' : 'PACKAGING')}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+            className={`p-4 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
               selectedCategoryTab === 'PACKAGING'
                 ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-400'
                 : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-amber-300'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-bold uppercase tracking-wider ${selectedCategoryTab === 'PACKAGING' ? 'text-amber-100' : 'text-amber-800'}`}>
-                📦 แพ็คเกจจิ้ง & จัดส่ง
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedCategoryTab === 'PACKAGING' ? 'text-amber-100' : 'text-amber-800'}`}>
+                📦 แพ็คเกจจิ้ง
               </span>
-              <div className={`p-2 rounded-xl ${selectedCategoryTab === 'PACKAGING' ? 'bg-white/10 text-amber-100' : 'bg-amber-50 text-amber-700'}`}>
-                <Receipt className="w-4 h-4" />
+              <div className={`p-1.5 rounded-xl ${selectedCategoryTab === 'PACKAGING' ? 'bg-white/10 text-amber-100' : 'bg-amber-50 text-amber-700'}`}>
+                <Receipt className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className={`text-xl sm:text-2xl font-black ${selectedCategoryTab === 'PACKAGING' ? 'text-white' : 'text-amber-700'}`}>
+              <div className={`text-lg sm:text-xl font-black ${selectedCategoryTab === 'PACKAGING' ? 'text-white' : 'text-amber-700'}`}>
                 ฿{packagingExpenseSum.toLocaleString()}
               </div>
-              <span className={`text-[11px] mt-0.5 block ${selectedCategoryTab === 'PACKAGING' ? 'text-amber-100' : 'text-slate-400'}`}>
-                {expenses.filter((e) => e.category === 'PACKAGING' || e.category === 'SHIPPING').length} รายการ (คลิกเพื่อกรอง)
+              <span className={`text-[10px] mt-0.5 block ${selectedCategoryTab === 'PACKAGING' ? 'text-amber-100' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category === 'PACKAGING' || e.category === 'SHIPPING').length} รายการ (คลิกกรอง)
               </span>
             </div>
           </div>
 
-          {/* Card 3: พรอพ เครื่องมือ & อื่นๆ */}
+          {/* Card 3: ของแถมลูกค้า (Freebie Gifts) */}
+          <div
+            onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'FREEBIE_GIFT' ? 'ALL' : 'FREEBIE_GIFT')}
+            className={`p-4 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+              selectedCategoryTab === 'FREEBIE_GIFT'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400'
+                : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedCategoryTab === 'FREEBIE_GIFT' ? 'text-emerald-100' : 'text-emerald-800'}`}>
+                🎁 ของแถมลูกค้า
+              </span>
+              <div className={`p-1.5 rounded-xl ${selectedCategoryTab === 'FREEBIE_GIFT' ? 'bg-white/10 text-emerald-100' : 'bg-emerald-50 text-emerald-700'}`}>
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div>
+              <div className={`text-lg sm:text-xl font-black ${selectedCategoryTab === 'FREEBIE_GIFT' ? 'text-white' : 'text-emerald-700'}`}>
+                ฿{freebieExpenseSum.toLocaleString()}
+              </div>
+              <span className={`text-[10px] mt-0.5 block ${selectedCategoryTab === 'FREEBIE_GIFT' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category === 'FREEBIE_GIFT').length} รายการ (คลิกกรอง)
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: พรอพ เครื่องมือ & อื่นๆ */}
           <div
             onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'OTHER' ? 'ALL' : 'OTHER')}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+            className={`p-4 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
               selectedCategoryTab === 'OTHER'
                 ? 'bg-slate-800 text-white border-slate-800 shadow-md ring-2 ring-slate-500'
                 : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-slate-300'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-bold uppercase tracking-wider ${selectedCategoryTab === 'OTHER' ? 'text-slate-200' : 'text-slate-700'}`}>
-                📸 พรอพ เครื่องมือ & อื่นๆ
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedCategoryTab === 'OTHER' ? 'text-slate-200' : 'text-slate-700'}`}>
+                📸 พรอพ & เครื่องมือ
               </span>
-              <div className={`p-2 rounded-xl ${selectedCategoryTab === 'OTHER' ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
-                <Sparkles className="w-4 h-4" />
+              <div className={`p-1.5 rounded-xl ${selectedCategoryTab === 'OTHER' ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
+                <Sparkles className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className={`text-xl sm:text-2xl font-black ${selectedCategoryTab === 'OTHER' ? 'text-white' : 'text-slate-800'}`}>
+              <div className={`text-lg sm:text-xl font-black ${selectedCategoryTab === 'OTHER' ? 'text-white' : 'text-slate-800'}`}>
                 ฿{otherOperatingSum.toLocaleString()}
               </div>
-              <span className={`text-[11px] mt-0.5 block ${selectedCategoryTab === 'OTHER' ? 'text-slate-300' : 'text-slate-400'}`}>
-                {expenses.filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING').length} รายการ (คลิกเพื่อกรอง)
+              <span className={`text-[10px] mt-0.5 block ${selectedCategoryTab === 'OTHER' ? 'text-slate-300' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING' && e.category !== 'FREEBIE_GIFT').length} รายการ (คลิกกรอง)
               </span>
             </div>
           </div>
 
-          {/* Card 4: ยอดค่าใช้จ่ายรวมทั้งหมด */}
+          {/* Card 5: ยอดค่าใช้จ่ายรวมทั้งหมด */}
           <div
             onClick={() => setSelectedCategoryTab('ALL')}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+            className={`p-4 rounded-3xl border transition cursor-pointer flex flex-col justify-between col-span-2 sm:col-span-1 ${
               selectedCategoryTab === 'ALL'
                 ? 'bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200 ring-2 ring-rose-400'
                 : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-rose-200'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-                💰 รวมค่าใช้จ่ายทั้งหมด
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700">
+                💰 รวมทุกอย่าง
               </span>
-              <div className="p-2 rounded-xl bg-rose-100 text-rose-700">
-                <DollarSign className="w-4 h-4" />
+              <div className="p-1.5 rounded-xl bg-rose-100 text-rose-700">
+                <DollarSign className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-black text-rose-600">
+              <div className="text-lg sm:text-xl font-black text-rose-600">
                 ฿{totalExpenseSum.toLocaleString()}
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
-                ทั้งหมด {expenses.length} รายการ (คลิกดูทั้งหมด)
+              <span className="text-[10px] text-slate-400 mt-0.5 block">
+                ทั้งหมด {expenses.length} รายการ
               </span>
             </div>
           </div>
@@ -689,7 +723,7 @@ export default function ExpensesPage() {
               <button
                 type="button"
                 onClick={() => setSelectedCategoryTab('ALL')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap shadow-xs ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap shadow-xs ${
                   selectedCategoryTab === 'ALL'
                     ? 'bg-slate-900 text-white'
                     : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -701,7 +735,7 @@ export default function ExpensesPage() {
               <button
                 type="button"
                 onClick={() => setSelectedCategoryTab('STOCK_LOT')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
                   selectedCategoryTab === 'STOCK_LOT'
                     ? 'bg-purple-900 text-white'
                     : 'bg-white text-purple-800 hover:bg-purple-50 border border-purple-200'
@@ -714,7 +748,7 @@ export default function ExpensesPage() {
               <button
                 type="button"
                 onClick={() => setSelectedCategoryTab('PACKAGING')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
                   selectedCategoryTab === 'PACKAGING'
                     ? 'bg-amber-600 text-white'
                     : 'bg-white text-amber-800 hover:bg-amber-50 border border-amber-200'
@@ -726,14 +760,27 @@ export default function ExpensesPage() {
 
               <button
                 type="button"
+                onClick={() => setSelectedCategoryTab('FREEBIE_GIFT')}
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                  selectedCategoryTab === 'FREEBIE_GIFT'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200'
+                }`}
+              >
+                <span>🎁 ของแถม ({expenses.filter((e) => e.category === 'FREEBIE_GIFT').length})</span>
+                <span className="text-[10px] opacity-80">฿{freebieExpenseSum.toLocaleString()}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setSelectedCategoryTab('OTHER')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
                   selectedCategoryTab === 'OTHER'
                     ? 'bg-slate-800 text-white'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
-                <span>📸 พรอพ & เครื่องมือ & อื่นๆ ({expenses.filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING').length})</span>
+                <span>📸 พรอพ & อื่นๆ ({expenses.filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING' && e.category !== 'FREEBIE_GIFT').length})</span>
                 <span className="text-[10px] opacity-80">฿{otherOperatingSum.toLocaleString()}</span>
               </button>
             </div>
@@ -762,7 +809,15 @@ export default function ExpensesPage() {
           <div className="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-600 flex items-center gap-1.5">
               <Receipt className="w-3.5 h-3.5 text-purple-600" />
-              {selectedCategoryTab === 'STOCK_LOT' ? '💎 รายการต้นทุนเฉพาะหิน' : selectedCategoryTab === 'PACKAGING' ? '📦 รายการแพ็คเกจจิ้ง' : selectedCategoryTab === 'OTHER' ? '📸 พรอพ & เครื่องมือ & อื่นๆ' : 'รายการค่าใช้จ่ายทั้งหมด'}
+              {selectedCategoryTab === 'STOCK_LOT'
+                ? '💎 รายการต้นทุนเฉพาะหิน'
+                : selectedCategoryTab === 'PACKAGING'
+                ? '📦 รายการแพ็คเกจจิ้ง'
+                : selectedCategoryTab === 'FREEBIE_GIFT'
+                ? '🎁 รายการของแถมลูกค้า'
+                : selectedCategoryTab === 'OTHER'
+                ? '📸 พรอพ & เครื่องมือ & อื่นๆ'
+                : 'รายการค่าใช้จ่ายทั้งหมด'}
               <span className="text-slate-400 font-normal">({filteredExpenses.length} รายการ)</span>
             </span>
             <span className="font-bold text-slate-900">
@@ -795,12 +850,33 @@ export default function ExpensesPage() {
                   <div
                     key={item.id}
                     onClick={() => setActiveDetailExpense(item)}
-                    className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-purple-50/40 transition cursor-pointer group"
+                    className="p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-purple-50/40 transition cursor-pointer group"
                   >
-                    <div className="flex items-start gap-3.5">
-                      <div className="p-2.5 rounded-2xl bg-purple-50 text-purple-700 mt-0.5 shrink-0 group-hover:scale-105 transition">
-                        <Receipt className="w-5 h-5" />
-                      </div>
+                    <div className="flex items-start gap-3">
+                      {item.r2_receipt_url ? (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReceiptUrl(item.r2_receipt_url!);
+                          }}
+                          className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shrink-0 cursor-pointer hover:opacity-90 group/img shadow-xs bg-slate-100"
+                          title="คลิกเพื่อดูรูปบิล/สลิปเต็มจอ"
+                        >
+                          <img
+                            src={item.r2_receipt_url}
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition">
+                            <Eye className="w-4 h-4 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 mt-0.5 shrink-0 group-hover:scale-105 transition">
+                          <Receipt className="w-5 h-5" />
+                        </div>
+                      )}
 
                       <div>
                         <div className="flex items-center gap-2 flex-wrap mb-1">
