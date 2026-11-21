@@ -242,10 +242,55 @@ export default function ExpensesPage() {
     }
   };
 
-  const totalExpenseSum = expenses.reduce(
-    (sum, e) => sum + Number(e.total_amount || 0),
-    0
-  );
+  // Calculation of categorized totals
+  const stoneExpenseSum = useMemo(() => {
+    return expenses
+      .filter((e) => e.category === 'STOCK_LOT')
+      .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [expenses]);
+
+  const packagingExpenseSum = useMemo(() => {
+    return expenses
+      .filter((e) => e.category === 'PACKAGING' || e.category === 'SHIPPING')
+      .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [expenses]);
+
+  const otherOperatingSum = useMemo(() => {
+    return expenses
+      .filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING')
+      .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [expenses]);
+
+  const totalExpenseSum = useMemo(() => {
+    return expenses.reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [expenses]);
+
+  // Tab filter & search state
+  const [selectedCategoryTab, setSelectedCategoryTab] = useState<'ALL' | 'STOCK_LOT' | 'PACKAGING' | 'OTHER'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      // Tab filter
+      if (selectedCategoryTab === 'STOCK_LOT' && e.category !== 'STOCK_LOT') return false;
+      if (selectedCategoryTab === 'PACKAGING' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING') return false;
+      if (selectedCategoryTab === 'OTHER' && (e.category === 'STOCK_LOT' || e.category === 'PACKAGING' || e.category === 'SHIPPING')) return false;
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const titleMatch = e.title.toLowerCase().includes(q);
+        const vendorMatch = e.vendor_name?.toLowerCase().includes(q) || false;
+        const notesMatch = e.notes?.toLowerCase().includes(q) || false;
+        return titleMatch || vendorMatch || notesMatch;
+      }
+      return true;
+    });
+  }, [expenses, selectedCategoryTab, searchQuery]);
+
+  const filteredSum = useMemo(() => {
+    return filteredExpenses.reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [filteredExpenses]);
 
   return (
     <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
@@ -289,6 +334,117 @@ export default function ExpensesPage() {
               <PlusCircle className="w-4 h-4" />
               <span>{showAddForm ? 'ปิดแบบฟอร์ม' : '+ บันทึกค่าใช้จ่ายใหม่'}</span>
             </button>
+          </div>
+        </div>
+
+        {/* 4 Summary Cards Separating Stone Cost vs Other Costs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          {/* Card 1: ต้นทุนเฉพาะหิน (Stock Lots) */}
+          <div
+            onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'STOCK_LOT' ? 'ALL' : 'STOCK_LOT')}
+            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+              selectedCategoryTab === 'STOCK_LOT'
+                ? 'bg-purple-900 text-white border-purple-900 shadow-md ring-2 ring-purple-500'
+                : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-purple-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-bold uppercase tracking-wider ${selectedCategoryTab === 'STOCK_LOT' ? 'text-purple-200' : 'text-purple-800'}`}>
+                💎 ต้นทุนเฉพาะหิน (Stone Lots)
+              </span>
+              <div className={`p-2 rounded-xl ${selectedCategoryTab === 'STOCK_LOT' ? 'bg-white/10 text-purple-200' : 'bg-purple-50 text-purple-700'}`}>
+                <Layers className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className={`text-xl sm:text-2xl font-black ${selectedCategoryTab === 'STOCK_LOT' ? 'text-white' : 'text-purple-900'}`}>
+                ฿{stoneExpenseSum.toLocaleString()}
+              </div>
+              <span className={`text-[11px] mt-0.5 block ${selectedCategoryTab === 'STOCK_LOT' ? 'text-purple-200' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category === 'STOCK_LOT').length} ล็อต (คลิกเพื่อกรอง)
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: ค่าแพ็คเกจจิ้ง & จัดส่ง */}
+          <div
+            onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'PACKAGING' ? 'ALL' : 'PACKAGING')}
+            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+              selectedCategoryTab === 'PACKAGING'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-400'
+                : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-amber-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-bold uppercase tracking-wider ${selectedCategoryTab === 'PACKAGING' ? 'text-amber-100' : 'text-amber-800'}`}>
+                📦 แพ็คเกจจิ้ง & จัดส่ง
+              </span>
+              <div className={`p-2 rounded-xl ${selectedCategoryTab === 'PACKAGING' ? 'bg-white/10 text-amber-100' : 'bg-amber-50 text-amber-700'}`}>
+                <Receipt className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className={`text-xl sm:text-2xl font-black ${selectedCategoryTab === 'PACKAGING' ? 'text-white' : 'text-amber-700'}`}>
+                ฿{packagingExpenseSum.toLocaleString()}
+              </div>
+              <span className={`text-[11px] mt-0.5 block ${selectedCategoryTab === 'PACKAGING' ? 'text-amber-100' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category === 'PACKAGING' || e.category === 'SHIPPING').length} รายการ (คลิกเพื่อกรอง)
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: พรอพ เครื่องมือ & อื่นๆ */}
+          <div
+            onClick={() => setSelectedCategoryTab(selectedCategoryTab === 'OTHER' ? 'ALL' : 'OTHER')}
+            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+              selectedCategoryTab === 'OTHER'
+                ? 'bg-slate-800 text-white border-slate-800 shadow-md ring-2 ring-slate-500'
+                : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-bold uppercase tracking-wider ${selectedCategoryTab === 'OTHER' ? 'text-slate-200' : 'text-slate-700'}`}>
+                📸 พรอพ เครื่องมือ & อื่นๆ
+              </span>
+              <div className={`p-2 rounded-xl ${selectedCategoryTab === 'OTHER' ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className={`text-xl sm:text-2xl font-black ${selectedCategoryTab === 'OTHER' ? 'text-white' : 'text-slate-800'}`}>
+                ฿{otherOperatingSum.toLocaleString()}
+              </div>
+              <span className={`text-[11px] mt-0.5 block ${selectedCategoryTab === 'OTHER' ? 'text-slate-300' : 'text-slate-400'}`}>
+                {expenses.filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING').length} รายการ (คลิกเพื่อกรอง)
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: ยอดค่าใช้จ่ายรวมทั้งหมด */}
+          <div
+            onClick={() => setSelectedCategoryTab('ALL')}
+            className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between ${
+              selectedCategoryTab === 'ALL'
+                ? 'bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200 ring-2 ring-rose-400'
+                : 'bg-white text-slate-900 border-slate-200/80 shadow-sm hover:border-rose-200'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                💰 รวมค่าใช้จ่ายทั้งหมด
+              </span>
+              <div className="p-2 rounded-xl bg-rose-100 text-rose-700">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-rose-600">
+                ฿{totalExpenseSum.toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                ทั้งหมด {expenses.length} รายการ (คลิกดูทั้งหมด)
+              </span>
+            </div>
           </div>
         </div>
 
@@ -527,11 +683,91 @@ export default function ExpensesPage() {
 
         {/* Expenses Table / List */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-purple-600" />
-              รายการค่าใช้จ่ายล่าสุด ({expenses.length} รายการ)
-            </h3>
+          {/* List Header with Tabs & Search */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 bg-slate-50/50">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryTab('ALL')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap shadow-xs ${
+                  selectedCategoryTab === 'ALL'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                ทั้งหมด ({expenses.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryTab('STOCK_LOT')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                  selectedCategoryTab === 'STOCK_LOT'
+                    ? 'bg-purple-900 text-white'
+                    : 'bg-white text-purple-800 hover:bg-purple-50 border border-purple-200'
+                }`}
+              >
+                <span>💎 เฉพาะค่าหิน ({expenses.filter((e) => e.category === 'STOCK_LOT').length})</span>
+                <span className="text-[10px] opacity-80">฿{stoneExpenseSum.toLocaleString()}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryTab('PACKAGING')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                  selectedCategoryTab === 'PACKAGING'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-white text-amber-800 hover:bg-amber-50 border border-amber-200'
+                }`}
+              >
+                <span>📦 แพ็คเกจจิ้ง ({expenses.filter((e) => e.category === 'PACKAGING' || e.category === 'SHIPPING').length})</span>
+                <span className="text-[10px] opacity-80">฿{packagingExpenseSum.toLocaleString()}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryTab('OTHER')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap shadow-xs ${
+                  selectedCategoryTab === 'OTHER'
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                <span>📸 พรอพ & เครื่องมือ & อื่นๆ ({expenses.filter((e) => e.category !== 'STOCK_LOT' && e.category !== 'PACKAGING' && e.category !== 'SHIPPING').length})</span>
+                <span className="text-[10px] opacity-80">฿{otherOperatingSum.toLocaleString()}</span>
+              </button>
+            </div>
+
+            {/* Search Box */}
+            <div className="relative min-w-[220px]">
+              <input
+                type="text"
+                placeholder="ค้นหาชื่อรายการ, ร้านค้า..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+              <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Subheader info showing filtered count and sum */}
+          <div className="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-600 flex items-center gap-1.5">
+              <Receipt className="w-3.5 h-3.5 text-purple-600" />
+              {selectedCategoryTab === 'STOCK_LOT' ? '💎 รายการต้นทุนเฉพาะหิน' : selectedCategoryTab === 'PACKAGING' ? '📦 รายการแพ็คเกจจิ้ง' : selectedCategoryTab === 'OTHER' ? '📸 พรอพ & เครื่องมือ & อื่นๆ' : 'รายการค่าใช้จ่ายทั้งหมด'}
+              <span className="text-slate-400 font-normal">({filteredExpenses.length} รายการ)</span>
+            </span>
+            <span className="font-bold text-slate-900">
+              ยอดรวมรายการที่เลือก: <span className="text-purple-700 font-extrabold text-sm">฿{filteredSum.toLocaleString()}</span>
+            </span>
           </div>
 
           {loading ? (
@@ -539,15 +775,15 @@ export default function ExpensesPage() {
               <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-xs font-semibold text-slate-600">กำลังโหลดรายการค่าใช้จ่าย...</p>
             </div>
-          ) : expenses.length === 0 ? (
+          ) : filteredExpenses.length === 0 ? (
             <div className="p-12 text-center text-slate-400 space-y-2">
               <Receipt className="w-10 h-10 mx-auto text-purple-300" />
-              <p className="text-sm font-semibold text-slate-700">ยังไม่มีรายการค่าใช้จ่าย</p>
-              <p className="text-xs text-slate-400">กดปุ่ม "+ บันทึกค่าใช้จ่ายใหม่" ด้านบนเพื่อเริ่มบันทึกบิล</p>
+              <p className="text-sm font-semibold text-slate-700">ไม่พบรายการค่าใช้จ่ายในหมวดหมู่นี้</p>
+              <p className="text-xs text-slate-400">ลองเปลี่ยนแท็บตัวกรองหรือล้างคำค้นหา</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {expenses.map((item) => {
+              {filteredExpenses.map((item) => {
                 const catConfig =
                   EXPENSE_CATEGORIES_CONFIG[item.category] ||
                   EXPENSE_CATEGORIES_CONFIG.OTHER;

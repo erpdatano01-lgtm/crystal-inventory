@@ -49,7 +49,7 @@ export default function DashboardPage() {
     load();
   }, []);
 
-  // 1. ยอดค่าใช้จ่ายรวมเดือนนี้
+  // 1. ยอดค่าใช้จ่ายรวมเดือนนี้ พร้อมแยกต้นทุนหิน vs ค่าอื่นๆ
   const currentMonthPrefix = new Date().toISOString().slice(0, 7); // e.g. "2026-11"
   const thisMonthExpenses = expenses.filter((e) =>
     e.expense_date.startsWith(currentMonthPrefix)
@@ -58,6 +58,10 @@ export default function DashboardPage() {
     (sum, e) => sum + Number(e.total_amount || 0),
     0
   );
+  const stoneExpenseThisMonth = thisMonthExpenses
+    .filter((e) => e.category === 'STOCK_LOT')
+    .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  const otherExpenseThisMonth = totalExpenseThisMonth - stoneExpenseThisMonth;
 
   // 2. จำนวนหินที่พร้อมขาย (AVAILABLE)
   const availableProducts = products.filter((p) => p.status === 'AVAILABLE');
@@ -180,7 +184,7 @@ export default function DashboardPage() {
 
         {/* 4 Core Summary Cards (Exact required metrics) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-          {/* Card 1: ค่าใช้จ่ายรวมเดือนนี้ */}
+          {/* Card 1: ค่าใช้จ่ายรวมเดือนนี้ พร้อมแยกค่าหิน vs ค่าอื่นๆ */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -194,9 +198,16 @@ export default function DashboardPage() {
               <div className="text-xl sm:text-2xl font-black text-rose-600">
                 ฿{totalExpenseThisMonth.toLocaleString()}
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
-                {thisMonthExpenses.length} รายการในเดือนนี้
-              </span>
+              <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-0.5 text-[11px]">
+                <div className="flex items-center justify-between text-purple-700 font-semibold">
+                  <span>💎 ต้นทุนหิน:</span>
+                  <span className="font-bold">฿{stoneExpenseThisMonth.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>📦 แพ็ค & พรอพ:</span>
+                  <span>฿{otherExpenseThisMonth.toLocaleString()}</span>
+                </div>
+              </div>
             </div>
           </div>
 
