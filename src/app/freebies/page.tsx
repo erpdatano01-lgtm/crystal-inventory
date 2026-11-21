@@ -58,10 +58,31 @@ export default function FreebiesPage() {
     load();
   }, []);
 
-  // Filter only freebies and gift items
+  // Filter non-stone items (Freebies, Props & Supplies)
   const freebieList = useMemo(() => {
-    return products.filter((p) => Boolean(p.sku?.startsWith('GIFT') || p.is_freebie));
+    return products.filter((p) =>
+      Boolean(
+        p.sku?.startsWith('GIFT') ||
+        p.sku?.startsWith('PROP') ||
+        p.is_freebie ||
+        p.grade_origin === '[PROP]' ||
+        p.stone_type?.includes('พร็อพ')
+      )
+    );
   }, [products]);
+
+  // Distinction counts
+  const freebieCount = useMemo(() => {
+    return freebieList.filter(
+      (p) => !p.sku?.startsWith('PROP') && p.grade_origin !== '[PROP]' && !p.stone_type?.includes('พร็อพ')
+    ).length;
+  }, [freebieList]);
+
+  const propCount = useMemo(() => {
+    return freebieList.filter(
+      (p) => p.sku?.startsWith('PROP') || p.grade_origin === '[PROP]' || p.stone_type?.includes('พร็อพ')
+    ).length;
+  }, [freebieList]);
 
   // Categories
   const categories = useMemo(() => {
@@ -196,29 +217,51 @@ export default function FreebiesPage() {
 
         {/* 4 Summary KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          {/* Card 1: ของแถมลูกค้า */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                🎁 รายการของแถม
+                🎁 ของแถมลูกค้า
               </span>
               <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
                 <Gift className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900">
-                {freebieList.length}
+              <div className="text-2xl sm:text-3xl font-black text-emerald-700">
+                {freebieCount}
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                พร้อมแจก {inStockCount} / หมด {freebieList.length - inStockCount}
+                รายการของแจกลูกค้า
               </span>
             </div>
           </div>
 
+          {/* Card 2: พร็อพถ่ายรูป & ฉาก */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                📦 จำนวนชิ้นคงเหลือ
+                📸 พร็อพถ่ายรูป & ฉาก
+              </span>
+              <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-indigo-700">
+                {propCount}
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                อุปกรณ์ประกอบฉาก & ไลฟ์ (ไม่แจก)
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: จำนวนชิ้นคงเหลือ */}
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                📦 สต็อกชิ้นคงเหลือ
               </span>
               <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
                 <Layers className="w-4 h-4" />
@@ -229,11 +272,12 @@ export default function FreebiesPage() {
                 {totalUnits.toLocaleString()} ชิ้น
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                รวมของแถมและซองแพ็คเกจ
+                พร้อมใช้งาน {inStockCount} รายการ
               </span>
             </div>
           </div>
 
+          {/* Card 4: มูลค่าต้นทุนรวม */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -249,25 +293,6 @@ export default function FreebiesPage() {
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
                 คำนวณจากทุนบิล Shopee
-              </span>
-            </div>
-          </div>
-
-          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                🛍️ หมวดหมู่ของแถม
-              </span>
-              <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
-                <Sparkles className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="text-2xl sm:text-3xl font-black text-amber-700">
-                {categories.length} หมวด
-              </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
-                โมเดล, แม่เหล็ก, เทศกาล, ซอง
               </span>
             </div>
           </div>
@@ -372,11 +397,16 @@ export default function FreebiesPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
             {filteredList.map((item) => {
               const isOutOfStock = (Number(item.qty_on_hand) || 0) <= 0;
+              const isProp = item.sku?.startsWith('PROP') || item.grade_origin === '[PROP]' || item.stone_type?.includes('พร็อพ');
               return (
                 <div
                   key={item.id}
                   onClick={() => setActiveModalItem(item)}
-                  className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 hover:border-emerald-300 hover:shadow-md transition overflow-hidden flex flex-col justify-between group cursor-pointer"
+                  className={`bg-white rounded-2xl sm:rounded-3xl border transition overflow-hidden flex flex-col justify-between group cursor-pointer ${
+                    isProp
+                      ? 'border-indigo-200/90 hover:border-indigo-400 hover:shadow-md'
+                      : 'border-slate-200/80 hover:border-emerald-300 hover:shadow-md'
+                  }`}
                 >
                   <div>
                     {/* Thumbnail */}
@@ -390,12 +420,18 @@ export default function FreebiesPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <Gift className="w-10 h-10" />
+                          {isProp ? <Sparkles className="w-10 h-10 text-indigo-300" /> : <Gift className="w-10 h-10" />}
                         </div>
                       )}
                       {/* SKU Badge */}
-                      <div className="absolute top-2 left-2 bg-black/75 backdrop-blur-xs text-white text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg shadow-xs">
-                        {item.sku}
+                      <div
+                        className={`absolute top-2 left-2 text-white text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg shadow-xs ${
+                          isProp
+                            ? 'bg-indigo-900/90 border border-indigo-400/40 text-indigo-100'
+                            : 'bg-black/75 backdrop-blur-xs'
+                        }`}
+                      >
+                        {isProp ? `📸 ${item.sku}` : item.sku}
                       </div>
 
                       {/* Stock Status Badge */}
@@ -403,6 +439,8 @@ export default function FreebiesPage() {
                         className={`absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-xs ${
                           isOutOfStock
                             ? 'bg-rose-500 text-white'
+                            : isProp
+                            ? 'bg-indigo-600 text-white'
                             : 'bg-emerald-500 text-white'
                         }`}
                       >
@@ -411,16 +449,31 @@ export default function FreebiesPage() {
                     </div>
 
                     {/* Content */}
-                    <div className="p-3 sm:p-3.5 space-y-1">
+                    <div className="p-3 sm:p-3.5 space-y-1.5">
                       <h4
-                        className="font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 leading-tight group-hover:text-emerald-800 transition"
+                        className={`font-bold text-xs sm:text-sm line-clamp-2 leading-tight transition ${
+                          isProp
+                            ? 'text-slate-800 group-hover:text-indigo-800'
+                            : 'text-slate-800 group-hover:text-emerald-800'
+                        }`}
                         title={item.name}
                       >
                         {item.name}
                       </h4>
-                      <p className="text-[10px] text-slate-400 truncate">
-                        {item.stone_type}
-                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {isProp ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            📸 พร็อพ
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            🎁 ของแถม
+                          </span>
+                        )}
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {item.stone_type}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -431,7 +484,7 @@ export default function FreebiesPage() {
                   >
                     <div>
                       <span className="text-[10px] text-slate-400 block leading-none">ทุน</span>
-                      <strong className="text-emerald-700 font-bold text-xs sm:text-sm">
+                      <strong className={`${isProp ? 'text-indigo-700' : 'text-emerald-700'} font-bold text-xs sm:text-sm`}>
                         ฿{Number(item.cost_price || 0).toLocaleString()}
                       </strong>
                     </div>
@@ -474,71 +527,91 @@ export default function FreebiesPage() {
                   <tr>
                     <th className="py-3 px-4">รูปภาพ</th>
                     <th className="py-3 px-4">รหัส SKU</th>
-                    <th className="py-3 px-4">ชื่อสินค้าของแถม</th>
-                    <th className="py-3 px-4">หมวดหมู่</th>
+                    <th className="py-3 px-4">ชื่อสินค้า / อุปกรณ์</th>
+                    <th className="py-3 px-4">ประเภท / หมวดหมู่</th>
                     <th className="py-3 px-4 text-right">ต้นทุนต่อชิ้น</th>
                     <th className="py-3 px-4 text-center">จำนวนคงเหลือ</th>
                     <th className="py-3 px-4 text-center">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredList.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => setActiveModalItem(item)}
-                      className="hover:bg-slate-50/80 transition cursor-pointer"
-                    >
-                      <td className="py-2.5 px-4">
-                        <img
-                          src={item.r2_thumbnail_url || ''}
-                          alt={item.name}
-                          className="w-10 h-10 rounded-xl object-contain bg-slate-100 border border-slate-200"
-                        />
-                      </td>
-                      <td className="py-2.5 px-4 font-mono font-bold text-slate-800">
-                        {item.sku}
-                      </td>
-                      <td className="py-2.5 px-4 font-semibold text-slate-800 max-w-xs truncate">
-                        {item.name}
-                      </td>
-                      <td className="py-2.5 px-4 text-slate-500">
-                        {item.stone_type}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
-                        ฿{Number(item.cost_price || 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                  {filteredList.map((item) => {
+                    const isProp = item.sku?.startsWith('PROP') || item.grade_origin === '[PROP]' || item.stone_type?.includes('พร็อพ');
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => setActiveModalItem(item)}
+                        className="hover:bg-slate-50/80 transition cursor-pointer"
+                      >
+                        <td className="py-2.5 px-4">
+                          <img
+                            src={item.r2_thumbnail_url || ''}
+                            alt={item.name}
+                            className="w-10 h-10 rounded-xl object-contain bg-slate-100 border border-slate-200"
+                          />
+                        </td>
+                        <td className="py-2.5 px-4 font-mono font-bold">
+                          {isProp ? (
+                            <span className="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg text-[11px]">
+                              📸 {item.sku}
+                            </span>
+                          ) : (
+                            <span className="text-slate-800">{item.sku}</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 font-semibold text-slate-800 max-w-xs truncate">
+                          {item.name}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            {isProp ? (
+                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                📸 พร็อพ
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                🎁 ของแถม
+                              </span>
+                            )}
+                            <span className="text-slate-500">{item.stone_type}</span>
+                          </div>
+                        </td>
+                        <td className={`py-2.5 px-4 text-right font-bold ${isProp ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                          ฿{Number(item.cost_price || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="inline-flex items-center gap-1 bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => handleQuickQtyChange(item, -1)}
+                              className="p-1 text-slate-600 hover:text-rose-600 rounded-lg hover:bg-white transition"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="font-mono text-xs font-bold px-1 min-w-[20px] text-center">
+                              {item.qty_on_hand}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickQtyChange(item, 1)}
+                              className="p-1 text-slate-600 hover:text-emerald-600 rounded-lg hover:bg-white transition"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                           <button
-                            type="button"
-                            onClick={() => handleQuickQtyChange(item, -1)}
-                            className="p-1 text-slate-600 hover:text-rose-600 rounded-lg hover:bg-white transition"
+                            onClick={() => openEditModal(item)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="แก้ไข"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
-                          <span className="font-mono text-xs font-bold px-1 min-w-[20px] text-center">
-                            {item.qty_on_hand}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickQtyChange(item, 1)}
-                            className="p-1 text-slate-600 hover:text-emerald-600 rounded-lg hover:bg-white transition"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="แก้ไข"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -557,12 +630,22 @@ export default function FreebiesPage() {
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800">
+                  <span className={`font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg ${
+                    activeModalItem.sku?.startsWith('PROP') || activeModalItem.grade_origin === '[PROP]' || activeModalItem.stone_type?.includes('พร็อพ')
+                      ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}>
                     {activeModalItem.sku}
                   </span>
-                  <span className="text-xs text-slate-400">
-                    {activeModalItem.stone_type}
-                  </span>
+                  {activeModalItem.sku?.startsWith('PROP') || activeModalItem.grade_origin === '[PROP]' || activeModalItem.stone_type?.includes('พร็อพ') ? (
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                      <span>📸 พร็อพถ่ายรูป & ตกแต่งฉาก</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">
+                      {activeModalItem.stone_type}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => setActiveModalItem(null)}
@@ -587,7 +670,11 @@ export default function FreebiesPage() {
                 </h3>
                 <div className="flex items-center justify-between mt-3 text-sm">
                   <span className="text-slate-500">ต้นทุนต่อชิ้น:</span>
-                  <strong className="text-emerald-700 font-extrabold text-base">
+                  <strong className={`${
+                    activeModalItem.sku?.startsWith('PROP') || activeModalItem.grade_origin === '[PROP]' || activeModalItem.stone_type?.includes('พร็อพ')
+                      ? 'text-indigo-700'
+                      : 'text-emerald-700'
+                  } font-extrabold text-base`}>
                     ฿{Number(activeModalItem.cost_price || 0).toLocaleString()}
                   </strong>
                 </div>

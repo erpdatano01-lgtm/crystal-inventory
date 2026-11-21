@@ -295,9 +295,15 @@ export default function ProductsPage() {
         return false;
       }
 
-      // Strict separation: Stone inventory NEVER mixes with freebies/supplies
-      const isFree = Boolean(p.sku?.startsWith('GIFT') || p.is_freebie);
-      if (isFree) return false;
+      // Strict separation: Stone inventory NEVER mixes with freebies, props or packaging
+      const isNonStone = Boolean(
+        p.sku?.startsWith('GIFT') ||
+        p.sku?.startsWith('PROP') ||
+        p.is_freebie ||
+        p.grade_origin === '[PROP]' ||
+        p.stone_type?.includes('พร็อพ')
+      );
+      if (isNonStone) return false;
 
       return true;
     });
@@ -448,7 +454,7 @@ export default function ProductsPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-purple-50/60 border border-purple-200/60 rounded-2xl w-full">
             <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-purple-900">
               <span className="p-1 rounded-lg bg-purple-200 text-purple-800">💎</span>
-              <span>คลังหินธรรมชาติ & คริสตัลเท่านั้น ({products.filter((p) => !p.sku?.startsWith('GIFT') && !p.is_freebie).length} ชิ้น)</span>
+              <span>คลังหินธรรมชาติ & คริสตัลเท่านั้น ({products.filter((p) => !p.sku?.startsWith('GIFT') && !p.sku?.startsWith('PROP') && !p.is_freebie && p.grade_origin !== '[PROP]' && !p.stone_type?.includes('พร็อพ')).length} ชิ้น)</span>
             </div>
 
             <Link
@@ -456,7 +462,7 @@ export default function ProductsPage() {
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95 ml-auto sm:ml-0"
             >
               <Gift className="w-3.5 h-3.5" />
-              <span>ไปยังคลังของแถม & พรอพ ({products.filter((p) => p.sku?.startsWith('GIFT') || p.is_freebie).length}) →</span>
+              <span>ไปยังคลังของแถม & พรอพ ({products.filter((p) => p.sku?.startsWith('GIFT') || p.sku?.startsWith('PROP') || p.is_freebie || p.grade_origin === '[PROP]' || p.stone_type?.includes('พร็อพ')).length}) →</span>
             </Link>
           </div>
 
