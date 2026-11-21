@@ -17,6 +17,7 @@ import {
   Settings,
   Video,
   CornerDownRight,
+  Gift,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -69,10 +70,19 @@ export default function Navbar() {
       items: [
         {
           href: '/products',
-          label: 'คลังสินค้า',
-          mobileLabel: 'คลังสินค้า',
+          label: 'คลังสินค้า (หินขาย)',
+          mobileLabel: 'คลังหิน',
           sublabel: 'รายการหินทั้งหมดในคลัง',
           icon: PackageCheck,
+        },
+        {
+          href: '/products?type=freebie',
+          label: 'คลังของแถม (Freebies)',
+          mobileLabel: 'คลังของแถม',
+          sublabel: 'สต็อกของแถม & อุปกรณ์',
+          icon: Gift,
+          badge: 'NEW',
+          isSubItem: true,
         },
         {
           href: '/products/new',

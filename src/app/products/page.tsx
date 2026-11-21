@@ -85,11 +85,16 @@ export default function ProductsPage() {
   const [productTypeFilter, setProductTypeFilter] = useState<'ALL' | 'SALE' | 'FREEBIE'>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
-  // Read ?lot= parameter from URL on load
+  // Read ?lot= and ?type= parameter from URL on load
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const paramLot = new URLSearchParams(window.location.search).get('lot');
+      const params = new URLSearchParams(window.location.search);
+      const paramLot = params.get('lot');
       if (paramLot) setSelectedLotId(paramLot);
+      const paramType = params.get('type');
+      if (paramType === 'freebie' || paramType === 'gift') {
+        setProductTypeFilter('FREEBIE');
+      }
     }
   }, []);
 
