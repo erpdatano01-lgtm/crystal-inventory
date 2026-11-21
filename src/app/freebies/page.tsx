@@ -58,31 +58,17 @@ export default function FreebiesPage() {
     load();
   }, []);
 
-  // Filter non-stone items (Freebies, Props & Supplies)
+  // Filter only freebies and gift packaging items (Strictly no props)
   const freebieList = useMemo(() => {
     return products.filter((p) =>
       Boolean(
-        p.sku?.startsWith('GIFT') ||
-        p.sku?.startsWith('PROP') ||
-        p.is_freebie ||
-        p.grade_origin === '[PROP]' ||
-        p.stone_type?.includes('พร็อพ')
+        (p.sku?.startsWith('GIFT') || p.is_freebie) &&
+        !p.sku?.startsWith('PROP') &&
+        p.grade_origin !== '[PROP]' &&
+        !p.stone_type?.includes('พร็อพ')
       )
     );
   }, [products]);
-
-  // Distinction counts
-  const freebieCount = useMemo(() => {
-    return freebieList.filter(
-      (p) => !p.sku?.startsWith('PROP') && p.grade_origin !== '[PROP]' && !p.stone_type?.includes('พร็อพ')
-    ).length;
-  }, [freebieList]);
-
-  const propCount = useMemo(() => {
-    return freebieList.filter(
-      (p) => p.sku?.startsWith('PROP') || p.grade_origin === '[PROP]' || p.stone_type?.includes('พร็อพ')
-    ).length;
-  }, [freebieList]);
 
   // Categories
   const categories = useMemo(() => {
@@ -193,13 +179,13 @@ export default function FreebiesPage() {
           <div className="relative z-10 space-y-1">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-xs">
               <Gift className="w-3.5 h-3.5" />
-              <span>คลังเฉพาะของแถม & พรอพ (แยกต่างหากจากคลังหิน)</span>
+              <span>คลังเฉพาะของแถม & บรรจุภัณฑ์ (แยกต่างหากจากคลังหิน)</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white">
-              คลังสต็อกของแถม & อุปกรณ์ (Freebie Stock)
+              คลังสต็อกของแถม & ซองแพ็คเกจจิ้ง (Freebies & Packaging)
             </h2>
             <p className="text-xs sm:text-sm text-emerald-100 max-w-xl">
-              จัดการสต็อกโมเดลแมว, แม่เหล็กตู้เย็น, ของตกแต่งคริสต์มาส, และถุงของแถม
+              จัดการสต็อกโมเดลแมว, แม่เหล็กตู้เย็น, ของตกแต่ง และซองของแถม
               พร้อมรูปภาพจากบิล Shopee สำหรับใช้ตัดสต็อกแถมลูกค้า
             </p>
           </div>
@@ -221,47 +207,27 @@ export default function FreebiesPage() {
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                🎁 ของแถมลูกค้า
+                🎁 รายการของแถม
               </span>
               <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
                 <Gift className="w-4 h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-black text-emerald-700">
-                {freebieCount}
+              <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                {freebieList.length}
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                รายการของแจกลูกค้า
+                พร้อมแจก {inStockCount} / หมด {freebieList.length - inStockCount}
               </span>
             </div>
           </div>
 
-          {/* Card 2: พร็อพถ่ายรูป & ฉาก */}
+          {/* Card 2: สต็อกชิ้นคงเหลือ */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                📸 พร็อพถ่ายรูป & ฉาก
-              </span>
-              <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
-                <Sparkles className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="text-2xl sm:text-3xl font-black text-indigo-700">
-                {propCount}
-              </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
-                อุปกรณ์ประกอบฉาก & ไลฟ์ (ไม่แจก)
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3: จำนวนชิ้นคงเหลือ */}
-          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                📦 สต็อกชิ้นคงเหลือ
+                📦 จำนวนชิ้นคงเหลือ
               </span>
               <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
                 <Layers className="w-4 h-4" />
@@ -272,12 +238,12 @@ export default function FreebiesPage() {
                 {totalUnits.toLocaleString()} ชิ้น
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                พร้อมใช้งาน {inStockCount} รายการ
+                รวมของแถมและซองแพ็คเกจ
               </span>
             </div>
           </div>
 
-          {/* Card 4: มูลค่าต้นทุนรวม */}
+          {/* Card 3: มูลค่าต้นทุนรวม */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -293,6 +259,26 @@ export default function FreebiesPage() {
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
                 คำนวณจากทุนบิล Shopee
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: หมวดหมู่ของแถม */}
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                🛍️ หมวดหมู่ของแถม
+              </span>
+              <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-700">
+                {categories.length} หมวด
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                โมเดล, แม่เหล็ก, เทศกาล, ซอง
               </span>
             </div>
           </div>

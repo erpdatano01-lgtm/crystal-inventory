@@ -77,9 +77,9 @@ export default function Navbar() {
         },
         {
           href: '/freebies',
-          label: 'คลังของแถม & พรอพ',
+          label: 'คลังของแถม',
           mobileLabel: 'คลังของแถม',
-          sublabel: 'สต็อกของแถม & อุปกรณ์',
+          sublabel: 'สต็อกของแจก & ซองแพ็คเกจ',
           icon: Gift,
           badge: 'NEW',
           isSubItem: true,

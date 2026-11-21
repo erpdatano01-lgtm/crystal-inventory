@@ -462,7 +462,7 @@ export default function ProductsPage() {
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95 ml-auto sm:ml-0"
             >
               <Gift className="w-3.5 h-3.5" />
-              <span>ไปยังคลังของแถม & พรอพ ({products.filter((p) => p.sku?.startsWith('GIFT') || p.sku?.startsWith('PROP') || p.is_freebie || p.grade_origin === '[PROP]' || p.stone_type?.includes('พร็อพ')).length}) →</span>
+              <span>ไปยังคลังของแถม ({products.filter((p) => p.sku?.startsWith('GIFT') || p.is_freebie).length}) →</span>
             </Link>
           </div>
 
