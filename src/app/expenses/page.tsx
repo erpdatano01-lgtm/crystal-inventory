@@ -36,8 +36,21 @@ import {
   FileSpreadsheet,
   Pencil,
   Save,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
+
+function parseReceiptUrls(raw?: string | null): string[] {
+  if (!raw) return [];
+  if (raw.startsWith('[') && raw.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch {}
+  }
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -46,7 +59,28 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSheetsModal, setShowSheetsModal] = useState(false);
-  const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
+  
+  // Multi-image Lightbox state
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = (urls: string[] | string, initialIdx = 0) => {
+    const list = Array.isArray(urls) ? urls : parseReceiptUrls(urls);
+    if (list.length > 0) {
+      setLightboxImages(list);
+      setLightboxIndex(Math.max(0, Math.min(initialIdx, list.length - 1)));
+    }
+  };
+
+  const closeLightbox = () => {
+    setLightboxImages([]);
+    setLightboxIndex(0);
+  };
+
+  const setSelectedReceiptUrl = (url: string | null) => {
+    if (url) openLightbox(url);
+    else closeLightbox();
+  };
 
   // Edit Expense state
   const [activeDetailExpense, setActiveDetailExpense] = useState<Expense | null>(null);
@@ -200,7 +234,7 @@ export default function ExpensesPage() {
           vendor_name: vendorName.trim() || null,
           total_amount: numAmount,
           payment_method: paymentMethod || null,
-          r2_receipt_url: receiptImages.length > 0 ? receiptImages[0] : null,
+          r2_receipt_url: receiptImages.length > 0 ? receiptImages.join(',') : null,
           drive_doc_url: driveDocUrl.trim() || null,
           notes: notes.trim() || null,
         },
@@ -853,30 +887,41 @@ export default function ExpensesPage() {
                     className="p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-purple-50/40 transition cursor-pointer group"
                   >
                     <div className="flex items-start gap-3">
-                      {item.r2_receipt_url ? (
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedReceiptUrl(item.r2_receipt_url!);
-                          }}
-                          className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shrink-0 cursor-pointer hover:opacity-90 group/img shadow-xs bg-slate-100"
-                          title="คลิกเพื่อดูรูปบิล/สลิปเต็มจอ"
-                        >
-                          <img
-                            src={item.r2_receipt_url}
-                            alt={item.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition">
-                            <Eye className="w-4 h-4 text-white" />
+                      {(() => {
+                        const receiptList = parseReceiptUrls(item.r2_receipt_url);
+                        if (receiptList.length === 0) {
+                          return (
+                            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 mt-0.5 shrink-0 group-hover:scale-105 transition">
+                              <Receipt className="w-5 h-5" />
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLightbox(receiptList, 0);
+                            }}
+                            className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shrink-0 cursor-pointer hover:opacity-90 group/img shadow-xs bg-slate-100"
+                            title={`คลิกเพื่อดูรูปบิล/สลิป (${receiptList.length} รูป)`}
+                          >
+                            <img
+                              src={receiptList[0]}
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            {receiptList.length > 1 && (
+                              <div className="absolute top-0.5 right-0.5 bg-black/75 text-white font-mono text-[9px] font-bold px-1 py-0.5 rounded leading-none shadow-xs">
+                                +{receiptList.length}
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition">
+                              <Eye className="w-4 h-4 text-white" />
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 mt-0.5 shrink-0 group-hover:scale-105 transition">
-                          <Receipt className="w-5 h-5" />
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       <div>
                         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -930,16 +975,20 @@ export default function ExpensesPage() {
                       </span>
 
                       <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        {item.r2_receipt_url && (
-                          <button
-                            onClick={() => setSelectedReceiptUrl(item.r2_receipt_url!)}
-                            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition"
-                            title="ดูสลิป"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>สลิป R2</span>
-                          </button>
-                        )}
+                        {(() => {
+                          const receiptList = parseReceiptUrls(item.r2_receipt_url);
+                          if (receiptList.length === 0) return null;
+                          return (
+                            <button
+                              onClick={() => openLightbox(receiptList, 0)}
+                              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition"
+                              title={`ดูรูปบิล (${receiptList.length} รูป)`}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{receiptList.length > 1 ? `บิล (${receiptList.length})` : 'สลิป R2'}</span>
+                            </button>
+                          );
+                        })()}
 
                         {item.drive_doc_url && (
                           <a
@@ -1083,26 +1132,41 @@ export default function ExpensesPage() {
                 )}
 
                 {/* Receipt Preview */}
-                {activeDetailExpense.r2_receipt_url && (
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-bold text-slate-700 block">
-                      สลิป / หลักฐานการจ่าย (Cloudflare R2 WebP)
-                    </span>
-                    <div
-                      onClick={() => setSelectedReceiptUrl(activeDetailExpense.r2_receipt_url!)}
-                      className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 max-h-56 cursor-pointer group"
-                    >
-                      <img
-                        src={activeDetailExpense.r2_receipt_url}
-                        alt="Receipt"
-                        className="w-full h-full object-contain max-h-56 group-hover:scale-105 transition"
-                      />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1.5">
-                        <Eye className="w-4 h-4" /> กดเพื่อดูรูปขนาดเต็ม
+                {(() => {
+                  const detailReceipts = parseReceiptUrls(activeDetailExpense.r2_receipt_url);
+                  if (detailReceipts.length === 0) return null;
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700 block">
+                          สลิป / หลักฐานบิล (Cloudflare R2) • {detailReceipts.length} รูป
+                        </span>
+                        <span className="text-[11px] text-slate-400">คลิกที่รูปเพื่อดูขนาดเต็ม</span>
+                      </div>
+                      <div className={`grid gap-2.5 ${detailReceipts.length === 1 ? 'grid-cols-1' : detailReceipts.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                        {detailReceipts.map((url, idx) => (
+                          <div
+                            key={url + idx}
+                            onClick={() => openLightbox(detailReceipts, idx)}
+                            className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 max-h-56 cursor-pointer group shadow-xs"
+                          >
+                            <img
+                              src={url}
+                              alt={`Receipt ${idx + 1}`}
+                              className="w-full h-full object-contain max-h-52 group-hover:scale-105 transition"
+                            />
+                            <div className="absolute top-2 left-2 bg-black/75 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg backdrop-blur-xs">
+                              รูปที่ {idx + 1}/{detailReceipts.length}
+                            </div>
+                            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1">
+                              <Eye className="w-4 h-4" /> ดูขนาดเต็ม
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* External Links */}
                 {activeDetailExpense.drive_doc_url && (
@@ -1268,11 +1332,11 @@ export default function ExpensesPage() {
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
                   <ImageUploader
-                    images={editForm.r2_receipt_url ? [editForm.r2_receipt_url] : []}
-                    onChange={(imgs) => setEditForm((f) => ({ ...f, r2_receipt_url: imgs[0] || null }))}
-                    maxFiles={1}
+                    images={parseReceiptUrls(editForm.r2_receipt_url)}
+                    onChange={(imgs) => setEditForm((f) => ({ ...f, r2_receipt_url: imgs.join(',') || null }))}
+                    maxFiles={5}
                     folder="receipts"
-                    label="รูปสลิป / ใบเสร็จ (ถ่ายด้วยกล้อง หรือเลือกจากเครื่อง)"
+                    label="รูปสลิป / ใบเสร็จ (ถ่ายด้วยกล้อง หรือเลือกจากเครื่องได้หลายรูป)"
                   />
                 </div>
 
@@ -1310,34 +1374,85 @@ export default function ExpensesPage() {
           </div>
         )}
 
-        {/* Lightbox for Receipt Image */}
-        {selectedReceiptUrl && (
+        {/* Multi-Image Lightbox for Receipt Images */}
+        {lightboxImages.length > 0 && (
           <div
-            onClick={() => setSelectedReceiptUrl(null)}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+            onClick={closeLightbox}
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 cursor-pointer animate-in fade-in duration-150"
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl p-4 max-w-lg w-full max-h-[85dvh] flex flex-col relative"
+              className="bg-white rounded-3xl p-4 sm:p-5 max-w-2xl w-full max-h-[92dvh] flex flex-col relative shadow-2xl cursor-default"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <h4 className="font-bold text-slate-900 text-sm">
-                  สลิป / ใบเสร็จรับเงิน (Cloudflare R2 WebP)
-                </h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    สลิป / ใบเสร็จรับเงิน (Cloudflare R2)
+                  </h4>
+                  {lightboxImages.length > 1 && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                      หน้า {lightboxIndex + 1} จาก {lightboxImages.length}
+                    </span>
+                  )}
+                </div>
                 <button
-                  onClick={() => setSelectedReceiptUrl(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                  onClick={closeLightbox}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+                  aria-label="ปิด"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="overflow-auto py-3 flex items-center justify-center">
+
+              {/* Main Image with Prev / Next */}
+              <div className="relative overflow-hidden py-3 flex-1 flex items-center justify-center min-h-[300px] max-h-[68vh] bg-slate-900/5 rounded-2xl my-2">
                 <img
-                  src={selectedReceiptUrl}
-                  alt="Receipt"
-                  className="max-h-[65vh] object-contain rounded-xl"
+                  src={lightboxImages[lightboxIndex]}
+                  alt={`Receipt page ${lightboxIndex + 1}`}
+                  className="max-h-[62vh] max-w-full object-contain rounded-xl select-none"
                 />
+
+                {lightboxImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setLightboxIndex((prev) => (prev > 0 ? prev - 1 : lightboxImages.length - 1))}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/75 text-white rounded-full transition backdrop-blur-xs shadow-md"
+                      title="หน้ารูปก่อนหน้า"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setLightboxIndex((prev) => (prev < lightboxImages.length - 1 ? prev + 1 : 0))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/75 text-white rounded-full transition backdrop-blur-xs shadow-md"
+                      title="หน้ารูปถัดไป"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
               </div>
+
+              {/* Thumbnail Bar for Switching */}
+              {lightboxImages.length > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-1 overflow-x-auto">
+                  {lightboxImages.map((imgUrl, idx) => (
+                    <button
+                      key={imgUrl + idx}
+                      onClick={() => setLightboxIndex(idx)}
+                      className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 transition shrink-0 ${
+                        lightboxIndex === idx
+                          ? 'border-purple-600 ring-2 ring-purple-300 shadow-md scale-105'
+                          : 'border-slate-200 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={imgUrl} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-[10px] font-bold">
+                        {idx + 1}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
