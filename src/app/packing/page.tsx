@@ -46,10 +46,18 @@ import {
   Sparkle,
   Construction,
   QrCode,
+  Smartphone,
 } from 'lucide-react';
 
 const LS_PACKING_RECORDS = 'crystal_packing_records_v1';
 const LS_ORDERS = 'crystal_orders_v2';
+const LS_CAMERA_DEVICE_ID = 'crystal_packing_camera_id';
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+};
 
 // Step flow definition
 type PackingStep = 'STEP_1_SCAN_ORDER' | 'STEP_2_SCAN_ITEMS' | 'STEP_3_SEAL_BOX';
@@ -86,6 +94,14 @@ export default function PackingPage() {
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [aspectRatio, setAspectRatio] = useState<'16-9' | '9-16'>('16-9');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('auto');
+
+  // Remote WebRTC Mobile Camera state
+  const [showRemoteQrModal, setShowRemoteQrModal] = useState(false);
+  const [remoteRoomId, setRemoteRoomId] = useState<string>('');
+  const [remoteCameraStatus, setRemoteCameraStatus] = useState<'idle' | 'waiting' | 'connected'>('idle');
+  const [isRemoteCameraActive, setIsRemoteCameraActive] = useState(false);
 
   // Real-time Barcode Detection HUD
   const [lastDetectedCode, setLastDetectedCode] = useState<string | null>(null);
@@ -123,6 +139,10 @@ export default function PackingPage() {
   const lastScanTimestampRef = useRef<number>(0);
   const lastScannedCodeRef = useRef<string>('');
   const zxingReaderRef = useRef<any>(null);
+  const remotePcRef = useRef<RTCPeerConnection | null>(null);
+  const remotePollRef = useRef<NodeJS.Timeout | null>(null);
+  const appliedCamCandidatesRef = useRef<Set<string>>(new Set());
+  const remoteOfferSetRef = useRef<boolean>(false);
 
   // Active Target Ref for async recording termination
   const activeTargetRef = useRef<{
@@ -293,21 +313,173 @@ export default function PackingPage() {
     };
   }, [selectedOrder, selectedSku, trackingNo, customerIg, products]);
 
-  // 2. Camera Controls
-  const startCamera = async (facing: 'user' | 'environment' = cameraFacing): Promise<MediaStream | null> => {
+  // Enumerate available cameras (local webcam, USB, Iriun, Camo, Continuity Camera)
+  const refreshVideoDevices = async () => {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      const all = await navigator.mediaDevices.enumerateDevices();
+      const vids = all.filter((d) => d.kind === 'videoinput');
+      setVideoDevices(vids);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedDev = localStorage.getItem(LS_CAMERA_DEVICE_ID);
+      if (savedDev) setSelectedDeviceId(savedDev);
+      refreshVideoDevices();
+    }
+    return () => {
+      if (remotePollRef.current) clearInterval(remotePollRef.current);
+      if (remotePcRef.current) remotePcRef.current.close();
+    };
+  }, []);
+
+  const stopRemoteCameraSession = () => {
+    if (remotePollRef.current) {
+      clearInterval(remotePollRef.current);
+      remotePollRef.current = null;
+    }
+    if (remotePcRef.current) {
+      remotePcRef.current.close();
+      remotePcRef.current = null;
+    }
+    remoteOfferSetRef.current = false;
+    appliedCamCandidatesRef.current.clear();
+    setRemoteCameraStatus('idle');
+    setIsRemoteCameraActive(false);
+  };
+
+  const startRemoteCameraSession = async () => {
     stopCamera();
+    stopRemoteCameraSession();
     setCameraError(null);
+
+    const newRoom = `PK${Math.floor(1000 + Math.random() * 9000)}`;
+    setRemoteRoomId(newRoom);
+    setRemoteCameraStatus('waiting');
+    setShowRemoteQrModal(true);
+
+    try {
+      await fetch('/api/packing/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: newRoom, action: 'create' }),
+      });
+
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      remotePcRef.current = pc;
+
+      pc.ontrack = (ev) => {
+        const incomingStream = ev.streams[0] || new MediaStream([ev.track]);
+        mediaStreamRef.current = incomingStream;
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = incomingStream;
+          videoPreviewRef.current.play().catch(() => {});
+        }
+        setIsCameraActive(true);
+        setIsRemoteCameraActive(true);
+        setRemoteCameraStatus('connected');
+        setShowRemoteQrModal(false);
+        showToast('📱 เชื่อมต่อกล้องมือถือสำเร็จ! พร้อมสแกนและอัดคลิปได้เลย');
+      };
+
+      pc.onicecandidate = async (ev) => {
+        if (ev.candidate) {
+          try {
+            await fetch('/api/packing/signal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomId: newRoom,
+                action: 'candidate',
+                role: 'host',
+                candidate: ev.candidate.toJSON(),
+              }),
+            });
+          } catch {
+            // ignore
+          }
+        }
+      };
+
+      remotePollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/packing/signal?room=${encodeURIComponent(newRoom)}`);
+          if (!res.ok) return;
+          const room = await res.json();
+
+          if (room.offer && !remoteOfferSetRef.current && pc.signalingState !== 'closed') {
+            remoteOfferSetRef.current = true;
+            await pc.setRemoteDescription(new RTCSessionDescription(room.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await fetch('/api/packing/signal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomId: newRoom,
+                action: 'answer',
+                answer: { type: answer.type, sdp: answer.sdp },
+              }),
+            });
+          }
+
+          if (remoteOfferSetRef.current && Array.isArray(room.cameraCandidates)) {
+            for (const cand of room.cameraCandidates) {
+              const key = JSON.stringify(cand);
+              if (!appliedCamCandidatesRef.current.has(key)) {
+                appliedCamCandidatesRef.current.add(key);
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+        } catch {
+          // keep polling
+        }
+      }, 900);
+    } catch (err: any) {
+      setCameraError(`ไม่สามารถสร้างห้องรับภาพมือถือได้: ${err?.message || ''}`);
+      setRemoteCameraStatus('idle');
+    }
+  };
+
+  // 2. Camera Controls
+  const startCamera = async (
+    facing: 'user' | 'environment' = cameraFacing,
+    overrideDeviceId?: string
+  ): Promise<MediaStream | null> => {
+    stopCamera();
+    stopRemoteCameraSession();
+    setCameraError(null);
+    const targetDeviceId = overrideDeviceId !== undefined ? overrideDeviceId : selectedDeviceId;
+
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('อุปกรณ์หรือเบราว์เซอร์นี้ไม่รองรับการเข้าถึงกล้องโดยตรง');
       }
 
+      const videoConstraints: MediaTrackConstraints =
+        targetDeviceId && targetDeviceId !== 'auto'
+          ? {
+              deviceId: { exact: targetDeviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            }
+          : {
+              facingMode: facing,
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            };
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: videoConstraints,
         audio: isMicEnabled,
       });
 
@@ -317,6 +489,7 @@ export default function PackingPage() {
         videoPreviewRef.current.play().catch(() => {});
       }
       setIsCameraActive(true);
+      refreshVideoDevices();
       return stream;
     } catch (err: any) {
       console.error('Camera access error:', err);
@@ -331,6 +504,7 @@ export default function PackingPage() {
   };
 
   const stopCamera = () => {
+    stopRemoteCameraSession();
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
@@ -344,9 +518,18 @@ export default function PackingPage() {
   const toggleCameraFacing = () => {
     const next = cameraFacing === 'user' ? 'environment' : 'user';
     setCameraFacing(next);
+    setSelectedDeviceId('auto');
     if (isCameraActive) {
-      startCamera(next);
+      startCamera(next, 'auto');
     }
+  };
+
+  const handleSelectDevice = (deviceId: string) => {
+    setSelectedDeviceId(deviceId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_CAMERA_DEVICE_ID, deviceId);
+    }
+    startCamera(cameraFacing, deviceId);
   };
 
   // 3. MediaRecorder controls
@@ -1324,7 +1507,37 @@ ${trackStr}
               </div>
 
               {/* Camera Switchers */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {videoDevices.length > 0 && (
+                  <select
+                    value={selectedDeviceId}
+                    onChange={(e) => handleSelectDevice(e.target.value)}
+                    className="max-w-[160px] px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    title="เลือกตัวกล้อง (รองรับกล้องคอม, USB, Iriun, Camo)"
+                  >
+                    <option value="auto">🎥 กล้องอัตโนมัติ</option>
+                    {videoDevices.map((d, i) => (
+                      <option key={d.deviceId || i} value={d.deviceId}>
+                        {d.label || `กล้องตัวที่ ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button
+                  type="button"
+                  onClick={startRemoteCameraSession}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
+                    isRemoteCameraActive
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100'
+                  }`}
+                  title="ใช้กล้องมือถือส่งภาพสดเข้าคอมผ่าน QR (ไม่ต้องใช้ Apple ID เดียวกัน)"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>{isRemoteCameraActive ? 'มือถือเชื่อมแล้ว' : 'กล้องมือถือ (QR)'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={toggleCameraFacing}
@@ -1398,14 +1611,24 @@ ${trackStr}
                     <p className="text-sm font-semibold text-white">กล้องยังไม่ได้เปิดใช้งาน</p>
                     <p className="text-xs text-slate-400">คลิกเปิดกล้องเพื่อเริ่มตรวจจับบาร์โค้ด</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => startCamera()}
-                    className="px-4 py-2.5 rounded-xl bg-purple-600 text-white font-bold text-xs sm:text-sm hover:bg-purple-700 transition shadow-lg shadow-purple-600/30 flex items-center gap-1.5 mx-auto"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>เปิดกล้องสตูดิโอ</span>
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startCamera()}
+                      className="px-4 py-2.5 rounded-xl bg-purple-600 text-white font-bold text-xs sm:text-sm hover:bg-purple-700 transition shadow-lg shadow-purple-600/30 flex items-center gap-1.5"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>เปิดกล้องสตูดิโอ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startRemoteCameraSession}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 text-purple-200 border border-slate-700 font-bold text-xs sm:text-sm hover:bg-slate-700 transition flex items-center gap-1.5"
+                    >
+                      <Smartphone className="w-4 h-4 text-emerald-400" />
+                      <span>ใช้กล้องมือถือ (QR)</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -2118,6 +2341,80 @@ ${trackStr}
                 <Copy className="w-3.5 h-3.5" />
                 <span>คัดลอกลิงก์</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remote Mobile Camera QR Pairing Modal */}
+      {showRemoteQrModal && remoteRoomId && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">เชื่อมต่อกล้องมือถือผ่านเว็บ</h3>
+                  <p className="text-[11px] text-slate-300">
+                    ไม่ต้องใช้ Apple ID เดียวกัน • ไม่ต้องลงแอปเพิ่ม
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRemoteQrModal(false);
+                  if (remoteCameraStatus !== 'connected') {
+                    stopRemoteCameraSession();
+                  }
+                }}
+                className="p-1.5 rounded-full hover:bg-white/10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 text-center space-y-4">
+              {(() => {
+                const origin =
+                  typeof window !== 'undefined'
+                    ? window.location.origin
+                    : 'https://crystal-inventory.vercel.app';
+                const camUrl = `${origin}/packing/camera?room=${encodeURIComponent(remoteRoomId)}`;
+                const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?format=svg&size=220x220&margin=0&data=${encodeURIComponent(
+                  camUrl
+                )}`;
+                return (
+                  <>
+                    <div className="inline-block p-3 bg-white border-2 border-slate-200 rounded-2xl shadow-sm">
+                      <img src={qrSrc} alt="QR Remote Camera" className="w-48 h-48 mx-auto" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-800">
+                        1. เปิดกล้องมือถือสแกน QR Code ด้านบน
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        2. กดปุ่ม <span className="font-bold text-purple-700">&quot;เปิดกล้อง &amp; ส่งภาพเข้าคอม&quot;</span> บนมือถือ
+                      </p>
+                    </div>
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-semibold flex items-center justify-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                      <span>กำลังรอสัญญาณจากมือถือ (ห้อง {remoteRoomId})...</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(camUrl);
+                        showToast('📋 คัดลอกลิงก์กล้องมือถือแล้ว');
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>คัดลอกลิงก์ไปเปิดในมือถือ</span>
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
