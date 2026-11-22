@@ -68,7 +68,7 @@ const FREEBIE_ORDERS: FreebieOrder[] = [
     id: 'ORDER-2',
     orderNumber: 2,
     title: 'แม่เหล็กสโนว์แมน & ต้นคริสต์มาสหมี (Shopee รวม 2 หน้า 1/2, 2/2)',
-    shortTitle: 'บิล 2: แม่เหล็กติดตู้เย็นคริสต์มาส (฿315 • 8 ชิ้น)',
+    shortTitle: 'บิล 2: แม่เหล็กติดตู้เย็นคริสต์มาส (฿315 • 8 แบบ / 26 ชิ้น)',
     amount: 315,
     itemCount: 8,
     files: 'File 23, 24',
