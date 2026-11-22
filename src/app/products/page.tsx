@@ -18,6 +18,8 @@ import {
   ProductStatus,
   STATUS_CONFIG,
   STONE_SHAPES,
+  AdCampaign,
+  CAMPAIGN_COLORS_CONFIG,
 } from '@/types';
 import {
   PackageCheck,
@@ -46,6 +48,7 @@ import {
   Save,
   Printer,
   Gift,
+  Tag,
 } from 'lucide-react';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
 import BarcodePrintModal from '@/components/BarcodePrintModal';
@@ -84,6 +87,8 @@ export default function ProductsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedLotId, setSelectedLotId] = useState<string>('');
   const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [selectedCampaignTag, setSelectedCampaignTag] = useState<string>('');
+  const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
   const [productTypeFilter, setProductTypeFilter] = useState<'ALL' | 'SALE' | 'FREEBIE'>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
@@ -150,9 +155,16 @@ export default function ProductsPage() {
     async function load() {
       setLoading(true);
       try {
-        const [p, l] = await Promise.all([fetchProducts(), fetchStockLots()]);
+        const [p, l, cRes] = await Promise.all([
+          fetchProducts(),
+          fetchStockLots(),
+          fetch('/api/campaigns').then((r) => r.json()).catch(() => ({ campaigns: [] })),
+        ]);
         setProducts(p);
         setLots(l);
+        if (Array.isArray(cRes?.campaigns)) {
+          setCampaigns(cRes.campaigns);
+        }
       } finally {
         setLoading(false);
       }
@@ -191,6 +203,7 @@ export default function ProductsPage() {
       selling_price: product.selling_price,
       min_price: product.min_price,
       storage_location: product.storage_location,
+      campaign_tag: product.campaign_tag || null,
       qty_on_hand: product.qty_on_hand,
       r2_thumbnail_url: product.r2_thumbnail_url,
       drive_video_url: product.drive_video_url,
@@ -315,9 +328,27 @@ export default function ProductsPage() {
         return false;
       }
 
+      if (selectedCampaignTag === '__NONE__' && p.campaign_tag) {
+        return false;
+      } else if (
+        selectedCampaignTag &&
+        selectedCampaignTag !== '__NONE__' &&
+        p.campaign_tag !== selectedCampaignTag
+      ) {
+        return false;
+      }
+
       return true;
     });
-  }, [stoneProducts, searchQuery, selectedStatus, selectedLotId, selectedLocation, productTypeFilter]);
+  }, [
+    stoneProducts,
+    searchQuery,
+    selectedStatus,
+    selectedLotId,
+    selectedLocation,
+    selectedCampaignTag,
+    productTypeFilter,
+  ]);
 
   // Copy Video Link to Clipboard with Toast
   const handleCopyVideoUrl = (p: Product) => {
@@ -579,13 +610,28 @@ export default function ProductsPage() {
               ))}
             </select>
 
-            {(searchQuery || selectedStatus || selectedLotId || selectedLocation || productTypeFilter !== 'ALL') && (
+            <select
+              value={selectedCampaignTag}
+              onChange={(e) => setSelectedCampaignTag(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-slate-700"
+            >
+              <option value="">ทุกชุดขาย / แคมเปญ</option>
+              <option value="__NONE__">⚪ ยังไม่เข้าชุดใดๆ (ว่าง)</option>
+              {campaigns.map((camp) => (
+                <option key={camp.id} value={camp.id}>
+                  🏷️ {camp.id}: {camp.name}
+                </option>
+              ))}
+            </select>
+
+            {(searchQuery || selectedStatus || selectedLotId || selectedLocation || selectedCampaignTag || productTypeFilter !== 'ALL') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedStatus('');
                   setSelectedLotId('');
                   setSelectedLocation('');
+                  setSelectedCampaignTag('');
                   setProductTypeFilter('ALL');
                 }}
                 className="col-span-2 sm:col-span-1 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition flex items-center justify-center gap-1"
@@ -753,6 +799,21 @@ export default function ProductsPage() {
                       >
                         {statusInfo.label.split(' (')[0]}
                       </span>
+                      {p.campaign_tag && (() => {
+                        const camp = campaigns.find((c) => c.id === p.campaign_tag);
+                        const colorCfg = camp
+                          ? CAMPAIGN_COLORS_CONFIG[camp.color]
+                          : CAMPAIGN_COLORS_CONFIG.purple;
+                        return (
+                          <span
+                            className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border shadow-sm flex items-center gap-1 ${colorCfg.badgeClass}`}
+                            title={camp ? `${camp.id}: ${camp.name}` : p.campaign_tag}
+                          >
+                            <Tag className="w-2.5 h-2.5" />
+                            <span>{p.campaign_tag}</span>
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Weight / Qty Pill */}
@@ -963,9 +1024,25 @@ export default function ProductsPage() {
                             alt=""
                             className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
                           />
-                          <span className="font-mono font-bold text-purple-800">
-                            {p.sku}
-                          </span>
+                          <div>
+                            <span className="font-mono font-bold text-purple-800 block">
+                              {p.sku}
+                            </span>
+                            {p.campaign_tag && (() => {
+                              const camp = campaigns.find((c) => c.id === p.campaign_tag);
+                              const colorCfg = camp
+                                ? CAMPAIGN_COLORS_CONFIG[camp.color]
+                                : CAMPAIGN_COLORS_CONFIG.purple;
+                              return (
+                                <span
+                                  className={`inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border mt-0.5 ${colorCfg.badgeClass}`}
+                                >
+                                  <Tag className="w-2.5 h-2.5" />
+                                  <span>{p.campaign_tag}</span>
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </td>
 
@@ -1568,6 +1645,25 @@ export default function ProductsPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">
+                      🏷️ ชุดขาย / แคมเปญ (Campaign Tag)
+                    </label>
+                    <select
+                      value={editForm.campaign_tag || ''}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, campaign_tag: e.target.value || null }))
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white font-semibold"
+                    >
+                      <option value="">⚪ ยังไม่เข้าชุดใดๆ</option>
+                      {campaigns.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          🏷️ {c.id}: {c.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">

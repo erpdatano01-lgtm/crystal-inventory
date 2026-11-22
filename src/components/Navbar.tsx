@@ -19,6 +19,7 @@ import {
   CornerDownRight,
   Gift,
   Box,
+  Megaphone,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -111,6 +112,13 @@ export default function Navbar() {
     {
       title: 'การขาย & จัดส่ง',
       items: [
+        {
+          href: '/campaigns',
+          label: 'จัดชุดขาย & Ads',
+          mobileLabel: 'ชุดขาย/Ads',
+          sublabel: 'แยกกลุ่มถ่าย & คละค่า Ads',
+          icon: Megaphone,
+        },
         {
           href: '/orders',
           label: 'เปิดบิล & บัญชี',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
+import { loadCampaignStore, setProductCampaignAssignment } from '@/lib/campaignStore';
 import { Product, ProductStatus } from '@/types';
 
 export const runtime = 'nodejs';
@@ -12,10 +13,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const [{ data, error }, campaignStore] = await Promise.all([
+    supabaseAdmin.from('products').select('*').order('created_at', { ascending: false }),
+    loadCampaignStore().catch(() => ({ campaigns: [], assignments: {} as Record<string, string> })),
+  ]);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -24,6 +25,7 @@ export async function GET() {
   const normalized = (data || []).map((p: any) => ({
     ...p,
     is_freebie: Boolean(p.sku?.startsWith('GIFT')),
+    campaign_tag: campaignStore.assignments[p.id] || null,
   }));
 
   return NextResponse.json(normalized);
@@ -203,9 +205,25 @@ export async function PATCH(request: NextRequest) {
       if (updErr) {
         return NextResponse.json({ error: updErr.message }, { status: 400 });
       }
+
+      let resolvedCampaignTag: string | null = null;
+      if ('campaign_tag' in body) {
+        const updatedStore = await setProductCampaignAssignment(
+          [idFromQuery],
+          body.campaign_tag || null
+        );
+        resolvedCampaignTag = updatedStore.assignments[idFromQuery] || null;
+      } else {
+        const currentStore = await loadCampaignStore().catch(() => ({
+          assignments: {} as Record<string, string>,
+        }));
+        resolvedCampaignTag = currentStore.assignments[idFromQuery] || null;
+      }
+
       return NextResponse.json({
         ...updated,
         is_freebie: Boolean(updated?.sku?.startsWith('GIFT')),
+        campaign_tag: resolvedCampaignTag,
       });
     }
 

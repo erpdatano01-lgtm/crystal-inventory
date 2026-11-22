@@ -66,9 +66,59 @@ export interface Product {
   drive_media_folder_url?: string | null;
   drive_video_url?: string | null;
   storage_location?: string | null;
+  campaign_tag?: string | null;
   created_at: string;
   updated_at?: string;
 }
+
+export type CampaignColor = 'purple' | 'pink' | 'blue' | 'emerald' | 'amber' | 'rose';
+
+export interface AdCampaign {
+  id: string; // e.g. 'ADS-01'
+  name: string; // e.g. 'ชุดที่ 1 (ตั้งราคาแล้ว)'
+  color: CampaignColor;
+  ads_budget: number; // งบยิง Ads ที่ตั้งไว้สำหรับชุดนี้ (บาท)
+  target_ads_pct: number; // % ค่า Ads ที่เผื่อไว้ในราคาขาย (default 20)
+  packaging_cost_per_item: number; // ค่าแพ็ก/ของแถมต่อชิ้น (default 25)
+  notes?: string;
+  created_at: string;
+}
+
+export const CAMPAIGN_COLORS_CONFIG: Record<
+  CampaignColor,
+  { label: string; badgeClass: string; dotClass: string }
+> = {
+  purple: {
+    label: 'ม่วง (Purple)',
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+    dotClass: 'bg-purple-500',
+  },
+  pink: {
+    label: 'ชมพู (Pink)',
+    badgeClass: 'bg-pink-100 text-pink-800 border-pink-200',
+    dotClass: 'bg-pink-500',
+  },
+  blue: {
+    label: 'ฟ้า (Blue)',
+    badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+    dotClass: 'bg-blue-500',
+  },
+  emerald: {
+    label: 'เขียว (Emerald)',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    dotClass: 'bg-emerald-500',
+  },
+  amber: {
+    label: 'ส้มทอง (Amber)',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotClass: 'bg-amber-500',
+  },
+  rose: {
+    label: 'แดงกุหลาบ (Rose)',
+    badgeClass: 'bg-rose-100 text-rose-800 border-rose-200',
+    dotClass: 'bg-rose-500',
+  },
+};
 
 export type MovementReason =
   | 'INITIAL_STOCK'
