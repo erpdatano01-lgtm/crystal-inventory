@@ -379,7 +379,7 @@ export default function ProductsPage() {
             <div className="flex items-center gap-2">
               <PackageCheck className="w-6 h-6 text-purple-600" />
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                คลังสินค้า & ค้นหาหน้าร้าน (Product Inventory)
+                คลังหิน &amp; ค้นหาหน้าร้าน (Crystal Inventory)
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
@@ -443,7 +443,7 @@ export default function ProductsPage() {
               title="ลงทะเบียนของแถม (หินแถม, ถุงผ้า, ฐานไม้, สติกเกอร์)"
             >
               <Gift className="w-4 h-4" />
-              <span>🎁 + ลงของแถม</span>
+              <span>+ ลงของแถม</span>
             </Link>
 
             {/* Link to Add Product */}

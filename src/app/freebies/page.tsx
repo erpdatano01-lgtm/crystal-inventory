@@ -318,7 +318,14 @@ export default function FreebiesPage() {
             </p>
           </div>
 
-          <div className="relative z-10 flex items-center gap-3">
+          <div className="relative z-10 flex items-center gap-2.5 flex-wrap">
+            <Link
+              href="/products/new?mode=freebie"
+              className="px-4 py-2.5 rounded-2xl bg-white text-emerald-800 hover:bg-emerald-50 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>ลงของแถมใหม่</span>
+            </Link>
             <Link
               href="/products"
               className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-2 backdrop-blur-xs shadow-xs"

@@ -70,24 +70,15 @@ export default function Navbar() {
       items: [
         {
           href: '/products',
-          label: 'คลังสินค้า (หินขาย)',
+          label: 'คลังหิน & คริสตัล',
           mobileLabel: 'คลังหิน',
           sublabel: 'รายการหินทั้งหมดในคลัง',
           icon: PackageCheck,
         },
         {
-          href: '/freebies',
-          label: 'คลังของแถม',
-          mobileLabel: 'คลังของแถม',
-          sublabel: 'สต็อกของแจก & ซองแพ็คเกจ',
-          icon: Gift,
-          badge: 'NEW',
-          isSubItem: true,
-        },
-        {
           href: '/products/new',
           label: 'รับหินเข้าสต็อก',
-          mobileLabel: 'รับหินเข้า',
+          mobileLabel: 'รับเข้า',
           sublabel: 'ลงทะเบียน & บาร์โค้ด',
           icon: PlusCircle,
           isSubItem: true,
@@ -95,10 +86,17 @@ export default function Navbar() {
         {
           href: '/settings',
           label: 'ตั้งค่าระบบรับหิน',
-          mobileLabel: 'ตั้งค่ารับหิน',
+          mobileLabel: 'ตั้งค่า',
           sublabel: 'ชนิดหิน, รูปทรง, รหัส SKU',
           icon: Settings,
           isSubItem: true,
+        },
+        {
+          href: '/freebies',
+          label: 'คลังของแถม',
+          mobileLabel: 'ของแถม',
+          sublabel: 'สต็อกของแจก & ซองแพ็คเกจ',
+          icon: Gift,
         },
       ],
     },
@@ -192,12 +190,10 @@ export default function Navbar() {
                       key={link.href}
                       href={link.href}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition group ${
-                        link.isSubItem
-                          ? 'ml-3 pl-2.5 border-l-2 border-slate-200 hover:border-purple-300'
-                          : ''
+                        link.isSubItem ? 'ml-4 pl-2.5' : ''
                       } ${
                         isActive
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20 font-bold border-l-purple-600'
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20 font-bold'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                       }`}
                     >
@@ -389,9 +385,7 @@ export default function Navbar() {
                           href={link.href}
                           onClick={() => setMobileMenuOpen(false)}
                           className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
-                            link.isSubItem
-                              ? 'ml-3 pl-2.5 border-l-2 border-slate-200'
-                              : ''
+                            link.isSubItem ? 'ml-4 pl-2.5' : ''
                           } ${
                             isActive
                               ? 'bg-purple-600 text-white font-bold shadow-md'
@@ -458,7 +452,7 @@ export default function Navbar() {
       {/* 4. MOBILE BOTTOM NAVIGATION (md:hidden)                   */}
       {/* ========================================================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 pb-safe">
-        <div className="grid grid-cols-7 h-16 px-0.5">
+        <div className="grid grid-cols-8 h-16 px-0.5">
           {flatNavLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -466,14 +460,14 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex flex-col items-center justify-center gap-1 min-w-0 px-0.5 transition ${
+                className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-0.5 transition ${
                   isActive
                     ? 'text-purple-600 font-bold'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon className="w-5 h-5 shrink-0" />
-                <span className="text-[10px] leading-tight text-center truncate w-full">
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="text-[9px] leading-tight text-center truncate w-full">
                   {link.mobileLabel}
                 </span>
               </Link>
