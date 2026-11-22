@@ -127,22 +127,44 @@ function RemoteCameraContent() {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
+      // Wait briefly for ICE candidates to bake into localDescription (Vanilla ICE)
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') {
+          resolve();
+          return;
+        }
+        const timer = setTimeout(resolve, 1800);
+        const onState = () => {
+          if (pc.iceGatheringState === 'complete') {
+            clearTimeout(timer);
+            pc.removeEventListener('icegatheringstatechange', onState);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', onState);
+      });
+
+      const finalOffer = pc.localDescription || offer;
       await fetch('/api/packing/signal', {
         method: 'POST',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomId,
           action: 'offer',
-          offer: { type: offer.type, sdp: offer.sdp },
+          offer: { type: finalOffer.type, sdp: finalOffer.sdp },
         }),
       });
 
       setStatus('waiting');
 
-      // Poll for host answer & ICE candidates
+      // Poll for host answer & ICE candidates (bypass all caches)
       pollRef.current = setInterval(async () => {
         try {
-          const res = await fetch(`/api/packing/signal?room=${encodeURIComponent(roomId)}`);
+          const res = await fetch(
+            `/api/packing/signal?room=${encodeURIComponent(roomId)}&t=${Date.now()}`,
+            { cache: 'no-store' }
+          );
           if (!res.ok) return;
           const room = await res.json();
 
@@ -167,7 +189,7 @@ function RemoteCameraContent() {
         } catch {
           // keep polling
         }
-      }, 900);
+      }, 800);
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err?.message || 'ไม่สามารถเปิดกล้องได้');

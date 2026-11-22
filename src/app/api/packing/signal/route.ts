@@ -73,16 +73,28 @@ async function writeRoom(room: SignalRoom): Promise<SignalRoom> {
   return next;
 }
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  Pragma: 'no-cache',
+};
+
+function jsonNoStore(data: any, init?: { status?: number }) {
+  return NextResponse.json(data, {
+    status: init?.status ?? 200,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const roomId = sanitizeRoomId(searchParams.get('room'));
   if (!roomId) {
-    return NextResponse.json({ error: 'Missing room parameter' }, { status: 400 });
+    return jsonNoStore({ error: 'Missing room parameter' }, { status: 400 });
   }
 
   const room = await readRoom(roomId);
   if (!room) {
-    return NextResponse.json({
+    return jsonNoStore({
       roomId,
       offer: null,
       answer: null,
@@ -92,7 +104,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.json(room);
+  return jsonNoStore(room);
 }
 
 export async function POST(request: NextRequest) {
@@ -102,7 +114,7 @@ export async function POST(request: NextRequest) {
     const action = String(body?.action || '');
 
     if (!roomId) {
-      return NextResponse.json({ error: 'Missing roomId' }, { status: 400 });
+      return jsonNoStore({ error: 'Missing roomId' }, { status: 400 });
     }
 
     if (action === 'create' || action === 'reset') {
@@ -115,7 +127,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date().toISOString(),
       };
       await writeRoom(fresh);
-      return NextResponse.json(fresh);
+      return jsonNoStore(fresh);
     }
 
     const existing: SignalRoom = (await readRoom(roomId)) || {
@@ -133,9 +145,9 @@ export async function POST(request: NextRequest) {
         offer: body.offer || null,
         answer: null,
         hostCandidates: [],
-        cameraCandidates: existing.cameraCandidates || [],
+        cameraCandidates: [],
       });
-      return NextResponse.json(updated);
+      return jsonNoStore(updated);
     }
 
     if (action === 'answer') {
@@ -143,14 +155,14 @@ export async function POST(request: NextRequest) {
         ...existing,
         answer: body.answer || null,
       });
-      return NextResponse.json(updated);
+      return jsonNoStore(updated);
     }
 
     if (action === 'candidate') {
       const role = body.role === 'host' ? 'host' : 'camera';
       const candidate = body.candidate;
       if (!candidate) {
-        return NextResponse.json(existing);
+        return jsonNoStore(existing);
       }
 
       const hostCandidates =
@@ -167,12 +179,12 @@ export async function POST(request: NextRequest) {
         hostCandidates,
         cameraCandidates,
       });
-      return NextResponse.json(updated);
+      return jsonNoStore(updated);
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return jsonNoStore({ error: 'Invalid action' }, { status: 400 });
   } catch (err: any) {
     console.error('POST /api/packing/signal error:', err);
-    return NextResponse.json({ error: err?.message || 'Signaling error' }, { status: 500 });
+    return jsonNoStore({ error: err?.message || 'Signaling error' }, { status: 500 });
   }
 }

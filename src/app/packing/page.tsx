@@ -407,7 +407,10 @@ export default function PackingPage() {
 
       remotePollRef.current = setInterval(async () => {
         try {
-          const res = await fetch(`/api/packing/signal?room=${encodeURIComponent(newRoom)}`);
+          const res = await fetch(
+            `/api/packing/signal?room=${encodeURIComponent(newRoom)}&t=${Date.now()}`,
+            { cache: 'no-store' }
+          );
           if (!res.ok) return;
           const room = await res.json();
 
@@ -416,13 +419,33 @@ export default function PackingPage() {
             await pc.setRemoteDescription(new RTCSessionDescription(room.offer));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
+
+            // Wait briefly for ICE candidates to bake into localDescription (Vanilla ICE)
+            await new Promise<void>((resolve) => {
+              if (pc.iceGatheringState === 'complete') {
+                resolve();
+                return;
+              }
+              const timer = setTimeout(resolve, 1800);
+              const onState = () => {
+                if (pc.iceGatheringState === 'complete') {
+                  clearTimeout(timer);
+                  pc.removeEventListener('icegatheringstatechange', onState);
+                  resolve();
+                }
+              };
+              pc.addEventListener('icegatheringstatechange', onState);
+            });
+
+            const finalAnswer = pc.localDescription || answer;
             await fetch('/api/packing/signal', {
               method: 'POST',
+              cache: 'no-store',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 roomId: newRoom,
                 action: 'answer',
-                answer: { type: answer.type, sdp: answer.sdp },
+                answer: { type: finalAnswer.type, sdp: finalAnswer.sdp },
               }),
             });
           }
@@ -443,7 +466,7 @@ export default function PackingPage() {
         } catch {
           // keep polling
         }
-      }, 900);
+      }, 800);
     } catch (err: any) {
       setCameraError(`ไม่สามารถสร้างห้องรับภาพมือถือได้: ${err?.message || ''}`);
       setRemoteCameraStatus('idle');
