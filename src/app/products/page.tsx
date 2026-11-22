@@ -126,6 +126,10 @@ export default function ProductsPage() {
 
   // Detail Modal
   const [activeModalProduct, setActiveModalProduct] = useState<Product | null>(null);
+  // Damaged / Convert to Freebie Modal
+  const [damagedModalProduct, setDamagedModalProduct] = useState<Product | null>(null);
+  const [damagedNote, setDamagedNote] = useState('');
+  const [isHandlingDamaged, setIsHandlingDamaged] = useState(false);
   // Edit Modal
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState<Partial<Product>>({});
@@ -183,6 +187,44 @@ export default function ProductsPage() {
       showToast(`ลบสินค้า ${sku} สำเร็จแล้ว`);
     } else {
       alert('เกิดข้อผิดพลาดในการลบสินค้า');
+    }
+  };
+
+  const handleSubmitDamagedAction = async (action: 'DAMAGED' | 'CONVERT_TO_FREEBIE') => {
+    if (!damagedModalProduct) return;
+    setIsHandlingDamaged(true);
+    try {
+      const res = await fetch('/api/products/handle-damaged', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: damagedModalProduct.id,
+          action,
+          note: damagedNote,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || 'เกิดข้อผิดพลาดในการดำเนินการ');
+        return;
+      }
+      if (data.product) {
+        setProducts((prev) =>
+          prev.map((p) => (p.id === data.product.id ? { ...p, ...data.product } : p))
+        );
+      }
+      showToast(
+        action === 'CONVERT_TO_FREEBIE'
+          ? `🎁 ย้าย ${data.product?.sku || damagedModalProduct.sku} ไปคลังของแถมแล้ว!`
+          : `💔 บันทึก ${damagedModalProduct.sku} เป็นแตกเสียหาย (DAMAGED) แล้ว`
+      );
+      setDamagedModalProduct(null);
+      setDamagedNote('');
+    } catch (err) {
+      console.error(err);
+      alert('เกิดข้อผิดพลาดในการบันทึก');
+    } finally {
+      setIsHandlingDamaged(false);
     }
   };
 
@@ -1371,6 +1413,21 @@ export default function ProductsPage() {
                     ขายแล้ว (SOLD)
                   </button>
                 </div>
+
+                {/* Broken / Damaged or Convert to Freebie Action */}
+                {!activeModalProduct.sku?.startsWith('GIFT-') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDamagedModalProduct(activeModalProduct);
+                      setDamagedNote('');
+                      setActiveModalProduct(null);
+                    }}
+                    className="w-full py-2 min-h-[38px] text-[11px] font-bold rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>💔 หินแตก/มีตำหนิ (ตัดสูญเสีย หรือ เปลี่ยนเป็นของแถม)</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1790,6 +1847,103 @@ export default function ProductsPage() {
           products={products}
           initialSelectedProducts={barcodeTargetProducts}
         />
+
+        {/* Damaged Stone / Convert to Freebie Modal */}
+        {damagedModalProduct && (
+          <div
+            onClick={() => setDamagedModalProduct(null)}
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden"
+            >
+              <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-base">จัดการหินแตก / มีตำหนิ</h3>
+                  <p className="text-xs text-slate-300 font-mono mt-0.5">
+                    {damagedModalProduct.sku} • {damagedModalProduct.name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDamagedModalProduct(null)}
+                  className="p-1.5 rounded-full hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                  <span>ทุนหินชิ้นนี้:</span>
+                  <span className="font-bold text-slate-900">
+                    ฿{Number(damagedModalProduct.cost_price || 0).toLocaleString()}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    หมายเหตุ (ไม่บังคับ)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ทำตกแตกตอนแพ็ก / บิ่นมุมล่าง"
+                    value={damagedNote}
+                    onChange={(e) => setDamagedNote(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2.5 pt-1">
+                  <button
+                    type="button"
+                    disabled={isHandlingDamaged}
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `ยืนยันตัด "${damagedModalProduct.sku}" เป็นแตกเสียหาย (DAMAGED)?\n\nสต็อกจะเหลือ 0 และจะไม่นับเป็นยอดขายในหน้า /orders`
+                        )
+                      ) {
+                        handleSubmitDamagedAction('DAMAGED');
+                      }
+                    }}
+                    className="w-full p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-left transition disabled:opacity-50"
+                  >
+                    <p className="font-bold text-sm text-rose-800">
+                      💔 1. แจ้งแตกเสียหาย / ตัดสูญเสีย (DAMAGED)
+                    </p>
+                    <p className="text-[11px] text-rose-600 mt-0.5">
+                      ตัดสต็อกเหลือ 0, ถอดออกจากชุดขาย (ถ้ามี), บันทึกประวัติ DAMAGED ไม่ปนกับยอดขาย
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isHandlingDamaged}
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `ยืนยันเปลี่ยน "${damagedModalProduct.sku}" เป็นของแถม (GIFT-${damagedModalProduct.sku})?\n\nราคาขายจะถูกตั้งเป็น ฿0 และย้ายเข้าคลังของแถม /freebies`
+                        )
+                      ) {
+                        handleSubmitDamagedAction('CONVERT_TO_FREEBIE');
+                      }
+                    }}
+                    className="w-full p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left transition disabled:opacity-50"
+                  >
+                    <p className="font-bold text-sm text-emerald-800">
+                      🎁 2. เปลี่ยนเป็นของแถม (ย้ายไป /freebies)
+                    </p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5">
+                      เปลี่ยนรหัสเป็น GIFT-..., ตั้งราคาขาย ฿0, ถอดออกจากชุดขาย เพื่อใช้แถมลูกค้า
+                    </p>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
