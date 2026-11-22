@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import ShippingLabelModal from '@/components/ShippingLabelModal';
-import { fetchProducts } from '@/lib/inventoryService';
+import { fetchProducts, isPackagingItem } from '@/lib/inventoryService';
 import { encodeCode128B } from '@/lib/barcodeGenerator';
 import { Product, Order, PackingLog, PackedItemLogEntry } from '@/types';
 import {
@@ -104,6 +104,10 @@ export default function PackingPage() {
   // Toast & Modals
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewVideoModalUrl, setPreviewVideoModalUrl] = useState<string | null>(null);
+
+  // Packaging supplies selection & deduction per parcel
+  const [selectedPackagingQtys, setSelectedPackagingQtys] = useState<Record<string, number>>({});
+  const [packagingDeducted, setPackagingDeducted] = useState<boolean>(false);
 
   // Past Packing Records & Search
   const [packingRecords, setPackingRecords] = useState<PackingLog[]>([]);
@@ -731,11 +735,116 @@ export default function PackingPage() {
     }
   };
 
+  // Packaging supplies derived from products
+  const packagingItems = useMemo(() => {
+    return products.filter((p) => isPackagingItem(p));
+  }, [products]);
+
+  const packagingBoxes = useMemo(() => {
+    return packagingItems.filter((p) => p.stone_type === 'กล่องพัสดุ');
+  }, [packagingItems]);
+
+  const packagingAccessories = useMemo(() => {
+    return packagingItems.filter((p) => p.stone_type !== 'กล่องพัสดุ');
+  }, [packagingItems]);
+
+  // Default 1 thank-you card (PKG-CARD-001) when packaging items load
+  useEffect(() => {
+    const card = packagingItems.find((p) => p.sku === 'PKG-CARD-001' && (p.qty_on_hand || 0) > 0);
+    if (card) {
+      setSelectedPackagingQtys((prev) =>
+        Object.keys(prev).length === 0 ? { [card.id]: 1 } : prev
+      );
+    }
+  }, [packagingItems]);
+
+  const adjustPackagingQty = (productId: string, delta: number) => {
+    setSelectedPackagingQtys((prev) => {
+      const nextVal = Math.max(0, (prev[productId] || 0) + delta);
+      const next = { ...prev };
+      if (nextVal === 0) {
+        delete next[productId];
+      } else {
+        next[productId] = nextVal;
+      }
+      return next;
+    });
+  };
+
+  const toggleBoxSelection = (boxId: string) => {
+    setSelectedPackagingQtys((prev) => {
+      const next = { ...prev };
+      const wasSelected = (next[boxId] || 0) > 0;
+      for (const b of packagingBoxes) {
+        delete next[b.id];
+      }
+      if (!wasSelected) {
+        next[boxId] = 1;
+      }
+      return next;
+    });
+  };
+
+  const selectedPackagingSummary = useMemo(() => {
+    let count = 0;
+    let totalCost = 0;
+    const list: Array<{ productId: string; sku: string; name: string; qty: number }> = [];
+    for (const [pid, qty] of Object.entries(selectedPackagingQtys)) {
+      if (qty > 0) {
+        const prod = packagingItems.find((p) => p.id === pid);
+        if (prod) {
+          count += qty;
+          totalCost += (Number(prod.cost_price) || 0) * qty;
+          list.push({ productId: prod.id, sku: prod.sku, name: prod.name, qty });
+        }
+      }
+    }
+    return { count, totalCost, list };
+  }, [selectedPackagingQtys, packagingItems]);
+
+  const deductSelectedPackaging = async () => {
+    if (packagingDeducted || selectedPackagingSummary.list.length === 0) return;
+    setPackagingDeducted(true);
+    try {
+      const res = await fetch('/api/packaging/deduct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNo: selectedOrder?.order_no || selectedSku || '',
+          items: selectedPackagingSummary.list,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.deducted) && data.deducted.length > 0) {
+          setProducts((prev) =>
+            prev.map((p) => {
+              const hit = data.deducted.find((d: any) => d.productId === p.id);
+              return hit
+                ? {
+                    ...p,
+                    qty_on_hand: hit.newQty,
+                    status: hit.newQty === 0 ? 'SOLD' : 'AVAILABLE',
+                  }
+                : p;
+            })
+          );
+          showToast(
+            `📦 ตัดสต็อกแพ็คเกจจิ้ง ${data.deducted.length} รายการ (฿${data.totalPackagingCost}) เรียบร้อย!`
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('Packaging deduction error:', err);
+    }
+  };
+
   // Finish Box & Seal
-  const handleConfirmSealBox = () => {
+  const handleConfirmSealBox = async () => {
     stopRecording();
     playAudioCue('box_sealed');
-    showToast('🎉 ยืนยันปิดกล่องพัสดุเสร็จสิ้น! วิดีโอถูกบันทึกและผูกกับออเดอร์เรียบร้อย');
+    await deductSelectedPackaging();
+    showToast('🎉 ยืนยันปิดกล่องพัสดุเสร็จสิ้น! วิดีโอและสต็อกแพ็คเกจจิ้งถูกบันทึกเรียบร้อย');
   };
 
   // Save or update tracking number on the active order at any time
@@ -789,6 +898,9 @@ export default function PackingPage() {
     setRecordingState('idle');
     setRecordingDuration(0);
     recordedChunksRef.current = [];
+    setPackagingDeducted(false);
+    const card = packagingItems.find((p) => p.sku === 'PKG-CARD-001' && (p.qty_on_hand || 0) > 0);
+    setSelectedPackagingQtys(card ? { [card.id]: 1 } : {});
     showToast('📦 พร้อมแพ็กกล่องถัดไป: นำใบปะหน้าพัสดุมาส่องกล้องได้เลยครับ');
   };
 
@@ -1657,6 +1769,121 @@ ${trackStr}
                       </button>
                     </div>
                   </div>
+
+                  {/* Packaging Supplies Picker (Auto-deducted on Seal Box) */}
+                  {packagingItems.length > 0 && (
+                    <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/90 space-y-2.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                          <Box className="w-3.5 h-3.5 text-amber-600" />
+                          <span>แพ็คเกจจิ้งที่ใช้ (ตัดสต็อกตอนปิดกล่อง)</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                          เลือก {selectedPackagingSummary.count} ชิ้น (~฿
+                          {selectedPackagingSummary.totalCost.toFixed(2)})
+                        </span>
+                      </div>
+
+                      {/* Boxes (Single-pick toggle) */}
+                      {packagingBoxes.length > 0 && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-slate-600 block">
+                            📦 กล่องพัสดุ:
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {packagingBoxes.map((b) => {
+                              const active = (selectedPackagingQtys[b.id] || 0) > 0;
+                              const outOfStock = (b.qty_on_hand || 0) <= 0;
+                              return (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  disabled={outOfStock || packagingDeducted}
+                                  onClick={() => toggleBoxSelection(b.id)}
+                                  className={`p-2 rounded-xl border text-left transition text-[11px] disabled:opacity-40 ${
+                                    active
+                                      ? 'bg-amber-600 text-white border-amber-600 font-bold shadow-xs'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:border-amber-400'
+                                  }`}
+                                >
+                                  <div className="truncate font-semibold">
+                                    {b.name.replace('กล่องไปรษณีย์ฝาชน ', '').replace('กล่องไทยโทน ', '')}
+                                  </div>
+                                  <div
+                                    className={`text-[9px] mt-0.5 ${
+                                      active ? 'text-amber-100' : 'text-slate-400'
+                                    }`}
+                                  >
+                                    เหลือ {b.qty_on_hand} • ฿{Number(b.cost_price).toFixed(2)}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bags & Thank-you Card (Stepper) */}
+                      {packagingAccessories.length > 0 && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-slate-600 block">
+                            🃏 การ์ดขอบคุณ & ถุงซิป/ถุงฝากาว:
+                          </span>
+                          <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                            {packagingAccessories.map((acc) => {
+                              const qty = selectedPackagingQtys[acc.id] || 0;
+                              return (
+                                <div
+                                  key={acc.id}
+                                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] ${
+                                    qty > 0
+                                      ? 'bg-white border-amber-400 text-slate-900 font-semibold'
+                                      : 'bg-white/60 border-slate-200/80 text-slate-600'
+                                  }`}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate">{acc.name}</p>
+                                    <p className="text-[9px] text-slate-400">
+                                      เหลือ {acc.qty_on_hand} • ฿{Number(acc.cost_price).toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      disabled={qty <= 0 || packagingDeducted}
+                                      onClick={() => adjustPackagingQty(acc.id, -1)}
+                                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold disabled:opacity-30"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-5 text-center font-mono font-bold text-xs">
+                                      {qty}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        packagingDeducted || qty >= (acc.qty_on_hand || 0)
+                                      }
+                                      onClick={() => adjustPackagingQty(acc.id, 1)}
+                                      className="w-6 h-6 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold disabled:opacity-30"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {packagingDeducted && (
+                        <p className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">
+                          ✅ ตัดสต็อกแพ็คเกจจิ้งของกล่องนี้เรียบร้อยแล้ว
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* STEP 3 ACTION BOX: UNLOCKED ONLY WHEN ALL ITEMS VERIFIED */}
                   {packingStep === 'STEP_3_SEAL_BOX' ? (
