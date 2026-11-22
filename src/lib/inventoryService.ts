@@ -527,7 +527,6 @@ export function isNonStoneFreebie(
       sku.startsWith('GIFT-CAT-') ||
       sku.startsWith('GIFT-NEKO-') ||
       sku.startsWith('GIFT-MAG-') ||
-      sku.startsWith('GIFT-BAG-') ||
       sku.startsWith('GIFT-POUCH-') ||
       sku.startsWith('GIFT-STAND-') ||
       sku.startsWith('GIFT-SAGE-') ||
@@ -537,7 +536,6 @@ export function isNonStoneFreebie(
       grade === '[PROP]' ||
       cat === 'โมเดล & ฟิกเกอร์' ||
       cat === 'แม่เหล็กติดตู้เย็น' ||
-      cat === 'ถุง & ซองของแถม' ||
       cat === 'ของตกแต่งเทศกาล' ||
       cat === 'Accessory' ||
       cat.includes('พร็อพ')
@@ -546,7 +544,7 @@ export function isNonStoneFreebie(
 
 /**
  * Determine whether a product is a countable packaging item
- * (shipping boxes, zip bags, thank-you cards) belonging in /packaging.
+ * (shipping boxes, zip bags, seal bags, thank-you cards) belonging in /packaging.
  */
 export function isPackagingItem(
   p: Pick<Product, 'sku' | 'stone_type'>
@@ -557,6 +555,7 @@ export function isPackagingItem(
     sku.startsWith('PKG-') ||
       cat === 'กล่องพัสดุ' ||
       cat === 'ถุงซิปล็อค' ||
+      cat === 'ถุงซีล & ถุงฝากาว' ||
       cat === 'การ์ดขอบคุณ'
   );
 }

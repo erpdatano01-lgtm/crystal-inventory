@@ -100,6 +100,34 @@ const PACKAGING_ORDERS: PackagingOrder[] = [
     ],
     skus: ['PKG-CARD-001'],
   },
+  {
+    id: 'PKG-ORDER-5',
+    orderNumber: 5,
+    title: 'ถุงซีล 7x10 cm ลายคริสต์มาส (FDC Group 2 แพ็ค / 200 ใบ)',
+    shortTitle: 'บิล 5: ถุงซีลคริสต์มาส 7x10 cm (฿57 • 200 ใบ)',
+    amount: 57,
+    itemCount: 2,
+    files: 'File 28',
+    vendor: 'Shopee (FDC Group)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_28.jpg',
+    ],
+    skus: ['PKG-BAG-002', 'PKG-BAG-003'],
+  },
+  {
+    id: 'PKG-ORDER-6',
+    orderNumber: 6,
+    title: 'ถุงฝากาวลายดอกไม้ 7x7 cm (EveryPack 1 แพ็ค / 100 ใบ)',
+    shortTitle: 'บิล 6: ถุงฝากาวลายดอกไม้ 7x7 cm (฿18 • 100 ใบ)',
+    amount: 18,
+    itemCount: 1,
+    files: 'File 22',
+    vendor: 'Shopee (EveryPack)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_22.jpg',
+    ],
+    skus: ['PKG-BAG-001'],
+  },
 ];
 
 function getOrderForPackaging(sku: string): PackagingOrder | undefined {
@@ -367,7 +395,7 @@ export default function PackagingPage() {
                 {categories.length} หมวด
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                กล่องพัสดุ, ถุงซิปล็อค, การ์ดขอบคุณ
+                กล่องพัสดุ, ถุงซิป, ถุงซีล &amp; ถุงฝากาว, การ์ด
               </span>
             </div>
           </div>
@@ -394,10 +422,10 @@ export default function PackagingPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-slate-800 block">
-                  เลือกดูตามบิลคำสั่งซื้อ (4 บิลแพ็คเกจจิ้งที่ลงสต็อก)
+                  เลือกดูตามบิลคำสั่งซื้อ ({PACKAGING_ORDERS.length} บิลแพ็คเกจจิ้งที่ลงสต็อก)
                 </span>
                 <span className="text-[11px] text-slate-400 block">
-                  ตรวจเช็กกล่องและถุงซิปที่ซื้อเข้ามาในแต่ละบิล
+                  ตรวจเช็กกล่องและถุงที่ซื้อเข้ามาในแต่ละบิล
                 </span>
               </div>
             </div>
@@ -411,7 +439,7 @@ export default function PackagingPage() {
                 }}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition shadow-2xs"
               >
-                <option value="ALL">📑 ดูทั้งหมด (4 บิล • 10 รายการ • รวม ฿1,838)</option>
+                <option value="ALL">📑 ดูทั้งหมด ({PACKAGING_ORDERS.length} บิล • {packagingList.length} รายการ • รวม ฿1,913)</option>
                 {PACKAGING_ORDERS.map((ord) => (
                   <option key={ord.id} value={ord.id}>
                     {ord.shortTitle}

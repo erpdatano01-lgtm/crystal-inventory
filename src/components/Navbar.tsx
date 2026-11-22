@@ -96,7 +96,7 @@ export default function Navbar() {
           href: '/freebies',
           label: 'คลังของแถม',
           mobileLabel: 'ของแถม',
-          sublabel: 'สต็อกของแจก & ซองของแถม',
+          sublabel: 'สต็อกโมเดล & แม่เหล็กของแจก',
           icon: Gift,
         },
         {

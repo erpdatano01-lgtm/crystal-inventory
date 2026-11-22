@@ -99,38 +99,6 @@ const FREEBIE_ORDERS: FreebieOrder[] = [
       'GIFT-NEKO-004', 'GIFT-NEKO-005', 'GIFT-NEKO-006',
     ],
   },
-  {
-    id: 'ORDER-4',
-    orderNumber: 4,
-    title: 'ถุงซีล 7x10 cm ลายคริสต์มาส (FDC Group 2 แพ็ค)',
-    shortTitle: 'บิล 4: ถุงซีลคริสต์มาส 2 แพ็ค (฿57 • 200 ใบ)',
-    amount: 57,
-    itemCount: 2,
-    files: 'File 28',
-    vendor: 'Shopee (FDC Group)',
-    receiptUrls: [
-      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_28.jpg',
-    ],
-    skus: [
-      'GIFT-BAG-002', 'GIFT-BAG-003',
-    ],
-  },
-  {
-    id: 'ORDER-5',
-    orderNumber: 5,
-    title: 'ถุงฝากาวลายดอกไม้ 7x7 cm (EveryPack 1 แพ็ค 100 ใบ)',
-    shortTitle: 'บิล 5: ถุงฝากาวลายดอกไม้ (฿18 • 100 ใบ)',
-    amount: 18,
-    itemCount: 1,
-    files: 'File 22',
-    vendor: 'Shopee (EveryPack)',
-    receiptUrls: [
-      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_22.jpg',
-    ],
-    skus: [
-      'GIFT-BAG-001',
-    ],
-  },
 ];
 
 function getOrderForItem(sku: string): FreebieOrder | undefined {
@@ -311,10 +279,10 @@ export default function FreebiesPage() {
               <span>คลังเฉพาะของแถม & บรรจุภัณฑ์ (แยกต่างหากจากคลังหิน)</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white">
-              คลังสต็อกของแถม & ซองแพ็คเกจจิ้ง (Freebies & Packaging)
+              คลังสต็อกของแถมลูกค้า (Freebies Warehouse)
             </h2>
             <p className="text-xs sm:text-sm text-emerald-100 max-w-xl">
-              จัดการสต็อกโมเดลแมว, แม่เหล็กตู้เย็น, ของตกแต่ง และซองของแถม
+              จัดการสต็อกโมเดลแมว, แม่เหล็กติดตู้เย็น และฟิกเกอร์ของแถม
               พร้อมรูปภาพจากบิล Shopee สำหรับใช้ตัดสต็อกแถมลูกค้า
             </p>
           </div>
@@ -374,7 +342,7 @@ export default function FreebiesPage() {
                 {totalUnits.toLocaleString()} ชิ้น
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                รวมของแถมและซองแพ็คเกจ
+                รวมโมเดล ฟิกเกอร์ และแม่เหล็ก
               </span>
             </div>
           </div>
@@ -414,7 +382,7 @@ export default function FreebiesPage() {
                 {categories.length} หมวด
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                โมเดล, แม่เหล็ก, เทศกาล, ซอง
+                โมเดล, ฟิกเกอร์, แม่เหล็กติดตู้เย็น
               </span>
             </div>
           </div>
@@ -430,7 +398,7 @@ export default function FreebiesPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-slate-800 block">
-                  เลือกดูตามบิลคำสั่งซื้อ (5 รายการค่าใช้จ่าย)
+                  เลือกดูตามบิลคำสั่งซื้อ (3 รายการค่าใช้จ่าย)
                 </span>
                 <span className="text-[11px] text-slate-400 block">
                   กรองเฉพาะของแถมที่นำเข้าในแต่ละบิล Shopee
@@ -447,7 +415,7 @@ export default function FreebiesPage() {
                 }}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition shadow-2xs"
               >
-                <option value="ALL">📑 ดูทั้งหมด (ครบ 5 บิล • {freebieList.length} รายการ • รวม ฿1,690)</option>
+                <option value="ALL">📑 ดูทั้งหมด (ครบ 3 บิล • {freebieList.length} รายการ • รวม ฿1,615)</option>
                 {FREEBIE_ORDERS.map((ord) => (
                   <option key={ord.id} value={ord.id}>
                     {ord.shortTitle}
