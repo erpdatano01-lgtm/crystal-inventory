@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { fetchProducts } from '@/lib/inventoryService';
-import { Product } from '@/types';
+import { fetchProducts, isNonStoneFreebie, formatUnitCost } from '@/lib/inventoryService';
+import { Product, ProductStatus } from '@/types';
 import {
   Gift,
   PackageCheck,
@@ -174,23 +174,10 @@ export default function FreebiesPage() {
     load();
   }, []);
 
-  // Filter non-stone freebies and gift packaging items (Shopee models, magnets, bags)
+  // Filter non-stone freebies and gift packaging items (Shopee models, magnets, bags, accessories)
   // Real stones belong in the Stone Warehouse (/products)
   const freebieList = useMemo(() => {
-    return products.filter((p) => {
-      const sku = p.sku || '';
-      const cat = p.stone_type || '';
-      const isNonStone =
-        sku.startsWith('GIFT-SANTA-') ||
-        sku.startsWith('GIFT-CAT-') ||
-        sku.startsWith('GIFT-NEKO-') ||
-        sku.startsWith('GIFT-MAG-') ||
-        sku.startsWith('GIFT-BAG-') ||
-        cat === 'โมเดล & ฟิกเกอร์' ||
-        cat === 'แม่เหล็กติดตู้เย็น' ||
-        cat === 'ถุง & ซองของแถม';
-      return isNonStone;
-    });
+    return products.filter((p) => isNonStoneFreebie(p));
   }, [products]);
 
   // Categories
@@ -245,19 +232,20 @@ export default function FreebiesPage() {
     return freebieList.filter((item) => (Number(item.qty_on_hand) || 0) > 0).length;
   }, [freebieList]);
 
-  // Quick Quantity Changer (+1 / -1)
+  // Quick Quantity Changer (+1 / -1) and sync AVAILABLE/SOLD status with /orders
   const handleQuickQtyChange = async (item: Product, delta: number) => {
     const newQty = Math.max(0, (Number(item.qty_on_hand) || 0) + delta);
+    const nextStatus: ProductStatus = newQty === 0 ? 'SOLD' : 'AVAILABLE';
     setUpdatingId(item.id);
     try {
       const res = await fetch(`/api/products?id=${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qty_on_hand: newQty }),
+        body: JSON.stringify({ qty_on_hand: newQty, status: nextStatus }),
       });
       if (!res.ok) throw new Error('Update failed');
       setProducts((prev) =>
-        prev.map((p) => (p.id === item.id ? { ...p, qty_on_hand: newQty } : p))
+        prev.map((p) => (p.id === item.id ? { ...p, qty_on_hand: newQty, status: nextStatus } : p))
       );
     } catch (err: any) {
       alert('เกิดข้อผิดพลาดในการปรับจำนวน: ' + err.message);
@@ -281,16 +269,25 @@ export default function FreebiesPage() {
 
   const handleEditSave = async () => {
     if (!editingItem) return;
+    const safeCost = Math.max(0, Number(editForm.cost_price) || 0);
+    const safeQty = Math.max(0, Number(editForm.qty_on_hand) || 0);
+    const nextStatus: ProductStatus = safeQty === 0 ? 'SOLD' : 'AVAILABLE';
+    const payload = {
+      ...editForm,
+      cost_price: safeCost,
+      qty_on_hand: safeQty,
+      status: nextStatus,
+    };
     setIsSaving(true);
     try {
       const res = await fetch(`/api/products?id=${editingItem.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Update failed');
       setProducts((prev) =>
-        prev.map((p) => (p.id === editingItem.id ? { ...p, ...editForm } : p))
+        prev.map((p) => (p.id === editingItem.id ? { ...p, ...payload } : p))
       );
       setEditingItem(null);
     } catch (err: any) {
@@ -436,7 +433,10 @@ export default function FreebiesPage() {
             <div className="w-full sm:w-80">
               <select
                 value={selectedOrderId}
-                onChange={(e) => setSelectedOrderId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedOrderId(e.target.value);
+                  setSelectedCategory('ALL');
+                }}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition shadow-2xs"
               >
                 <option value="ALL">📑 ดูทั้งหมด (ครบ 5 บิล • 35 รายการ • รวม ฿1,690)</option>
@@ -689,7 +689,7 @@ export default function FreebiesPage() {
                         {item.sku?.startsWith('GIFT-BAG-') ? 'ทุน / ใบ' : 'ทุน'}
                       </span>
                       <strong className={`${isProp ? 'text-indigo-700' : 'text-emerald-700'} font-bold text-xs sm:text-sm`}>
-                        ฿{Number(item.cost_price || 0) < 1 ? Number(item.cost_price || 0).toFixed(2) : Number(item.cost_price || 0).toLocaleString()}
+                        ฿{formatUnitCost(item.cost_price)}
                       </strong>
                     </div>
 
@@ -795,7 +795,7 @@ export default function FreebiesPage() {
                           </div>
                         </td>
                         <td className={`py-2.5 px-4 text-right font-bold ${isProp ? 'text-indigo-700' : 'text-emerald-700'}`}>
-                          ฿{Number(item.cost_price || 0) < 1 ? Number(item.cost_price || 0).toFixed(2) : Number(item.cost_price || 0).toLocaleString()}
+                          ฿{formatUnitCost(item.cost_price)}
                           {item.sku?.startsWith('GIFT-BAG-') && <span className="text-[10px] text-slate-400 block font-normal">/ ใบ</span>}
                         </td>
                         <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
@@ -888,19 +888,21 @@ export default function FreebiesPage() {
                   {activeModalItem.name}
                 </h3>
                 <div className="flex items-center justify-between mt-3 text-sm">
-                  <span className="text-slate-500">ต้นทุนต่อชิ้น:</span>
+                  <span className="text-slate-500">
+                    {activeModalItem.sku?.startsWith('GIFT-BAG-') ? 'ต้นทุนต่อใบ:' : 'ต้นทุนต่อชิ้น:'}
+                  </span>
                   <strong className={`${
                     activeModalItem.sku?.startsWith('PROP') || activeModalItem.grade_origin === '[PROP]' || activeModalItem.stone_type?.includes('พร็อพ')
                       ? 'text-indigo-700'
                       : 'text-emerald-700'
                   } font-extrabold text-base`}>
-                    ฿{Number(activeModalItem.cost_price || 0).toLocaleString()}
+                    ฿{formatUnitCost(activeModalItem.cost_price)}
                   </strong>
                 </div>
                 <div className="flex items-center justify-between mt-1 text-sm">
                   <span className="text-slate-500">คงเหลือในสต็อก:</span>
                   <strong className="text-slate-900 font-bold font-mono">
-                    {activeModalItem.qty_on_hand} ชิ้น
+                    {activeModalItem.qty_on_hand} {activeModalItem.sku?.startsWith('GIFT-BAG-') ? 'ใบ' : 'ชิ้น'}
                   </strong>
                 </div>
                 {activeModalItem.storage_location && (
@@ -1000,8 +1002,15 @@ export default function FreebiesPage() {
                     <input
                       type="number"
                       step="any"
-                      value={editForm.cost_price || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, cost_price: parseFloat(e.target.value) }))}
+                      min="0"
+                      value={editForm.cost_price ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setEditForm((f) => ({
+                          ...f,
+                          cost_price: raw === '' ? 0 : parseFloat(raw),
+                        }));
+                      }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700"
                     />
                   </div>
@@ -1009,8 +1018,15 @@ export default function FreebiesPage() {
                     <label className="font-semibold text-slate-600 block mb-1">จำนวนคงเหลือ</label>
                     <input
                       type="number"
+                      min="0"
                       value={editForm.qty_on_hand ?? ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, qty_on_hand: parseInt(e.target.value, 10) }))}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setEditForm((f) => ({
+                          ...f,
+                          qty_on_hand: raw === '' ? 0 : parseInt(raw, 10),
+                        }));
+                      }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-mono font-bold"
                     />
                   </div>

@@ -476,7 +476,7 @@ export default function NewProductPage() {
       });
 
       alert(`บันทึก${isFreebie ? 'ของแถม' : 'สินค้า'} ${sku} เข้าสต็อกสำเร็จ! พร้อมพิมพ์บาร์โค้ดได้ทันที`);
-      router.push('/products');
+      router.push(isFreebie && freebieKind === 'ACCESSORY' ? '/freebies' : '/products');
     } catch (err: any) {
       console.error(err);
       alert('บันทึกล้มเหลว: ' + err.message);

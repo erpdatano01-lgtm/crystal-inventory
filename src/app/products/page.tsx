@@ -9,6 +9,7 @@ import {
   fetchStockLots,
   updateProductStatus,
   deleteProduct,
+  isNonStoneFreebie,
 } from '@/lib/inventoryService';
 import {
   Product,
@@ -260,18 +261,36 @@ export default function ProductsPage() {
     }
   };
 
-  // Distinct storage locations available across products
+  // Separate stone products vs non-stone freebies cleanly
+  const stoneProducts = useMemo(
+    () => products.filter((p) => !isNonStoneFreebie(p)),
+    [products]
+  );
+
+  const nonStoneFreebiesCount = useMemo(
+    () => products.length - stoneProducts.length,
+    [products, stoneProducts]
+  );
+
+  // Distinct storage locations available across stone products only
   const availableLocations = useMemo(() => {
     const locSet = new Set<string>();
-    products.forEach((p) => {
+    stoneProducts.forEach((p) => {
       if (p.storage_location) locSet.add(p.storage_location);
     });
     return Array.from(locSet).sort();
-  }, [products]);
+  }, [stoneProducts]);
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    return stoneProducts.filter((p) => {
+      if (productTypeFilter === 'FREEBIE' && !p.sku?.toUpperCase().startsWith('GIFT')) {
+        return false;
+      }
+      if (productTypeFilter === 'SALE' && p.sku?.toUpperCase().startsWith('GIFT')) {
+        return false;
+      }
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchSku = p.sku.toLowerCase().includes(q);
@@ -295,26 +314,9 @@ export default function ProductsPage() {
         return false;
       }
 
-      // Stone warehouse shows ALL stones (both regular stock & stone freebies), but strictly excludes non-stone items (models, magnets, bags, props)
-      const isNonStone = Boolean(
-        p.sku?.startsWith('GIFT-SANTA-') ||
-        p.sku?.startsWith('GIFT-CAT-') ||
-        p.sku?.startsWith('GIFT-NEKO-') ||
-        p.sku?.startsWith('GIFT-MAG-') ||
-        p.sku?.startsWith('GIFT-BAG-') ||
-        p.sku?.startsWith('PROP-') ||
-        p.grade_origin === '[PROP]' ||
-        p.stone_type === 'โมเดล & ฟิกเกอร์' ||
-        p.stone_type === 'แม่เหล็กติดตู้เย็น' ||
-        p.stone_type === 'ถุง & ซองของแถม' ||
-        p.stone_type === 'ของตกแต่งเทศกาล' ||
-        p.stone_type?.includes('พร็อพ')
-      );
-      if (isNonStone) return false;
-
       return true;
     });
-  }, [products, searchQuery, selectedStatus, selectedLotId, selectedLocation, productTypeFilter]);
+  }, [stoneProducts, searchQuery, selectedStatus, selectedLotId, selectedLocation, productTypeFilter]);
 
   // Copy Video Link to Clipboard with Toast
   const handleCopyVideoUrl = (p: Product) => {
@@ -462,19 +464,7 @@ export default function ProductsPage() {
             <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-purple-900">
               <span className="p-1 rounded-lg bg-purple-200 text-purple-800">💎</span>
               <span>
-                คลังหินธรรมชาติ & คริสตัลทั้งหมด ({
-                  products.filter((p) =>
-                    !p.sku?.startsWith('GIFT-SANTA-') &&
-                    !p.sku?.startsWith('GIFT-CAT-') &&
-                    !p.sku?.startsWith('GIFT-NEKO-') &&
-                    !p.sku?.startsWith('GIFT-MAG-') &&
-                    !p.sku?.startsWith('GIFT-BAG-') &&
-                    !p.sku?.startsWith('PROP-') &&
-                    p.stone_type !== 'โมเดล & ฟิกเกอร์' &&
-                    p.stone_type !== 'แม่เหล็กติดตู้เย็น' &&
-                    p.stone_type !== 'ถุง & ซองของแถม'
-                  ).length
-                } ชิ้น — รวมหินสำหรับขาย & หินของแถม)
+                คลังหินธรรมชาติ & คริสตัลทั้งหมด ({stoneProducts.length} ชิ้น — รวมหินสำหรับขาย & หินของแถม)
               </span>
             </div>
 
@@ -483,18 +473,7 @@ export default function ProductsPage() {
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95 ml-auto sm:ml-0"
             >
               <Gift className="w-3.5 h-3.5" />
-              <span>ไปยังคลังของแถม & แพ็คเกจจิ้ง ({
-                products.filter((p) =>
-                  p.sku?.startsWith('GIFT-SANTA-') ||
-                  p.sku?.startsWith('GIFT-CAT-') ||
-                  p.sku?.startsWith('GIFT-NEKO-') ||
-                  p.sku?.startsWith('GIFT-MAG-') ||
-                  p.sku?.startsWith('GIFT-BAG-') ||
-                  p.stone_type === 'โมเดล & ฟิกเกอร์' ||
-                  p.stone_type === 'แม่เหล็กติดตู้เย็น' ||
-                  p.stone_type === 'ถุง & ซองของแถม'
-                ).length
-              }) →</span>
+              <span>ไปยังคลังของแถม & แพ็คเกจจิ้ง ({nonStoneFreebiesCount}) →</span>
             </Link>
           </div>
 
@@ -548,8 +527,18 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Filters: Status, Lot ID & Location/Shape */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+          {/* Filters: Type, Status, Lot ID & Location/Shape */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+            <select
+              value={productTypeFilter}
+              onChange={(e) => setProductTypeFilter(e.target.value as 'ALL' | 'SALE' | 'FREEBIE')}
+              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-slate-700"
+            >
+              <option value="ALL">💎 หินทั้งหมด (ขาย + แถม)</option>
+              <option value="SALE">💰 หินสำหรับขายเท่านั้น</option>
+              <option value="FREEBIE">🎁 หินของแถมเท่านั้น</option>
+            </select>
+
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
@@ -589,13 +578,14 @@ export default function ProductsPage() {
               ))}
             </select>
 
-            {(searchQuery || selectedStatus || selectedLotId || selectedLocation) && (
+            {(searchQuery || selectedStatus || selectedLotId || selectedLocation || productTypeFilter !== 'ALL') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedStatus('');
                   setSelectedLotId('');
                   setSelectedLocation('');
+                  setProductTypeFilter('ALL');
                 }}
                 className="col-span-2 sm:col-span-1 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition flex items-center justify-center gap-1"
               >

@@ -7,6 +7,7 @@ import {
   fetchProducts,
   fetchExpenses,
   fetchStockLots,
+  isNonStoneFreebie,
 } from '@/lib/inventoryService';
 import { Product, Expense, StockLot, STATUS_CONFIG, EXPENSE_CATEGORIES_CONFIG } from '@/types';
 import {
@@ -63,28 +64,35 @@ export default function DashboardPage() {
     .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
   const otherExpenseThisMonth = totalExpenseThisMonth - stoneExpenseThisMonth;
 
-  // 2. จำนวนหินที่พร้อมขาย (AVAILABLE)
-  const availableProducts = products.filter((p) => p.status === 'AVAILABLE');
+  // แยกคลังหินออกจากคลังของแถม/ซอง (ไม่นับซอง/โมเดลรวมเป็นหินขาย)
+  const stoneProducts = products.filter((p) => !isNonStoneFreebie(p));
+  const nonStoneFreebies = products.filter((p) => isNonStoneFreebie(p));
+  const sellingStones = stoneProducts.filter((p) => !p.sku?.startsWith('GIFT-'));
+
+  // 2. จำนวนหินที่พร้อมขาย (AVAILABLE เฉพาะหินขาย ไม่รวมซอง/ของแถม)
+  const availableProducts = sellingStones.filter(
+    (p) => p.status === 'AVAILABLE' && Number(p.qty_on_hand ?? 0) > 0
+  );
   const availableCount = availableProducts.reduce(
-    (sum, p) => sum + Number(p.qty_on_hand || 1),
+    (sum, p) => sum + Number(p.qty_on_hand ?? 0),
     0
   );
 
-  // 3. มูลค่าต้นทุนสต็อกคงเหลือรวม (สำหรับสินค้าที่ยังไม่ขาย: AVAILABLE, PREP, IN_TRANSIT, RESERVED)
-  const inStockProducts = products.filter((p) => p.status !== 'SOLD');
-  const totalCostInStock = inStockProducts.reduce(
-    (sum, p) => sum + Number(p.cost_price || 0) * Number(p.qty_on_hand || 1),
+  // 3. มูลค่าต้นทุนสต็อกหินคงเหลือรวม (สำหรับหินที่ยังไม่ขาย: AVAILABLE, PREP, IN_TRANSIT, RESERVED)
+  const inStockStones = stoneProducts.filter((p) => p.status !== 'SOLD');
+  const totalCostInStock = inStockStones.reduce(
+    (sum, p) => sum + Number(p.cost_price || 0) * Number(p.qty_on_hand ?? 0),
     0
   );
 
-  // 4. มูลค่าราคาขายรวม (Potential Retail Value)
-  const totalSellingInStock = inStockProducts.reduce(
-    (sum, p) => sum + Number(p.selling_price || 0) * Number(p.qty_on_hand || 1),
+  // 4. มูลค่าราคาขายรวม (Potential Retail Value ของหิน)
+  const totalSellingInStock = inStockStones.reduce(
+    (sum, p) => sum + Number(p.selling_price || 0) * Number(p.qty_on_hand ?? 0),
     0
   );
 
   // 5. สินค้าขายแล้วทั้งหมด
-  const soldProducts = products.filter((p) => p.status === 'SOLD');
+  const soldProducts = stoneProducts.filter((p) => p.status === 'SOLD');
   const totalSoldRevenue = soldProducts.reduce(
     (sum, p) => sum + Number(p.selling_price || 0),
     0
@@ -204,7 +212,7 @@ export default function DashboardPage() {
                   <span className="font-bold">฿{stoneExpenseThisMonth.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-400">
-                  <span>📦 แพ็ค & พรอพ:</span>
+                  <span>📦 แพ็ค ของแถม & อื่นๆ:</span>
                   <span>฿{otherExpenseThisMonth.toLocaleString()}</span>
                 </div>
               </div>
@@ -226,7 +234,7 @@ export default function DashboardPage() {
                 {availableCount} <span className="text-sm font-semibold text-slate-500">ชิ้น</span>
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                จากทั้งหมด {products.length} รายการในระบบ
+                คลังหิน {stoneProducts.length} ชิ้น • คลังของแถม {nonStoneFreebies.length} รายการ
               </span>
             </div>
           </div>
@@ -235,7 +243,7 @@ export default function DashboardPage() {
           <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                ต้นทุนสต็อกคงเหลือรวม
+                ต้นทุนสต็อกหินคงเหลือรวม
               </span>
               <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
                 <DollarSign className="w-4 h-4" />
@@ -243,10 +251,10 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="text-xl sm:text-2xl font-black text-slate-900">
-                ฿{totalCostInStock.toLocaleString()}
+                ฿{Math.round(totalCostInStock).toLocaleString()}
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                {inStockProducts.length} รายการที่ยังไม่ขาย
+                {inStockStones.length} ชิ้นหินที่ยังไม่ขาย
               </span>
             </div>
           </div>
@@ -266,7 +274,7 @@ export default function DashboardPage() {
                 ฿{totalSellingInStock.toLocaleString()}
               </div>
               <span className="text-[11px] text-emerald-600 font-semibold mt-0.5 block">
-                กำไรคาดการณ์ ฿{(totalSellingInStock - totalCostInStock).toLocaleString()}
+                กำไรคาดการณ์ ฿{Math.round(totalSellingInStock - totalCostInStock).toLocaleString()}
               </span>
             </div>
           </div>
@@ -289,7 +297,7 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {products.length === 0 ? (
+            {stoneProducts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                 <Sparkles className="w-8 h-8 text-purple-300 mx-auto mb-1.5" />
                 <p className="text-xs font-semibold text-slate-600">ยังไม่มีรายการหินในสต็อก</p>
@@ -299,7 +307,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {products.slice(0, 4).map((p) => {
+                {stoneProducts.slice(0, 4).map((p) => {
                   const statusInfo = STATUS_CONFIG[p.status] || STATUS_CONFIG.AVAILABLE;
                   const thumb = p.r2_thumbnail_url || 'https://images.unsplash.com/photo-1598887142487-3c854d51d2c7?auto=format&fit=crop&w=300&q=80';
 

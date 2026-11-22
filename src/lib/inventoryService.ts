@@ -510,3 +510,45 @@ export async function resetTestData(target: 'all' | 'products' | 'expenses' = 'a
   }
   return false;
 }
+
+/**
+ * Determine whether a product is a non-stone freebie / packaging item / prop
+ * (models, magnets, bags, pouches, stands, etc.) that belongs in /freebies
+ * rather than the Stone Warehouse (/products).
+ */
+export function isNonStoneFreebie(
+  p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'>
+): boolean {
+  const sku = (p.sku || '').toUpperCase();
+  const cat = p.stone_type || '';
+  const grade = p.grade_origin || '';
+  return Boolean(
+    sku.startsWith('GIFT-SANTA-') ||
+      sku.startsWith('GIFT-CAT-') ||
+      sku.startsWith('GIFT-NEKO-') ||
+      sku.startsWith('GIFT-MAG-') ||
+      sku.startsWith('GIFT-BAG-') ||
+      sku.startsWith('GIFT-POUCH-') ||
+      sku.startsWith('GIFT-STAND-') ||
+      sku.startsWith('GIFT-SAGE-') ||
+      sku.startsWith('GIFT-STICKER-') ||
+      sku.startsWith('GIFT-GIFT-') ||
+      sku.startsWith('PROP-') ||
+      grade === '[PROP]' ||
+      cat === 'โมเดล & ฟิกเกอร์' ||
+      cat === 'แม่เหล็กติดตู้เย็น' ||
+      cat === 'ถุง & ซองของแถม' ||
+      cat === 'ของตกแต่งเทศกาล' ||
+      cat === 'Accessory' ||
+      cat.includes('พร็อพ')
+  );
+}
+
+/**
+ * Format unit cost cleanly, preserving 2 decimals for sub-baht items (e.g. bags).
+ */
+export function formatUnitCost(cost: number | string | null | undefined): string {
+  const val = Number(cost) || 0;
+  if (val > 0 && val < 1) return val.toFixed(2);
+  return val.toLocaleString();
+}
