@@ -10,6 +10,7 @@ import {
   updateProductStatus,
   deleteProduct,
   isNonStoneFreebie,
+  isStoneProduct,
 } from '@/lib/inventoryService';
 import {
   Product,
@@ -261,15 +262,15 @@ export default function ProductsPage() {
     }
   };
 
-  // Separate stone products vs non-stone freebies cleanly
+  // Separate stone products vs non-stone freebies & packaging cleanly
   const stoneProducts = useMemo(
-    () => products.filter((p) => !isNonStoneFreebie(p)),
+    () => products.filter((p) => isStoneProduct(p)),
     [products]
   );
 
   const nonStoneFreebiesCount = useMemo(
-    () => products.length - stoneProducts.length,
-    [products, stoneProducts]
+    () => products.filter((p) => isNonStoneFreebie(p)).length,
+    [products]
   );
 
   // Distinct storage locations available across stone products only

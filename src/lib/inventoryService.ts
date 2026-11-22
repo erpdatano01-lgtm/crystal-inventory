@@ -545,10 +545,37 @@ export function isNonStoneFreebie(
 }
 
 /**
+ * Determine whether a product is a countable packaging item
+ * (shipping boxes, zip bags, thank-you cards) belonging in /packaging.
+ */
+export function isPackagingItem(
+  p: Pick<Product, 'sku' | 'stone_type'>
+): boolean {
+  const sku = (p.sku || '').toUpperCase();
+  const cat = p.stone_type || '';
+  return Boolean(
+    sku.startsWith('PKG-') ||
+      cat === 'กล่องพัสดุ' ||
+      cat === 'ถุงซิปล็อค' ||
+      cat === 'การ์ดขอบคุณ'
+  );
+}
+
+/**
+ * Determine whether a product is a natural crystal / stone item
+ * belonging in the Stone Warehouse (/products).
+ */
+export function isStoneProduct(
+  p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'>
+): boolean {
+  return !isNonStoneFreebie(p) && !isPackagingItem(p);
+}
+
+/**
  * Format unit cost cleanly, preserving 2 decimals for sub-baht items (e.g. bags).
  */
 export function formatUnitCost(cost: number | string | null | undefined): string {
   const val = Number(cost) || 0;
   if (val > 0 && val < 1) return val.toFixed(2);
-  return val.toLocaleString();
+  return val.toLocaleString('th-TH', { maximumFractionDigits: 2 });
 }

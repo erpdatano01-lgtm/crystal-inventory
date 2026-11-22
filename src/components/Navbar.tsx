@@ -18,6 +18,7 @@ import {
   Video,
   CornerDownRight,
   Gift,
+  Box,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -95,8 +96,15 @@ export default function Navbar() {
           href: '/freebies',
           label: 'คลังของแถม',
           mobileLabel: 'ของแถม',
-          sublabel: 'สต็อกของแจก & ซองแพ็คเกจ',
+          sublabel: 'สต็อกของแจก & ซองของแถม',
           icon: Gift,
+        },
+        {
+          href: '/packaging',
+          label: 'คลังแพ็คเกจจิ้ง',
+          mobileLabel: 'แพ็คเกจ',
+          sublabel: 'กล่องพัสดุ, ถุงซิป & การ์ด',
+          icon: Box,
         },
       ],
     },
@@ -453,7 +461,9 @@ export default function Navbar() {
       {/* ========================================================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 pb-safe">
         <div className="grid grid-cols-8 h-16 px-0.5">
-          {flatNavLinks.map((link) => {
+          {flatNavLinks
+            .filter((l) => l.href !== '/settings')
+            .map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
             return (

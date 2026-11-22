@@ -8,6 +8,8 @@ import {
   fetchExpenses,
   fetchStockLots,
   isNonStoneFreebie,
+  isPackagingItem,
+  isStoneProduct,
 } from '@/lib/inventoryService';
 import { Product, Expense, StockLot, STATUS_CONFIG, EXPENSE_CATEGORIES_CONFIG } from '@/types';
 import {
@@ -64,9 +66,10 @@ export default function DashboardPage() {
     .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
   const otherExpenseThisMonth = totalExpenseThisMonth - stoneExpenseThisMonth;
 
-  // แยกคลังหินออกจากคลังของแถม/ซอง (ไม่นับซอง/โมเดลรวมเป็นหินขาย)
-  const stoneProducts = products.filter((p) => !isNonStoneFreebie(p));
+  // แยกคลังหิน คลังของแถม และคลังแพ็คเกจจิ้งออกจากกัน
+  const stoneProducts = products.filter((p) => isStoneProduct(p));
   const nonStoneFreebies = products.filter((p) => isNonStoneFreebie(p));
+  const packagingItems = products.filter((p) => isPackagingItem(p));
   const sellingStones = stoneProducts.filter((p) => !p.sku?.startsWith('GIFT-'));
 
   // 2. จำนวนหินที่พร้อมขาย (AVAILABLE เฉพาะหินขาย ไม่รวมซอง/ของแถม)
@@ -234,7 +237,7 @@ export default function DashboardPage() {
                 {availableCount} <span className="text-sm font-semibold text-slate-500">ชิ้น</span>
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                คลังหิน {stoneProducts.length} ชิ้น • คลังของแถม {nonStoneFreebies.length} รายการ
+                หิน {stoneProducts.length} • ของแถม {nonStoneFreebies.length} • แพ็คเกจ {packagingItems.length}
               </span>
             </div>
           </div>

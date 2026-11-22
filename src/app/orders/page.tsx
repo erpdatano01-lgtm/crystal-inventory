@@ -9,6 +9,7 @@ import ShippingLabelModal from '@/components/ShippingLabelModal';
 import {
   fetchProducts,
   fetchExpenses,
+  isPackagingItem,
 } from '@/lib/inventoryService';
 import {
   Product,
@@ -108,9 +109,11 @@ export default function OrdersPage() {
     loadData();
   }, []);
 
-  // Products available to sell
+  // Products available to sell or gift (exclude internal packaging supplies)
   const availableProducts = useMemo(() => {
-    return products.filter((p) => p.status === 'AVAILABLE' && p.qty_on_hand > 0);
+    return products.filter(
+      (p) => p.status === 'AVAILABLE' && p.qty_on_hand > 0 && !isPackagingItem(p)
+    );
   }, [products]);
 
   // Financial Summary (FlowAccount style)
