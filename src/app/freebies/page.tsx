@@ -25,14 +25,130 @@ import {
   Layers,
   ArrowRight,
   Save,
+  Receipt,
+  FileText,
 } from 'lucide-react';
+
+interface FreebieOrder {
+  id: string;
+  orderNumber: number;
+  title: string;
+  shortTitle: string;
+  amount: number;
+  itemCount: number;
+  files: string;
+  vendor: string;
+  receiptUrls: string[];
+  skus: string[];
+}
+
+const FREEBIE_ORDERS: FreebieOrder[] = [
+  {
+    id: 'ORDER-1',
+    orderNumber: 1,
+    title: 'ของแถมคริสต์มาส & โมเดลแมว DIY (Shopee รวม 3 หน้า 1/3, 2/3, 3/3)',
+    shortTitle: 'บิล 1: โมเดลแมว & คริสต์มาส DIY (฿981 • 20 ชิ้น)',
+    amount: 981,
+    itemCount: 20,
+    files: 'File 25, 26, 27',
+    vendor: 'Shopee (YunoShop, KKON, แมวญี่ปุ่น)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_25.jpg',
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_26.jpg',
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_27.jpg',
+    ],
+    skus: [
+      'GIFT-SANTA-001', 'GIFT-SANTA-002', 'GIFT-SANTA-003', 'GIFT-SANTA-004', 'GIFT-SANTA-005',
+      'GIFT-CAT-001', 'GIFT-CAT-002', 'GIFT-CAT-003', 'GIFT-CAT-004', 'GIFT-CAT-005',
+      'GIFT-CAT-006', 'GIFT-CAT-007', 'GIFT-CAT-008', 'GIFT-CAT-009', 'GIFT-CAT-010',
+      'GIFT-CAT-011', 'GIFT-CAT-012', 'GIFT-CAT-013', 'GIFT-CAT-014', 'GIFT-CAT-015',
+    ],
+  },
+  {
+    id: 'ORDER-2',
+    orderNumber: 2,
+    title: 'แม่เหล็กสโนว์แมน & ต้นคริสต์มาสหมี (Shopee รวม 2 หน้า 1/2, 2/2)',
+    shortTitle: 'บิล 2: แม่เหล็กติดตู้เย็นคริสต์มาส (฿315 • 8 ชิ้น)',
+    amount: 315,
+    itemCount: 8,
+    files: 'File 23, 24',
+    vendor: 'Shopee (Guofu Studio)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_23.jpg',
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_24.jpg',
+    ],
+    skus: [
+      'GIFT-MAG-001', 'GIFT-MAG-002', 'GIFT-MAG-003', 'GIFT-MAG-004',
+      'GIFT-MAG-005', 'GIFT-MAG-006', 'GIFT-MAG-007', 'GIFT-MAG-008',
+    ],
+  },
+  {
+    id: 'ORDER-3',
+    orderNumber: 3,
+    title: 'ฟิกเกอร์โมเดลแมวจิ๋วเรซิ่น (NEKO HEAL JAI)',
+    shortTitle: 'บิล 3: โมเดลแมวจิ๋วเรซิ่น NEKO (฿319 • 4 ชิ้น)',
+    amount: 319,
+    itemCount: 4,
+    files: 'File 20',
+    vendor: 'Shopee (NEKO HEAL JAI)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_20.jpg',
+    ],
+    skus: [
+      'GIFT-NEKO-001', 'GIFT-NEKO-002', 'GIFT-NEKO-003', 'GIFT-NEKO-004',
+    ],
+  },
+  {
+    id: 'ORDER-4',
+    orderNumber: 4,
+    title: 'ถุงซีล 7x10 cm ลายคริสต์มาส (FDC Group 2 แพ็ค)',
+    shortTitle: 'บิล 4: ถุงซีลคริสต์มาส 2 แพ็ค (฿57 • 200 ใบ)',
+    amount: 57,
+    itemCount: 2,
+    files: 'File 28',
+    vendor: 'Shopee (FDC Group)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_28.jpg',
+    ],
+    skus: [
+      'GIFT-BAG-002', 'GIFT-BAG-003',
+    ],
+  },
+  {
+    id: 'ORDER-5',
+    orderNumber: 5,
+    title: 'ถุงฝากาวลายดอกไม้ 7x7 cm (EveryPack 1 แพ็ค 100 ใบ)',
+    shortTitle: 'บิล 5: ถุงฝากาวลายดอกไม้ (฿18 • 100 ใบ)',
+    amount: 18,
+    itemCount: 1,
+    files: 'File 22',
+    vendor: 'Shopee (EveryPack)',
+    receiptUrls: [
+      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_22.jpg',
+    ],
+    skus: [
+      'GIFT-BAG-001',
+    ],
+  },
+];
+
+function getOrderForItem(sku: string): FreebieOrder | undefined {
+  return FREEBIE_ORDERS.find((o) => o.skus.includes(sku));
+}
 
 export default function FreebiesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  // Active Order info
+  const activeOrder = useMemo(
+    () => FREEBIE_ORDERS.find((o) => o.id === selectedOrderId) || null,
+    [selectedOrderId]
+  );
 
   // Detail Modal
   const [activeModalItem, setActiveModalItem] = useState<Product | null>(null);
@@ -89,6 +205,14 @@ export default function FreebiesPage() {
   // Filtered List
   const filteredList = useMemo(() => {
     return freebieList.filter((item) => {
+      // Filter by Order (from Expenses)
+      if (selectedOrderId !== 'ALL') {
+        const order = FREEBIE_ORDERS.find((o) => o.id === selectedOrderId);
+        if (order && !order.skus.includes(item.sku)) {
+          return false;
+        }
+      }
+
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -103,7 +227,7 @@ export default function FreebiesPage() {
       }
       return true;
     });
-  }, [freebieList, searchQuery, selectedCategory]);
+  }, [freebieList, searchQuery, selectedCategory, selectedOrderId]);
 
   // Summary KPI metrics
   const totalUnits = useMemo(() => {
@@ -292,7 +416,83 @@ export default function FreebiesPage() {
         </div>
 
         {/* Filter Bar & Search */}
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-3.5">
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+          {/* Order Filter Dropdown */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <Receipt className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">
+                  เลือกดูตามบิลคำสั่งซื้อ (5 รายการค่าใช้จ่าย)
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  กรองเฉพาะของแถมที่นำเข้าในแต่ละบิล Shopee
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full sm:w-80">
+              <select
+                value={selectedOrderId}
+                onChange={(e) => setSelectedOrderId(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition shadow-2xs"
+              >
+                <option value="ALL">📑 ดูทั้งหมด (ครบ 5 บิล • 35 รายการ • รวม ฿1,690)</option>
+                {FREEBIE_ORDERS.map((ord) => (
+                  <option key={ord.id} value={ord.id}>
+                    {ord.shortTitle}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Active Order Details Banner */}
+          {activeOrder && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-cyan-50/40 border border-emerald-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                    บิล #{activeOrder.orderNumber}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {activeOrder.title}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>ร้าน: <strong className="text-slate-700">{activeOrder.vendor}</strong></span>
+                  <span>ไฟล์: <strong className="text-slate-700">{activeOrder.files}</strong></span>
+                  <span>ยอดบิล: <strong className="text-emerald-700">฿{activeOrder.amount.toLocaleString()}</strong></span>
+                  <span>จำนวนของในบิล: <strong className="text-emerald-700">{activeOrder.itemCount} รายการ</strong></span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {activeOrder.receiptUrls.map((url, idx) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100/60 transition shadow-2xs"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                    ดูสลิปบิล {activeOrder.receiptUrls.length > 1 ? `#${idx + 1}` : ''}
+                  </a>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderId('ALL')}
+                  className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 transition"
+                >
+                  ✕ ล้างตัวกรอง
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Category Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             <button
@@ -463,6 +663,15 @@ export default function FreebiesPage() {
                             🎁 ของแถม
                           </span>
                         )}
+                        {(() => {
+                          const order = getOrderForItem(item.sku);
+                          if (!order) return null;
+                          return (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                              🧾 บิล {order.orderNumber}
+                            </span>
+                          );
+                        })()}
                         <p className="text-[10px] text-slate-400 truncate">
                           {item.stone_type}
                         </p>
@@ -523,6 +732,7 @@ export default function FreebiesPage() {
                     <th className="py-3 px-4">รูปภาพ</th>
                     <th className="py-3 px-4">รหัส SKU</th>
                     <th className="py-3 px-4">ชื่อสินค้า / อุปกรณ์</th>
+                    <th className="py-3 px-4">บิลคำสั่งซื้อ</th>
                     <th className="py-3 px-4">ประเภท / หมวดหมู่</th>
                     <th className="py-3 px-4 text-right">ต้นทุนต่อชิ้น</th>
                     <th className="py-3 px-4 text-center">จำนวนคงเหลือ</th>
@@ -532,6 +742,7 @@ export default function FreebiesPage() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredList.map((item) => {
                     const isProp = item.sku?.startsWith('PROP') || item.grade_origin === '[PROP]' || item.stone_type?.includes('พร็อพ');
+                    const order = getOrderForItem(item.sku);
                     return (
                       <tr
                         key={item.id}
@@ -556,6 +767,18 @@ export default function FreebiesPage() {
                         </td>
                         <td className="py-2.5 px-4 font-semibold text-slate-800 max-w-xs truncate">
                           {item.name}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {order ? (
+                            <span
+                              className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              title={order.title}
+                            >
+                              🧾 บิล {order.orderNumber}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">-</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-1.5">
@@ -688,6 +911,43 @@ export default function FreebiesPage() {
                     </span>
                   </div>
                 )}
+
+                {/* Associated Expense Order Info */}
+                {(() => {
+                  const order = getOrderForItem(activeModalItem.sku);
+                  if (!order) return null;
+                  return (
+                    <div className="mt-3 p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                          <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                          บิลคำสั่งซื้อ #{order.orderNumber} (ในค่าใช้จ่าย)
+                        </span>
+                        <span className="font-bold text-emerald-700">฿{order.amount.toLocaleString()}</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] font-medium leading-relaxed">
+                        {order.title}
+                      </p>
+                      <div className="text-[10px] text-slate-500">
+                        ร้าน: <strong>{order.vendor}</strong> • หลักฐาน: <strong>{order.files}</strong>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1 flex-wrap">
+                        {order.receiptUrls.map((url, idx) => (
+                          <a
+                            key={url}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline"
+                          >
+                            <FileText className="w-3 h-3" />
+                            ดูสลิปบิล {order.receiptUrls.length > 1 ? `#${idx + 1}` : ''}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
