@@ -58,16 +58,23 @@ export default function FreebiesPage() {
     load();
   }, []);
 
-  // Filter only freebies and gift packaging items (Strictly no props)
+  // Filter non-stone freebies and gift packaging items (Shopee models, magnets, bags)
+  // Real stones belong in the Stone Warehouse (/products)
   const freebieList = useMemo(() => {
-    return products.filter((p) =>
-      Boolean(
-        (p.sku?.startsWith('GIFT') || p.is_freebie) &&
-        !p.sku?.startsWith('PROP') &&
-        p.grade_origin !== '[PROP]' &&
-        !p.stone_type?.includes('พร็อพ')
-      )
-    );
+    return products.filter((p) => {
+      const sku = p.sku || '';
+      const cat = p.stone_type || '';
+      const isNonStone =
+        sku.startsWith('GIFT-SANTA-') ||
+        sku.startsWith('GIFT-CAT-') ||
+        sku.startsWith('GIFT-NEKO-') ||
+        sku.startsWith('GIFT-MAG-') ||
+        sku.startsWith('GIFT-BAG-') ||
+        cat === 'โมเดล & ฟิกเกอร์' ||
+        cat === 'แม่เหล็กติดตู้เย็น' ||
+        cat === 'ถุง & ซองของแถม';
+      return isNonStone;
+    });
   }, [products]);
 
   // Categories
@@ -469,9 +476,11 @@ export default function FreebiesPage() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div>
-                      <span className="text-[10px] text-slate-400 block leading-none">ทุน</span>
+                      <span className="text-[10px] text-slate-400 block leading-none">
+                        {item.sku?.startsWith('GIFT-BAG-') ? 'ทุน / ใบ' : 'ทุน'}
+                      </span>
                       <strong className={`${isProp ? 'text-indigo-700' : 'text-emerald-700'} font-bold text-xs sm:text-sm`}>
-                        ฿{Number(item.cost_price || 0).toLocaleString()}
+                        ฿{Number(item.cost_price || 0) < 1 ? Number(item.cost_price || 0).toFixed(2) : Number(item.cost_price || 0).toLocaleString()}
                       </strong>
                     </div>
 
@@ -563,7 +572,8 @@ export default function FreebiesPage() {
                           </div>
                         </td>
                         <td className={`py-2.5 px-4 text-right font-bold ${isProp ? 'text-indigo-700' : 'text-emerald-700'}`}>
-                          ฿{Number(item.cost_price || 0).toLocaleString()}
+                          ฿{Number(item.cost_price || 0) < 1 ? Number(item.cost_price || 0).toFixed(2) : Number(item.cost_price || 0).toLocaleString()}
+                          {item.sku?.startsWith('GIFT-BAG-') && <span className="text-[10px] text-slate-400 block font-normal">/ ใบ</span>}
                         </td>
                         <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="inline-flex items-center gap-1 bg-slate-100 rounded-xl p-0.5 border border-slate-200">
