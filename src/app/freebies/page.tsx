@@ -86,16 +86,17 @@ const FREEBIE_ORDERS: FreebieOrder[] = [
     id: 'ORDER-3',
     orderNumber: 3,
     title: 'ฟิกเกอร์โมเดลแมวจิ๋วเรซิ่น (NEKO HEAL JAI)',
-    shortTitle: 'บิล 3: โมเดลแมวจิ๋วเรซิ่น NEKO (฿319 • 4 ชิ้น)',
+    shortTitle: 'บิล 3: โมเดลแมวจิ๋วเรซิ่น NEKO (฿319 • 6 ชิ้น)',
     amount: 319,
-    itemCount: 4,
+    itemCount: 6,
     files: 'File 20',
     vendor: 'Shopee (NEKO HEAL JAI)',
     receiptUrls: [
       'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_20.jpg',
     ],
     skus: [
-      'GIFT-NEKO-001', 'GIFT-NEKO-002', 'GIFT-NEKO-003', 'GIFT-NEKO-004',
+      'GIFT-NEKO-001', 'GIFT-NEKO-002', 'GIFT-NEKO-003',
+      'GIFT-NEKO-004', 'GIFT-NEKO-005', 'GIFT-NEKO-006',
     ],
   },
   {
@@ -446,7 +447,7 @@ export default function FreebiesPage() {
                 }}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition shadow-2xs"
               >
-                <option value="ALL">📑 ดูทั้งหมด (ครบ 5 บิล • 35 รายการ • รวม ฿1,690)</option>
+                <option value="ALL">📑 ดูทั้งหมด (ครบ 5 บิล • {freebieList.length} รายการ • รวม ฿1,690)</option>
                 {FREEBIE_ORDERS.map((ord) => (
                   <option key={ord.id} value={ord.id}>
                     {ord.shortTitle}
