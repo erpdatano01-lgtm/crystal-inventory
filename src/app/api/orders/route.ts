@@ -201,6 +201,12 @@ export async function PATCH(request: NextRequest) {
       customer_name,
       customer_phone,
       customer_address,
+      is_open_box,
+      free_shipping_threshold,
+      shipping_fee,
+      discount,
+      appendItems,
+      appendPayment,
     } = body || {};
 
     if (!id && !order_no) {
@@ -217,6 +223,10 @@ export async function PATCH(request: NextRequest) {
     if (customer_name !== undefined) updatePayload.customer_name = customer_name;
     if (customer_phone !== undefined) updatePayload.customer_phone = customer_phone;
     if (customer_address !== undefined) updatePayload.customer_address = customer_address;
+    if (is_open_box !== undefined) updatePayload.is_open_box = is_open_box;
+    if (free_shipping_threshold !== undefined) updatePayload.free_shipping_threshold = free_shipping_threshold;
+    if (shipping_fee !== undefined) updatePayload.shipping_fee = shipping_fee;
+    if (discount !== undefined) updatePayload.discount = discount;
 
     let updatedOrder: Order | null = null;
 
@@ -294,9 +304,44 @@ export async function PATCH(request: NextRequest) {
         const matchOrderNo = Boolean(order_no && parsed && parsed.order_no === order_no);
 
         if (matchId || matchOrderNo) {
+          const baseOrder: any = parsed || {};
+          const extraItems = Array.isArray(appendItems) ? appendItems : [];
+          const combinedItems = [...(baseOrder.items || []), ...extraItems];
+
+          const nextDiscount =
+            updatePayload.discount !== undefined
+              ? Number(updatePayload.discount)
+              : Number(baseOrder.discount || 0);
+          const nextShipping =
+            updatePayload.shipping_fee !== undefined
+              ? Number(updatePayload.shipping_fee)
+              : Number(baseOrder.shipping_fee || 0);
+
+          const nextSubtotal = combinedItems.reduce(
+            (s: number, it: any) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1),
+            0
+          );
+          const nextTotalCost = combinedItems.reduce(
+            (s: number, it: any) => s + (Number(it.cost_price) || 0) * (Number(it.qty) || 1),
+            0
+          );
+          const nextTotalAmount = Math.max(0, nextSubtotal - nextDiscount + nextShipping);
+          const nextProfit = nextTotalAmount - nextTotalCost;
+
+          const existingLogs = Array.isArray(baseOrder.payment_logs) ? baseOrder.payment_logs : [];
+          const nextLogs = appendPayment ? [...existingLogs, appendPayment] : existingLogs;
+
           const merged: Order = {
-            ...(parsed || {}),
+            ...baseOrder,
             ...updatePayload,
+            items: combinedItems,
+            subtotal: nextSubtotal,
+            total_cost: nextTotalCost,
+            discount: nextDiscount,
+            shipping_fee: nextShipping,
+            total_amount: nextTotalAmount,
+            profit: nextProfit,
+            payment_logs: nextLogs,
           };
           updatedOrder = merged;
           await supabaseAdmin
@@ -306,6 +351,40 @@ export async function PATCH(request: NextRequest) {
         }
       } catch {
         // continue
+      }
+    }
+
+    // If new items were appended to an Open Box, deduct their stock & record movements
+    if (updatedOrder && Array.isArray(appendItems) && appendItems.length > 0) {
+      for (const item of appendItems) {
+        const { data: curProd } = await supabaseAdmin
+          .from('products')
+          .select('qty_on_hand')
+          .eq('id', item.product_id)
+          .single();
+
+        const currentQty = typeof curProd?.qty_on_hand === 'number' ? curProd.qty_on_hand : 1;
+        const deductQty = Number(item.qty) || 1;
+        const newQty = Math.max(0, currentQty - deductQty);
+        const newStatus = newQty === 0 ? 'SOLD' : 'AVAILABLE';
+
+        await supabaseAdmin
+          .from('products')
+          .update({
+            status: newStatus,
+            qty_on_hand: newQty,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', item.product_id);
+
+        await supabaseAdmin.from('stock_movements').insert([
+          {
+            product_id: item.product_id,
+            change_qty: -deductQty,
+            reason: 'SOLD',
+            note: JSON.stringify(updatedOrder),
+          },
+        ]);
       }
     }
 

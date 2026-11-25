@@ -139,7 +139,13 @@ export interface StockMovement {
 // SALES ORDERS & INVOICES (FlowAccount-style Billing & Accounting)
 // ====================================================================
 
-export type OrderStatus = 'PAID' | 'WAITING_PAYMENT' | 'SHIPPED' | 'CANCELLED';
+export type OrderStatus =
+  | 'PENDING'
+  | 'OPEN_BOX'
+  | 'PAID'
+  | 'WAITING_PAYMENT'
+  | 'SHIPPED'
+  | 'CANCELLED';
 
 export type SalesChannel =
   | 'WALK_IN'
@@ -169,6 +175,14 @@ export interface PackedItemLogEntry {
   verified_at_second: number;
 }
 
+export interface OrderPaymentLog {
+  date: string;
+  amount: number;
+  method: string;
+  slip_url?: string | null;
+  note?: string | null;
+}
+
 export interface Order {
   id: string;
   order_no: string; // e.g. INV-202611-001
@@ -192,6 +206,9 @@ export interface Order {
   tracking_no?: string | null;
   notes?: string | null;
   status: OrderStatus;
+  is_open_box?: boolean;
+  free_shipping_threshold?: number | null;
+  payment_logs?: OrderPaymentLog[];
   created_at: string;
 }
 
@@ -228,6 +245,8 @@ export const ORDER_STATUS_CONFIG: Record<
   OrderStatus,
   { label: string; badgeClass: string }
 > = {
+  PENDING: { label: 'รอดำเนินการ (Pending)', badgeClass: 'bg-purple-100 text-purple-800 border-purple-300' },
+  OPEN_BOX: { label: 'เปิดกล่องสะสม (Open Box)', badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
   PAID: { label: 'ชำระเงินแล้ว (Paid)', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
   WAITING_PAYMENT: { label: 'รอชำระเงิน (Unpaid)', badgeClass: 'bg-amber-100 text-amber-800 border-amber-300' },
   SHIPPED: { label: 'จัดส่งแล้ว (Shipped)', badgeClass: 'bg-blue-100 text-blue-800 border-blue-300' },

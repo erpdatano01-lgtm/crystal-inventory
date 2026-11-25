@@ -87,6 +87,17 @@ export default function OrdersPage() {
   const [orderItemFilter, setOrderItemFilter] = useState<'SALE' | 'FREEBIE' | 'ALL'>('SALE');
   const [orderItemSearch, setOrderItemSearch] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOpenBoxMode, setIsOpenBoxMode] = useState(false);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(1500);
+  const [initialOrderStatus, setInitialOrderStatus] = useState<OrderStatus>('PENDING');
+
+  // Add-to-Open-Box Modal state
+  const [addingToBoxOrder, setAddingToBoxOrder] = useState<Order | null>(null);
+  const [boxExtraItems, setBoxExtraItems] = useState<OrderItem[]>([]);
+  const [boxExtraSearch, setBoxExtraSearch] = useState('');
+  const [boxExtraPayMethod, setBoxExtraPayMethod] = useState('โอนเงิน (Mobile Banking)');
+  const [boxExtraNote, setBoxExtraNote] = useState('');
+  const [isSavingBoxAdd, setIsSavingBoxAdd] = useState(false);
 
   // Load data
   const loadData = async () => {
@@ -254,6 +265,7 @@ export default function OrdersPage() {
 
     setIsSubmitting(true);
     try {
+      const targetStatus: OrderStatus = isOpenBoxMode ? 'OPEN_BOX' : initialOrderStatus;
       const orderPayload: Partial<Order> = {
         order_date: new Date().toISOString().slice(0, 10),
         customer_name: customerName,
@@ -271,7 +283,18 @@ export default function OrdersPage() {
         slip_url: orderSlipUrls[0] || null,
         tracking_no: trackingNo || null,
         notes: notes || null,
-        status: 'PAID',
+        status: targetStatus,
+        is_open_box: isOpenBoxMode,
+        free_shipping_threshold: isOpenBoxMode ? freeShippingThreshold : null,
+        payment_logs: [
+          {
+            date: new Date().toISOString().slice(0, 10),
+            amount: orderTotalAmount,
+            method: paymentMethod,
+            slip_url: orderSlipUrls[0] || null,
+            note: isOpenBoxMode ? 'เปิดกล่องรอบที่ 1' : 'บันทึกบิล',
+          },
+        ],
       };
 
       const res = await fetch('/api/orders', {
@@ -296,17 +319,87 @@ export default function OrdersPage() {
       setShippingFee(0);
       setNotes('');
       setOrderSlipUrls([]);
+      setIsOpenBoxMode(false);
+      setInitialOrderStatus('PENDING');
       setShowCreateModal(false);
 
-      // Open shipping label modal directly so user can print parcel label or switch to receipt
-      setSelectedLabelOrder(created);
-
-      // Reload data
+      // Reload data (FlowAccount style: stays on orders table with PENDING / OPEN_BOX status)
       await loadData();
+      alert(
+        isOpenBoxMode
+          ? `เปิดกล่องสะสม ${created.order_no} สำเร็จ! (สะสม ฿${created.total_amount.toLocaleString()} / เป้าส่งฟรี ฿${freeShippingThreshold.toLocaleString()})`
+          : `บันทึกบิล ${created.order_no} สถานะ "${ORDER_STATUS_CONFIG[targetStatus].label}" เรียบร้อยแล้ว`
+      );
     } catch (err: any) {
       alert(`เกิดข้อผิดพลาด: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // FlowAccount-style quick status update on any order row
+  const handleQuickOrderStatusChange = async (ord: Order, nextStatus: OrderStatus) => {
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: ord.id,
+          order_no: ord.order_no,
+          status: nextStatus,
+          is_open_box: nextStatus === 'OPEN_BOX',
+        }),
+      });
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === ord.id || o.order_no === ord.order_no
+              ? { ...o, status: nextStatus, is_open_box: nextStatus === 'OPEN_BOX' }
+              : o
+          )
+        );
+      } else {
+        alert('ไม่สามารถเปลี่ยนสถานะบิลได้');
+      }
+    } catch {
+      alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ');
+    }
+  };
+
+  // Append new stones + payment round into an existing Open Box order
+  const handleAddItemsToBox = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addingToBoxOrder || boxExtraItems.length === 0) return;
+    setIsSavingBoxAdd(true);
+    try {
+      const extraAmount = boxExtraItems.reduce((s, i) => s + i.unit_price * i.qty, 0);
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: addingToBoxOrder.id,
+          order_no: addingToBoxOrder.order_no,
+          appendItems: boxExtraItems,
+          appendPayment: {
+            date: new Date().toISOString().slice(0, 10),
+            amount: extraAmount,
+            method: boxExtraPayMethod,
+            note: boxExtraNote || `เพิ่มหินเข้ากล่อง (${boxExtraItems.length} ชิ้น)`,
+          },
+        }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to append items');
+      }
+      setAddingToBoxOrder(null);
+      setBoxExtraItems([]);
+      setBoxExtraNote('');
+      setBoxExtraSearch('');
+      await loadData();
+    } catch (err: any) {
+      alert(`เพิ่มหินเข้ากล่องไม่สำเร็จ: ${err?.message || ''}`);
+    } finally {
+      setIsSavingBoxAdd(false);
     }
   };
 
@@ -570,12 +663,34 @@ export default function OrdersPage() {
 
         {/* Orders List Table */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-600" />
               <h3 className="font-bold text-slate-900 text-sm sm:text-base">
                 รายการบิลขายทั้งหมด ({filteredOrders.length})
               </h3>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {[
+                { key: '', label: `ทั้งหมด (${orders.length})` },
+                { key: 'OPEN_BOX', label: `📦 เปิดกล่อง (${orders.filter((o) => o.status === 'OPEN_BOX').length})` },
+                { key: 'PENDING', label: `⏳ รอดำเนินการ (${orders.filter((o) => o.status === 'PENDING').length})` },
+                { key: 'PAID', label: `✅ ชำระแล้ว (${orders.filter((o) => o.status === 'PAID').length})` },
+                { key: 'SHIPPED', label: `🚚 จัดส่งแล้ว (${orders.filter((o) => o.status === 'SHIPPED').length})` },
+              ].map((tab) => (
+                <button
+                  key={tab.key || 'ALL'}
+                  type="button"
+                  onClick={() => setSelectedStatus(tab.key)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition ${
+                    selectedStatus === tab.key
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -672,12 +787,74 @@ export default function OrdersPage() {
                         </td>
 
                         <td className="py-3.5 px-4 text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusConfig.badgeClass}`}
+                          <div className="flex flex-col items-center gap-1.5">
+                            {/* FlowAccount-style inline status dropdown */}
+                            <select
+                              value={ord.status}
+                              onChange={(e) =>
+                                handleQuickOrderStatusChange(ord, e.target.value as OrderStatus)
+                              }
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer outline-none ${statusConfig.badgeClass}`}
                             >
-                              {statusConfig.label}
-                            </span>
+                              {Object.entries(ORDER_STATUS_CONFIG).map(([k, cfg]) => (
+                                <option key={k} value={k} className="bg-white text-slate-900">
+                                  {cfg.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Open Box Free-Shipping Progress & Actions */}
+                            {ord.status === 'OPEN_BOX' && (() => {
+                              const threshold = Number(ord.free_shipping_threshold) || 1500;
+                              const currentTotal = Number(ord.total_amount) || 0;
+                              const pct = Math.min(100, Math.round((currentTotal / threshold) * 100));
+                              const reached = currentTotal >= threshold;
+                              return (
+                                <div className="w-44 p-2 rounded-xl bg-indigo-50/70 border border-indigo-200 text-left space-y-1.5">
+                                  <div className="flex items-center justify-between text-[10px] font-bold">
+                                    <span className={reached ? 'text-emerald-700' : 'text-indigo-800'}>
+                                      {reached ? '🎉 ครบส่งฟรีแล้ว!' : `สะสม ${pct}%`}
+                                    </span>
+                                    <span className="text-slate-600">
+                                      ฿{currentTotal.toLocaleString()}/{threshold.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-white rounded-full overflow-hidden border border-indigo-100">
+                                    <div
+                                      className={`h-full transition-all ${
+                                        reached ? 'bg-emerald-500' : 'bg-indigo-500'
+                                      }`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAddingToBoxOrder(ord);
+                                        setBoxExtraItems([]);
+                                        setBoxExtraNote('');
+                                        setBoxExtraSearch('');
+                                      }}
+                                      className="flex-1 py-1 px-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold transition"
+                                    >
+                                      + เพิ่มหินเข้ากล่อง
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleQuickOrderStatusChange(ord, 'PENDING');
+                                        setSelectedLabelOrder({ ...ord, status: 'PENDING', is_open_box: false });
+                                      }}
+                                      className="py-1 px-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition"
+                                      title="ปิดกล่อง & เตรียมส่ง"
+                                    >
+                                      ปิดกล่อง
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             {/* Flexible Tracking No Badge / Add Button */}
                             {ord.tracking_no ? (
@@ -824,6 +1001,67 @@ export default function OrdersPage() {
 
               <form id="create-order-form" onSubmit={handleCreateOrder} className="flex flex-col flex-1 min-h-0">
                 <div className="p-5 sm:p-6 overflow-y-auto overscroll-contain space-y-6 flex-1">
+                {/* 0. Order Mode (Normal Pending Bill vs Open Box) */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOpenBoxMode(false);
+                        setInitialOrderStatus('PENDING');
+                      }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                        !isOpenBoxMode
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🧾 บิลขายปกติ (รอดำเนินการ)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsOpenBoxMode(true)}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                        isOpenBoxMode
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      📦 เปิดกล่องสะสม (รอครบส่งฟรี)
+                    </button>
+                  </div>
+
+                  {isOpenBoxMode ? (
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <span className="text-xs font-semibold text-indigo-900">
+                        🎯 ยอดสะสมครบส่งฟรี (฿):
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={freeShippingThreshold}
+                        onChange={(e) => setFreeShippingThreshold(Number(e.target.value) || 0)}
+                        className="w-32 px-3 py-1.5 text-sm font-bold text-right bg-white border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <span className="text-xs font-semibold text-slate-700">
+                        สถานะเริ่มต้นหลังบันทึกบิล:
+                      </span>
+                      <select
+                        value={initialOrderStatus}
+                        onChange={(e) => setInitialOrderStatus(e.target.value as OrderStatus)}
+                        className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="PENDING">⏳ รอดำเนินการ (Pending)</option>
+                        <option value="PAID">✅ ชำระเงินแล้ว (Paid)</option>
+                        <option value="WAITING_PAYMENT">💸 รอชำระเงิน (Unpaid)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
                 {/* 1. Customer Information */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
@@ -1351,6 +1589,213 @@ export default function OrdersPage() {
                   className="max-h-[65vh] object-contain rounded-xl"
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Items & Payment Round to Existing Open Box Modal */}
+        {addingToBoxOrder && (
+          <div
+            onClick={() => setAddingToBoxOrder(null)}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl w-full max-w-2xl max-h-[88dvh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden"
+            >
+              <div className="p-5 bg-indigo-900 text-white flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="font-bold text-base">
+                    📦 เพิ่มหินเข้ากล่อง {addingToBoxOrder.order_no}
+                  </h3>
+                  <p className="text-xs text-indigo-200 mt-0.5">
+                    ลูกค้า: {addingToBoxOrder.customer_name} • สะสมเดิม ฿
+                    {addingToBoxOrder.total_amount.toLocaleString()} / เป้าส่งฟรี ฿
+                    {(Number(addingToBoxOrder.free_shipping_threshold) || 1500).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddingToBoxOrder(null)}
+                  className="p-1.5 rounded-full hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddItemsToBox} className="flex flex-col flex-1 min-h-0">
+                <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                  {/* Search Available Stones & Gifts */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="ค้นหา SKU หรือชื่อหินที่จะเพิ่มเข้ากล่อง..."
+                      value={boxExtraSearch}
+                      onChange={(e) => setBoxExtraSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                    {availableProducts
+                      .filter((p) => {
+                        if (!boxExtraSearch.trim()) return true;
+                        const q = boxExtraSearch.toLowerCase();
+                        return (
+                          p.sku.toLowerCase().includes(q) ||
+                          p.name.toLowerCase().includes(q) ||
+                          p.stone_type.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((p) => {
+                        const picked = boxExtraItems.some((i) => i.product_id === p.id);
+                        const isGift = Boolean(p.sku?.startsWith('GIFT'));
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            disabled={picked}
+                            onClick={() => {
+                              setBoxExtraItems((prev) => [
+                                ...prev,
+                                {
+                                  product_id: p.id,
+                                  sku: p.sku,
+                                  name: p.name,
+                                  stone_type: p.stone_type,
+                                  unit_price: isGift ? 0 : Number(p.selling_price) || 0,
+                                  cost_price: Number(p.cost_price) || 0,
+                                  qty: 1,
+                                  is_freebie: isGift,
+                                  weight_grams: p.weight_grams,
+                                  r2_thumbnail_url: p.r2_thumbnail_url,
+                                },
+                              ]);
+                            }}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left text-xs transition ${
+                              picked
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                : 'bg-white hover:bg-indigo-50 border-slate-200'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <span className="font-mono font-bold text-indigo-700 mr-2">
+                                {p.sku}
+                              </span>
+                              <span className="font-semibold text-slate-900">{p.name}</span>
+                            </div>
+                            <span className="font-bold text-slate-800 shrink-0 ml-2">
+                              {isGift ? '฿0 (ของแถม)' : `฿${Number(p.selling_price || 0).toLocaleString()}`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  {/* Selected Extra Items */}
+                  {boxExtraItems.length > 0 && (
+                    <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">
+                      <p className="text-xs font-bold text-indigo-900">
+                        รายการที่เลือกเพิ่มรอบนี้ ({boxExtraItems.length} ชิ้น):
+                      </p>
+                      {boxExtraItems.map((it, idx) => (
+                        <div key={it.product_id} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="truncate font-semibold text-slate-800">
+                            {it.sku} • {it.name}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <input
+                              type="number"
+                              min={0}
+                              value={it.unit_price}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 0;
+                                setBoxExtraItems((prev) =>
+                                  prev.map((x, i) => (i === idx ? { ...x, unit_price: val } : x))
+                                );
+                              }}
+                              className="w-20 px-2 py-1 text-right font-bold bg-white border border-indigo-200 rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBoxExtraItems((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="text-rose-500 hover:text-rose-700 font-bold px-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {(() => {
+                        const addSum = boxExtraItems.reduce((s, i) => s + i.unit_price * i.qty, 0);
+                        const nextTotal = addingToBoxOrder.total_amount + addSum;
+                        const threshold =
+                          Number(addingToBoxOrder.free_shipping_threshold) || 1500;
+                        const reached = nextTotal >= threshold;
+                        return (
+                          <div className="pt-2 border-t border-indigo-200 flex items-center justify-between text-xs font-bold">
+                            <span className={reached ? 'text-emerald-700' : 'text-indigo-800'}>
+                              {reached
+                                ? '🎉 รอบนี้ครบโควต้าส่งฟรีแล้ว!'
+                                : `ขาดอีก ฿${(threshold - nextTotal).toLocaleString()} จะครบส่งฟรี`}
+                            </span>
+                            <span className="text-slate-900">
+                              ยอดรวมกล่องใหม่: ฿{nextTotal.toLocaleString()}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        วิธีรับเงินรอบนี้
+                      </label>
+                      <input
+                        type="text"
+                        value={boxExtraPayMethod}
+                        onChange={(e) => setBoxExtraPayMethod(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        หมายเหตุรอบนี้
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น โอนเพิ่มรอบ 2"
+                        value={boxExtraNote}
+                        onChange={(e) => setBoxExtraNote(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setAddingToBoxOrder(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={boxExtraItems.length === 0 || isSavingBoxAdd}
+                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50"
+                  >
+                    {isSavingBoxAdd ? 'กำลังบันทึก...' : 'บันทึกเพิ่มเข้ากล่อง & ตัดสต็อก'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
