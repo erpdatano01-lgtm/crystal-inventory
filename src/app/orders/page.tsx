@@ -1018,13 +1018,15 @@ export default function OrdersPage() {
                               </button>
                             )}
 
-                            {/* Edit Order Button (Allowed when status is PENDING) */}
-                            {ord.status === 'PENDING' && (
+                            {/* Edit Order Button (Allowed when status is PENDING, OPEN_BOX, or WAITING_PAYMENT) */}
+                            {(ord.status === 'PENDING' ||
+                              ord.status === 'OPEN_BOX' ||
+                              ord.status === 'WAITING_PAYMENT') && (
                               <button
                                 type="button"
                                 onClick={() => openEditOrderModal(ord)}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition"
-                                title="แก้ไขบิล (ทำได้ขณะที่สถานะเป็นรอดำเนินการ)"
+                                title="แก้ไขบิล (ทำได้ขณะที่สถานะเป็นรอดำเนินการ / เปิดกล่อง / รอชำระเงิน)"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                                 <span>แก้ไข</span>
