@@ -525,10 +525,12 @@ export function isNonStoneFreebie(
   return Boolean(
     p.is_freebie ||
       sku.startsWith('GIFT-') ||
+      sku.startsWith('PKG-BAG-') ||
       sku.startsWith('PROP-') ||
       grade === '[PROP]' ||
       grade === '[FREEBIE]' ||
       grade.includes('[ของแถม') ||
+      cat === 'ถุงซีล & ถุงฝากาว' ||
       cat === 'โมเดล & ฟิกเกอร์' ||
       cat === 'แม่เหล็กติดตู้เย็น' ||
       cat === 'ของตกแต่งเทศกาล' ||
@@ -539,18 +541,20 @@ export function isNonStoneFreebie(
 
 /**
  * Determine whether a product is a countable packaging item
- * (shipping boxes, zip bags, seal bags, thank-you cards) belonging in /packaging.
+ * (shipping boxes, zip bags, thank-you cards) belonging in /packaging.
  */
 export function isPackagingItem(
   p: Pick<Product, 'sku' | 'stone_type'>
 ): boolean {
   const sku = (p.sku || '').toUpperCase();
   const cat = p.stone_type || '';
+  if (sku.startsWith('PKG-BAG-') || cat === 'ถุงซีล & ถุงฝากาว') {
+    return false;
+  }
   return Boolean(
     sku.startsWith('PKG-') ||
       cat === 'กล่องพัสดุ' ||
       cat === 'ถุงซิปล็อค' ||
-      cat === 'ถุงซีล & ถุงฝากาว' ||
       cat === 'การ์ดขอบคุณ'
   );
 }
