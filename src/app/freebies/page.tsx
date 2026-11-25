@@ -279,11 +279,10 @@ export default function FreebiesPage() {
               <span>คลังเฉพาะของแถม & บรรจุภัณฑ์ (แยกต่างหากจากคลังหิน)</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white">
-              คลังสต็อกของแถมลูกค้า (Freebies Warehouse)
+              คลังสต็อกของแถมลูกค้า
             </h2>
             <p className="text-xs sm:text-sm text-emerald-100 max-w-xl">
-              จัดการสต็อกโมเดลแมว, แม่เหล็กติดตู้เย็น และฟิกเกอร์ของแถม
-              พร้อมรูปภาพจากบิล Shopee สำหรับใช้ตัดสต็อกแถมลูกค้า
+              รวมสต็อกของแถมทุกชนิดไว้ในที่เดียว ทั้งหินของแถม โมเดลแมว แม่เหล็กติดตู้เย็น และของแจกลูกค้า
             </p>
           </div>
 

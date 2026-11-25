@@ -304,7 +304,7 @@ export const EXPENSE_CATEGORIES_CONFIG: Record<
     badgeClass: 'bg-pink-100 text-pink-800 border-pink-200',
   },
   FREEBIE_GIFT: {
-    label: 'ของแถม / ของสมนาคุณ (Free Gifts & Packaging)',
+    label: 'ของแถม / ของสมนาคุณ',
     color: '#10b981',
     badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   },

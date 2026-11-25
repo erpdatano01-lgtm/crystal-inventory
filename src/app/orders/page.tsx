@@ -114,6 +114,38 @@ export default function OrdersPage() {
     loadData();
   }, []);
 
+  // Auto-open Create Order Modal if navigated from /products with ?sell=SKU
+  useEffect(() => {
+    if (typeof window === 'undefined' || products.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const sellSku = params.get('sell');
+    if (!sellSku) return;
+    const target = products.find(
+      (p) => p.sku.toUpperCase() === sellSku.trim().toUpperCase() && p.status === 'AVAILABLE' && p.qty_on_hand > 0
+    );
+    if (target) {
+      setShowCreateModal(true);
+      setSelectedItems((prev) => {
+        if (prev.some((i) => i.product_id === target.id)) return prev;
+        return [
+          ...prev,
+          {
+            product_id: target.id,
+            sku: target.sku,
+            name: target.name,
+            stone_type: target.stone_type,
+            unit_price: Number(target.selling_price) || 0,
+            cost_price: Number(target.cost_price) || 0,
+            qty: 1,
+            weight_grams: target.weight_grams,
+            r2_thumbnail_url: target.r2_thumbnail_url,
+          },
+        ];
+      });
+      window.history.replaceState({}, '', '/orders');
+    }
+  }, [products]);
+
   // Products available to sell or gift (exclude internal packaging supplies)
   const availableProducts = useMemo(() => {
     return products.filter(
@@ -967,6 +999,11 @@ export default function OrdersPage() {
                                     <span className="font-mono font-bold text-purple-700">
                                       {p.sku}
                                     </span>
+                                    {p.campaign_tag && (
+                                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                        🏷️ {p.campaign_tag}
+                                      </span>
+                                    )}
                                     {isGift && (
                                       <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                                         ของแถม

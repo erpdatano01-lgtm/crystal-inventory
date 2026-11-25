@@ -533,12 +533,12 @@ export default function ProductsPage() {
 
         {/* Search, Filter & Layout bar */}
         <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-          {/* Stone Inventory Notice with Separation Link to Freebies */}
+          {/* Stone Inventory Header Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-purple-50/60 border border-purple-200/60 rounded-2xl w-full">
             <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-purple-900">
               <span className="p-1 rounded-lg bg-purple-200 text-purple-800">💎</span>
               <span>
-                คลังหินธรรมชาติ & คริสตัลทั้งหมด ({stoneProducts.length} ชิ้น — รวมหินสำหรับขาย & หินของแถม)
+                คลังหินสำหรับขายทั้งหมด ({stoneProducts.length} ชิ้น)
               </span>
             </div>
 
@@ -547,7 +547,7 @@ export default function ProductsPage() {
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95 ml-auto sm:ml-0"
             >
               <Gift className="w-3.5 h-3.5" />
-              <span>ไปยังคลังของแถม & แพ็คเกจจิ้ง ({nonStoneFreebiesCount}) →</span>
+              <span>ไปยังคลังของแถม ({nonStoneFreebiesCount}) →</span>
             </Link>
           </div>
 
@@ -601,17 +601,8 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Filters: Type, Status, Lot ID & Location/Shape */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
-            <select
-              value={productTypeFilter}
-              onChange={(e) => setProductTypeFilter(e.target.value as 'ALL' | 'SALE' | 'FREEBIE')}
-              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-slate-700"
-            >
-              <option value="ALL">💎 หินทั้งหมด (ขาย + แถม)</option>
-              <option value="SALE">💰 หินสำหรับขายเท่านั้น</option>
-              <option value="FREEBIE">🎁 หินของแถมเท่านั้น</option>
-            </select>
+          {/* Filters: Status, Lot ID, Location & Campaign */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
 
             <select
               value={selectedStatus}
@@ -1402,16 +1393,12 @@ export default function ProductsPage() {
                   >
                     RESERVED
                   </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`ยืนยันการขาย ${activeModalProduct.sku}?`)) {
-                        handleQuickStatusChange(activeModalProduct, 'SOLD');
-                      }
-                    }}
-                    className="px-2 py-2 min-h-[38px] text-[11px] font-bold rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition truncate active:scale-95"
+                  <Link
+                    href={`/orders?sell=${encodeURIComponent(activeModalProduct.sku)}`}
+                    className="px-2 py-2 min-h-[38px] text-[11px] font-bold rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition truncate active:scale-95 flex items-center justify-center"
                   >
-                    ขายแล้ว (SOLD)
-                  </button>
+                    🧾 เปิดบิลขาย
+                  </Link>
                 </div>
 
                 {/* Broken / Damaged or Convert to Freebie Action */}
@@ -1924,7 +1911,7 @@ export default function ProductsPage() {
                     onClick={() => {
                       if (
                         confirm(
-                          `ยืนยันเปลี่ยน "${damagedModalProduct.sku}" เป็นของแถม (GIFT-${damagedModalProduct.sku})?\n\nราคาขายจะถูกตั้งเป็น ฿0 และย้ายเข้าคลังของแถม /freebies`
+                          `ยืนยันเปลี่ยน "${damagedModalProduct.sku}" เป็นของแถม (GIFT-${damagedModalProduct.sku})?\n\nราคาขายจะถูกตั้งเป็น ฿0 และย้ายเข้าคลังของแถม`
                         )
                       ) {
                         handleSubmitDamagedAction('CONVERT_TO_FREEBIE');
@@ -1933,7 +1920,7 @@ export default function ProductsPage() {
                     className="w-full p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left transition disabled:opacity-50"
                   >
                     <p className="font-bold text-sm text-emerald-800">
-                      🎁 2. เปลี่ยนเป็นของแถม (ย้ายไป /freebies)
+                      🎁 2. เปลี่ยนเป็นของแถม (ย้ายไปคลังของแถม)
                     </p>
                     <p className="text-[11px] text-emerald-700 mt-0.5">
                       เปลี่ยนรหัสเป็น GIFT-..., ตั้งราคาขาย ฿0, ถอดออกจากชุดขาย เพื่อใช้แถมลูกค้า
