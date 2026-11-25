@@ -31,20 +31,25 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [lots, setLots] = useState<StockLot[]>([]);
+  const [damagedLoss, setDamagedLoss] = useState<number>(0);
+  const [damagedCount, setDamagedCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [p, e, l] = await Promise.all([
+        const [p, e, l, d] = await Promise.all([
           fetchProducts(),
           fetchExpenses(),
           fetchStockLots(),
+          fetch('/api/products/handle-damaged').then((r) => r.json()).catch(() => ({ totalDamagedLoss: 0, count: 0 })),
         ]);
         setProducts(p);
         setExpenses(e);
         setLots(l);
+        setDamagedLoss(Number(d?.totalDamagedLoss) || 0);
+        setDamagedCount(Number(d?.count) || 0);
       } finally {
         setLoading(false);
       }
@@ -94,8 +99,10 @@ export default function DashboardPage() {
     0
   );
 
-  // 5. สินค้าขายแล้วทั้งหมด
-  const soldProducts = stoneProducts.filter((p) => p.status === 'SOLD');
+  // 5. สินค้าขายแล้วทั้งหมด (ไม่นับรายการที่แจ้งแตกเสียหาย DAMAGED)
+  const soldProducts = stoneProducts.filter(
+    (p) => p.status === 'SOLD' && !p.grade_origin?.includes('[DAMAGED]')
+  );
   const totalSoldRevenue = soldProducts.reduce(
     (sum, p) => sum + Number(p.selling_price || 0),
     0
@@ -218,6 +225,12 @@ export default function DashboardPage() {
                   <span>📦 แพ็ค ของแถม & อื่นๆ:</span>
                   <span>฿{otherExpenseThisMonth.toLocaleString()}</span>
                 </div>
+                {damagedLoss > 0 && (
+                  <div className="flex items-center justify-between text-rose-600 font-semibold">
+                    <span>💔 สินค้าเสียหาย ({damagedCount}):</span>
+                    <span>-฿{damagedLoss.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

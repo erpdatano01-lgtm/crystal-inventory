@@ -64,6 +64,8 @@ export default function OrdersPage() {
   const [editingTrackingOrder, setEditingTrackingOrder] = useState<Order | null>(null);
   const [trackingInputVal, setTrackingInputVal] = useState('');
   const [isUpdatingTracking, setIsUpdatingTracking] = useState(false);
+  const [damagedLoss, setDamagedLoss] = useState<number>(0);
+  const [damagedCount, setDamagedCount] = useState<number>(0);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,14 +92,17 @@ export default function OrdersPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [ordRes, prodData, expData] = await Promise.all([
+      const [ordRes, prodData, expData, dmgRes] = await Promise.all([
         fetch('/api/orders').then((r) => r.json()),
         fetchProducts(),
         fetchExpenses(),
+        fetch('/api/products/handle-damaged').then((r) => r.json()).catch(() => ({ totalDamagedLoss: 0, count: 0 })),
       ]);
       if (Array.isArray(ordRes)) setOrders(ordRes);
       setProducts(prodData);
       setExpenses(expData);
+      setDamagedLoss(Number(dmgRes?.totalDamagedLoss) || 0);
+      setDamagedCount(Number(dmgRes?.count) || 0);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -133,7 +138,7 @@ export default function OrdersPage() {
     return expenses.reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
   }, [expenses]);
 
-  const netProfit = grossProfit - totalOperatingExpenses;
+  const netProfit = grossProfit - totalOperatingExpenses - damagedLoss;
 
   // Filter available products for order creation modal
   const filteredOrderPickerProducts = useMemo(() => {
@@ -444,19 +449,23 @@ export default function OrdersPage() {
             </div>
           </div>
 
-          {/* Card 4: Operating Expenses */}
+          {/* Card 4: Operating Expenses & Damaged Loss */}
           <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-slate-500 font-bold mb-2">
-              <span>4. ค่าใช้จ่ายร้าน (Expense)</span>
+              <span>4. ค่าใช้จ่าย &amp; สูญเสีย</span>
               <div className="w-7 h-7 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                 <Receipt className="w-4 h-4" />
               </div>
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-black text-rose-600">
-                -฿{totalOperatingExpenses.toLocaleString()}
+                -฿{(totalOperatingExpenses + damagedLoss).toLocaleString()}
               </p>
-              <p className="text-[11px] text-slate-400 mt-1">ล็อตหิน/ส่ง/กล่อง/บูธ</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {damagedLoss > 0
+                  ? `รายจ่าย ฿${totalOperatingExpenses.toLocaleString()} + แตก ${damagedCount} ชิ้น (฿${damagedLoss.toLocaleString()})`
+                  : 'ล็อตหิน/ส่ง/กล่อง/บูธ/Ads'}
+              </p>
             </div>
           </div>
 

@@ -415,7 +415,7 @@ export default function FreebiesPage() {
                 }}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition shadow-2xs"
               >
-                <option value="ALL">📑 ดูทั้งหมด (ครบ 3 บิล • {freebieList.length} รายการ • รวม ฿1,615)</option>
+                <option value="ALL">📑 ดูทั้งหมด (หินของแถม + โมเดล/ของแจก • {freebieList.length} รายการ)</option>
                 {FREEBIE_ORDERS.map((ord) => (
                   <option key={ord.id} value={ord.id}>
                     {ord.shortTitle}

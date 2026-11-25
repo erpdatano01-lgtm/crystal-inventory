@@ -5,6 +5,52 @@ import { setProductCampaignAssignment } from '@/lib/campaignStore';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+export async function GET() {
+  try {
+    if (!isSupabaseAdminConfigured || !supabaseAdmin) {
+      return NextResponse.json({ totalDamagedLoss: 0, count: 0, items: [] });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('stock_movements')
+      .select('id, product_id, change_qty, note, created_at, products(id, sku, name, cost_price)')
+      .eq('reason', 'DAMAGED')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ totalDamagedLoss: 0, count: 0, items: [] });
+    }
+
+    let totalDamagedLoss = 0;
+    const items = (data || []).map((m: any) => {
+      const qty = Math.abs(Number(m.change_qty) || 1);
+      const unitCost = Number(m.products?.cost_price) || 0;
+      const loss = qty * unitCost;
+      totalDamagedLoss += loss;
+      return {
+        id: m.id,
+        product_id: m.product_id,
+        sku: m.products?.sku || '',
+        name: m.products?.name || '',
+        qty,
+        unitCost,
+        loss,
+        note: m.note || '',
+        created_at: m.created_at,
+      };
+    });
+
+    return NextResponse.json({
+      totalDamagedLoss: Number(totalDamagedLoss.toFixed(2)),
+      count: items.length,
+      items,
+    });
+  } catch (err: any) {
+    console.error('GET /api/products/handle-damaged error:', err);
+    return NextResponse.json({ totalDamagedLoss: 0, count: 0, items: [] });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!isSupabaseAdminConfigured || !supabaseAdmin) {

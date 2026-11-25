@@ -517,23 +517,18 @@ export async function resetTestData(target: 'all' | 'products' | 'expenses' = 'a
  * rather than the Stone Warehouse (/products).
  */
 export function isNonStoneFreebie(
-  p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'>
+  p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'> & { is_freebie?: boolean }
 ): boolean {
   const sku = (p.sku || '').toUpperCase();
   const cat = p.stone_type || '';
   const grade = p.grade_origin || '';
   return Boolean(
-    sku.startsWith('GIFT-SANTA-') ||
-      sku.startsWith('GIFT-CAT-') ||
-      sku.startsWith('GIFT-NEKO-') ||
-      sku.startsWith('GIFT-MAG-') ||
-      sku.startsWith('GIFT-POUCH-') ||
-      sku.startsWith('GIFT-STAND-') ||
-      sku.startsWith('GIFT-SAGE-') ||
-      sku.startsWith('GIFT-STICKER-') ||
-      sku.startsWith('GIFT-GIFT-') ||
+    p.is_freebie ||
+      sku.startsWith('GIFT-') ||
       sku.startsWith('PROP-') ||
       grade === '[PROP]' ||
+      grade === '[FREEBIE]' ||
+      grade.includes('[ของแถม') ||
       cat === 'โมเดล & ฟิกเกอร์' ||
       cat === 'แม่เหล็กติดตู้เย็น' ||
       cat === 'ของตกแต่งเทศกาล' ||
