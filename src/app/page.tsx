@@ -108,6 +108,15 @@ export default function DashboardPage() {
     0
   );
 
+  // 6. แจ้งเตือนสต็อกใกล้หมด (เฉพาะสินค้าแบบ BULK เท่านั้น ไม่นับหิน Unique หรือของแถมชิ้นเดียว)
+  const lowStockBulkItems = products.filter((p) => {
+    if (p.item_type !== 'BULK') return false;
+    const qty = Number(p.qty_on_hand ?? 0);
+    const threshold =
+      p.stone_type === 'กล่องพัสดุ' || p.stone_type === 'การ์ดขอบคุณ' ? 10 : 15;
+    return qty <= threshold;
+  });
+
   return (
     <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
@@ -295,6 +304,41 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Low Stock Alert for BULK supplies only (never triggers on 1-of-a-kind UNIQUE stones) */}
+        {!loading && lowStockBulkItems.length > 0 && (
+          <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="space-y-1">
+              <h3 className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-1.5">
+                <span>⚠️ แจ้งเตือนแพ็คเกจ / ของแถมแบบนับจำนวนใกล้หมด ({lowStockBulkItems.length} รายการ)</span>
+              </h3>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {lowStockBulkItems.map((item) => (
+                  <span
+                    key={item.id}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${
+                      Number(item.qty_on_hand) === 0
+                        ? 'bg-rose-100 text-rose-800 border-rose-200'
+                        : 'bg-white text-amber-900 border-amber-200'
+                    }`}
+                  >
+                    <span className="font-mono">{item.sku}</span>
+                    <span className="truncate max-w-[160px]">{item.name}</span>
+                    <span className="font-black">
+                      ({Number(item.qty_on_hand) === 0 ? 'หมด!' : `เหลือ ${item.qty_on_hand}`})
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <Link
+              href="/packaging"
+              className="shrink-0 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition text-center"
+            >
+              เช็กสต็อกแพ็คเกจ →
+            </Link>
+          </div>
+        )}
 
         {/* Recent Products & Lots Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

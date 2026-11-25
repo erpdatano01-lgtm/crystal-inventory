@@ -245,28 +245,71 @@ export default function PackingPage() {
         const prods = await fetchProducts();
         setProducts(prods);
 
+        let loadedOrders: Order[] = [];
         try {
           const res = await fetch('/api/orders');
           if (res.ok) {
             const ords = await res.json();
-            if (Array.isArray(ords)) setOrders(ords);
+            if (Array.isArray(ords)) {
+              loadedOrders = ords;
+              setOrders(ords);
+            }
           } else {
             const localOrds = localStorage.getItem(LS_ORDERS);
-            if (localOrds) setOrders(JSON.parse(localOrds));
+            if (localOrds) {
+              loadedOrders = JSON.parse(localOrds);
+              setOrders(loadedOrders);
+            }
           }
         } catch {
           const localOrds = localStorage.getItem(LS_ORDERS);
-          if (localOrds) setOrders(JSON.parse(localOrds));
+          if (localOrds) {
+            loadedOrders = JSON.parse(localOrds);
+            setOrders(loadedOrders);
+          }
         }
 
+        // Merge Cloud order packing videos + localStorage records (deduplicated)
+        let localList: PackingLog[] = [];
         const localRecs = localStorage.getItem(LS_PACKING_RECORDS);
         if (localRecs) {
           try {
-            setPackingRecords(JSON.parse(localRecs));
+            localList = JSON.parse(localRecs);
           } catch {
-            setPackingRecords([]);
+            localList = [];
           }
         }
+
+        const cloudList: PackingLog[] = loadedOrders
+          .filter((o) => Boolean(o.packing_video_url))
+          .map((o) => ({
+            id: `cloud_${o.id}`,
+            order_id: o.id,
+            order_no: o.order_no,
+            sku: o.items?.[0]?.sku || null,
+            product_name: o.items?.map((i) => i.name).join(', ') || 'หิน Vivida Crystal',
+            customer_name: o.customer_name,
+            customer_ig: null,
+            video_url: o.packing_video_url!,
+            duration_seconds: 0,
+            packed_at: o.packed_at || o.created_at,
+            packed_items_log: o.packed_items_log || null,
+            tracking_no: o.tracking_no || null,
+            notes: o.notes || null,
+          }));
+
+        const seenKeys = new Set<string>();
+        const mergedRecords: PackingLog[] = [];
+        for (const rec of [...cloudList, ...localList]) {
+          const key = rec.order_no || rec.video_url;
+          if (key && seenKeys.has(key)) continue;
+          if (key) seenKeys.add(key);
+          mergedRecords.push(rec);
+        }
+        mergedRecords.sort(
+          (a, b) => new Date(b.packed_at).getTime() - new Date(a.packed_at).getTime()
+        );
+        setPackingRecords(mergedRecords);
       } finally {
         setLoading(false);
       }

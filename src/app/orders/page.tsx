@@ -109,6 +109,19 @@ export default function OrdersPage() {
   const [payModalNote, setPayModalNote] = useState('');
   const [isSavingPayment, setIsSavingPayment] = useState(false);
 
+  // Period / Monthly P&L Filter state
+  const [periodMode, setPeriodMode] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [damagedItems, setDamagedItems] = useState<Array<{ loss: number; created_at: string }>>([]);
+
+  // Batch Tracking Scanner Modal state
+  const [showBatchTrackingModal, setShowBatchTrackingModal] = useState(false);
+  const [batchOrderInput, setBatchOrderInput] = useState('');
+  const [batchTrackInput, setBatchTrackInput] = useState('');
+  const [batchLogs, setBatchLogs] = useState<Array<{ orderNo: string; customer: string; trackingNo: string }>>([]);
+  const [isSavingBatchTrack, setIsSavingBatchTrack] = useState(false);
+
   // Load data
   const loadData = async () => {
     setLoading(true);
@@ -124,6 +137,7 @@ export default function OrdersPage() {
       setExpenses(expData);
       setDamagedLoss(Number(dmgRes?.totalDamagedLoss) || 0);
       setDamagedCount(Number(dmgRes?.count) || 0);
+      setDamagedItems(Array.isArray(dmgRes?.items) ? dmgRes.items : []);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -174,24 +188,98 @@ export default function OrdersPage() {
     );
   }, [products]);
 
-  // Financial Summary (FlowAccount style)
-  const totalSalesRevenue = useMemo(() => {
-    return orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  // Unique Customer Directory for 1-click Auto-fill on repeat orders
+  const customerDirectory = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; phone: string; address: string; channel: SalesChannel }
+    >();
+    for (const o of orders) {
+      const name = (o.customer_name || '').trim();
+      if (!name || name.includes('ลูกค้าทั่วไป')) continue;
+      if (!map.has(name)) {
+        map.set(name, {
+          name,
+          phone: o.customer_phone || '',
+          address: o.customer_address || '',
+          channel: o.channel || 'WALK_IN',
+        });
+      } else {
+        const existing = map.get(name)!;
+        if (!existing.phone && o.customer_phone) existing.phone = o.customer_phone;
+        if (!existing.address && o.customer_address) existing.address = o.customer_address;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'th'));
   }, [orders]);
 
+  // Period Date Range Filtering
+  const isDateInPeriod = (dateStr?: string | null): boolean => {
+    if (periodMode === 'ALL') return true;
+    const d = (dateStr || '').slice(0, 10);
+    if (!d) return false;
+    const now = new Date();
+    const thisMonthPrefix = now.toISOString().slice(0, 7);
+    if (periodMode === 'THIS_MONTH') {
+      return d.startsWith(thisMonthPrefix);
+    }
+    if (periodMode === 'LAST_MONTH') {
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthPrefix = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+      return d.startsWith(lastMonthPrefix);
+    }
+    if (periodMode === 'CUSTOM') {
+      if (customStartDate && d < customStartDate) return false;
+      if (customEndDate && d > customEndDate) return false;
+      return true;
+    }
+    return true;
+  };
+
+  const periodOrders = useMemo(
+    () => orders.filter((o) => isDateInPeriod(o.order_date || o.created_at)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orders, periodMode, customStartDate, customEndDate]
+  );
+
+  const periodExpenses = useMemo(
+    () => expenses.filter((e) => isDateInPeriod(e.expense_date || e.created_at)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [expenses, periodMode, customStartDate, customEndDate]
+  );
+
+  const periodDamagedLoss = useMemo(() => {
+    if (periodMode === 'ALL') return damagedLoss;
+    return damagedItems
+      .filter((d) => isDateInPeriod(d.created_at))
+      .reduce((s, d) => s + (Number(d.loss) || 0), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [damagedLoss, damagedItems, periodMode, customStartDate, customEndDate]);
+
+  const periodDamagedCount = useMemo(() => {
+    if (periodMode === 'ALL') return damagedCount;
+    return damagedItems.filter((d) => isDateInPeriod(d.created_at)).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [damagedCount, damagedItems, periodMode, customStartDate, customEndDate]);
+
+  // Financial Summary (FlowAccount style, respects selected Period)
+  const totalSalesRevenue = useMemo(() => {
+    return periodOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  }, [periodOrders]);
+
   const totalCOGS = useMemo(() => {
-    return orders.reduce((sum, o) => sum + (o.total_cost || 0), 0);
-  }, [orders]);
+    return periodOrders.reduce((sum, o) => sum + (o.total_cost || 0), 0);
+  }, [periodOrders]);
 
   const grossProfit = totalSalesRevenue - totalCOGS;
   const grossMargin =
     totalSalesRevenue > 0 ? ((grossProfit / totalSalesRevenue) * 100).toFixed(1) : '0';
 
   const totalOperatingExpenses = useMemo(() => {
-    return expenses.reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
-  }, [expenses]);
+    return periodExpenses.reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+  }, [periodExpenses]);
 
-  const netProfit = grossProfit - totalOperatingExpenses - damagedLoss;
+  const netProfit = grossProfit - totalOperatingExpenses - periodDamagedLoss;
 
   // Filter available products for order creation modal
   const filteredOrderPickerProducts = useMemo(() => {
@@ -641,9 +729,71 @@ export default function OrdersPage() {
     }
   };
 
+  // Batch Tracking Save
+  const handleSaveBatchTracking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const rawOrder = batchOrderInput.trim();
+    const rawTrack = batchTrackInput.trim();
+    if (!rawOrder || !rawTrack) return;
+
+    // Extract order_no if scanned from QR URL (?order_no=...)
+    let resolvedOrderNo = rawOrder;
+    try {
+      if (rawOrder.includes('order_no=')) {
+        const u = new URL(rawOrder.startsWith('http') ? rawOrder : `https://x.com?${rawOrder}`);
+        resolvedOrderNo = u.searchParams.get('order_no') || rawOrder;
+      }
+    } catch {
+      // keep rawOrder
+    }
+
+    const matched = orders.find(
+      (o) =>
+        o.order_no.toLowerCase() === resolvedOrderNo.toLowerCase() ||
+        o.id.toLowerCase() === resolvedOrderNo.toLowerCase()
+    );
+    if (!matched) {
+      alert(`ไม่พบบิลเลขที่ "${resolvedOrderNo}"`);
+      return;
+    }
+
+    setIsSavingBatchTrack(true);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: matched.id,
+          order_no: matched.order_no,
+          tracking_no: rawTrack,
+          status: 'SHIPPED',
+        }),
+      });
+      if (!res.ok) throw new Error('Update failed');
+
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === matched.id || o.order_no === matched.order_no
+            ? { ...o, tracking_no: rawTrack, status: 'SHIPPED' }
+            : o
+        )
+      );
+      setBatchLogs((prev) => [
+        { orderNo: matched.order_no, customer: matched.customer_name, trackingNo: rawTrack },
+        ...prev,
+      ]);
+      setBatchOrderInput('');
+      setBatchTrackInput('');
+    } catch {
+      alert('ไม่สามารถบันทึกเลขพัสดุได้');
+    } finally {
+      setIsSavingBatchTrack(false);
+    }
+  };
+
   // Filtered orders
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
+    return periodOrders.filter((o) => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchNo = o.order_no.toLowerCase().includes(q);
@@ -657,7 +807,7 @@ export default function OrdersPage() {
       if (selectedStatus && o.status !== selectedStatus) return false;
       return true;
     });
-  }, [orders, searchQuery, selectedChannel, selectedStatus]);
+  }, [periodOrders, searchQuery, selectedChannel, selectedStatus]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
@@ -682,15 +832,75 @@ export default function OrdersPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <button
-              onClick={() => setShowCreateModal(true)}
+              type="button"
+              onClick={() => {
+                setBatchLogs([]);
+                setBatchOrderInput('');
+                setBatchTrackInput('');
+                setShowBatchTrackingModal(true);
+              }}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm active:scale-95 transition"
+            >
+              <Truck className="w-4 h-4 text-emerald-400" />
+              <span>ยิงเลขพัสดุรวดเดียว</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setEditingOrder(null);
+                setShowCreateModal(true);
+              }}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
             >
               <PlusCircle className="w-5 h-5" />
               <span>+ เปิดบิลขายใหม่</span>
             </button>
           </div>
+        </div>
+
+        {/* Period / Monthly Filter Bar */}
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <span className="text-xs font-bold text-slate-500 px-1.5 shrink-0">ช่วงเวลาบัญชี:</span>
+            {[
+              { id: 'ALL', label: 'ทั้งหมด' },
+              { id: 'THIS_MONTH', label: 'เดือนนี้' },
+              { id: 'LAST_MONTH', label: 'เดือนที่แล้ว' },
+              { id: 'CUSTOM', label: 'กำหนดเอง' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPeriodMode(p.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition ${
+                  periodMode === p.id
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {periodMode === 'CUSTOM' && (
+            <div className="flex items-center gap-2 text-xs">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+              />
+              <span className="text-slate-400">ถึง</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+              />
+            </div>
+          )}
         </div>
 
         {/* FlowAccount P&L Accounting Summary Dashboard (5 Cards) */}
@@ -707,7 +917,7 @@ export default function OrdersPage() {
               <p className="text-xl sm:text-2xl font-black text-slate-900">
                 ฿{totalSalesRevenue.toLocaleString()}
               </p>
-              <p className="text-[11px] text-slate-400 mt-1">จาก {orders.length} บิลขาย</p>
+              <p className="text-[11px] text-slate-400 mt-1">จาก {periodOrders.length} บิลขาย</p>
             </div>
           </div>
 
@@ -753,11 +963,11 @@ export default function OrdersPage() {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-black text-rose-600">
-                -฿{(totalOperatingExpenses + damagedLoss).toLocaleString()}
+                -฿{(totalOperatingExpenses + periodDamagedLoss).toLocaleString()}
               </p>
               <p className="text-[11px] text-slate-400 mt-1">
-                {damagedLoss > 0
-                  ? `รายจ่าย ฿${totalOperatingExpenses.toLocaleString()} + แตก ${damagedCount} ชิ้น (฿${damagedLoss.toLocaleString()})`
+                {periodDamagedLoss > 0
+                  ? `รายจ่าย ฿${totalOperatingExpenses.toLocaleString()} + แตก ${periodDamagedCount} ชิ้น (฿${periodDamagedLoss.toLocaleString()})`
                   : 'ล็อตหิน/ส่ง/กล่อง/บูธ/Ads'}
               </p>
             </div>
@@ -1295,9 +1505,33 @@ export default function OrdersPage() {
 
                 {/* 1. Customer Information */}
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <span>1. ข้อมูลลูกค้า & ช่องทางการขาย</span>
-                  </h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <span>1. ข้อมูลลูกค้า &amp; ช่องทางการขาย</span>
+                    </h4>
+                    {customerDirectory.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const c = customerDirectory.find((x) => x.name === e.target.value);
+                          if (c) {
+                            setCustomerName(c.name);
+                            if (c.phone) setCustomerPhone(c.phone);
+                            if (c.address) setCustomerAddress(c.address);
+                            setChannel(c.channel);
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">👥 เลือกลูกค้าเดิมเพื่อเติมข้อมูลอัตโนมัติ...</option>
+                        {customerDirectory.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name} {c.phone ? `(${c.phone})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="sm:col-span-2 space-y-1">
@@ -2110,6 +2344,107 @@ export default function OrdersPage() {
                     {isSavingPayment ? 'กำลังบันทึก...' : '✅ ยืนยันรับชำระเงิน'}
                   </button>
                 </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Batch Tracking Scanner Modal */}
+        {showBatchTrackingModal && (
+          <div
+            onClick={() => setShowBatchTrackingModal(false)}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden"
+            >
+              <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <h3 className="font-bold text-base">ยิงเลขพัสดุรวดเดียว (Batch Tracking)</h3>
+                    <p className="text-[11px] text-slate-300">
+                      เลือกหรือยิงรหัสบิล แล้วตามด้วยเลขพัสดุ ระบบจะบันทึกและปรับเป็น &quot;จัดส่งแล้ว&quot; อัตโนมัติ
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchTrackingModal(false)}
+                  className="p-1.5 rounded-full hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveBatchTracking} className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    1. เลขที่บิล (พิมพ์/สแกน หรือเลือกจากรายการที่ยังไม่มีเลขพัสดุ)
+                  </label>
+                  <div className="space-y-2">
+                    <select
+                      value={batchOrderInput}
+                      onChange={(e) => setBatchOrderInput(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                    >
+                      <option value="">-- เลือกบิลที่รอใส่เลขพัสดุ --</option>
+                      {orders
+                        .filter((o) => !o.tracking_no && o.status !== 'CANCELLED' && o.status !== 'OPEN_BOX')
+                        .map((o) => (
+                          <option key={o.id} value={o.order_no}>
+                            {o.order_no} • {o.customer_name} (฿{o.total_amount.toLocaleString()})
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="หรือยิง QR/บาร์โค้ดรหัสบิล INV-..."
+                      value={batchOrderInput}
+                      onChange={(e) => setBatchOrderInput(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm font-mono bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    2. เลขพัสดุ (Tracking No.)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ยิงบาร์โค้ดหรือพิมพ์เลขพัสดุ แล้วกด Enter..."
+                    value={batchTrackInput}
+                    onChange={(e) => setBatchTrackInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-emerald-50/50 border border-emerald-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!batchOrderInput.trim() || !batchTrackInput.trim() || isSavingBatchTrack}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition disabled:opacity-40"
+                >
+                  {isSavingBatchTrack ? 'กำลังบันทึก...' : '✅ บันทึกเลขพัสดุ & ไปกล่องถัดไป'}
+                </button>
+
+                {batchLogs.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100 space-y-1.5 max-h-40 overflow-y-auto">
+                    <p className="text-[11px] font-bold text-slate-500">
+                      บันทึกแล้วในรอบนี้ ({batchLogs.length} กล่อง):
+                    </p>
+                    {batchLogs.map((log, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between text-xs p-2 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200"
+                      >
+                        <span className="font-mono font-bold">{log.orderNo} ({log.customer})</span>
+                        <span className="font-mono font-bold">{log.trackingNo}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </form>
             </div>
           </div>
