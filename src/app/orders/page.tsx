@@ -1140,10 +1140,10 @@ export default function OrdersPage() {
                         className="w-32 px-3 py-1.5 text-sm font-bold text-right bg-white border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
-                  ) : (
+                  ) : editingOrder ? (
                     <div className="flex items-center justify-between gap-3 pt-1">
                       <span className="text-xs font-semibold text-slate-700">
-                        สถานะเริ่มต้นหลังบันทึกบิล:
+                        สถานะบิล:
                       </span>
                       <select
                         value={initialOrderStatus}
@@ -1154,6 +1154,13 @@ export default function OrdersPage() {
                         <option value="PAID">✅ ชำระเงินแล้ว (Paid)</option>
                         <option value="WAITING_PAYMENT">💸 รอชำระเงิน (Unpaid)</option>
                       </select>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 pt-1 text-xs">
+                      <span className="font-semibold text-slate-600">สถานะเริ่มต้นหลังเปิดบิล:</span>
+                      <span className="px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200 font-bold">
+                        ⏳ รอดำเนินการ (Pending)
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1189,7 +1196,7 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={`grid grid-cols-1 ${editingOrder ? 'sm:grid-cols-2' : ''} gap-3`}>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-700">ช่องทางจำหน่าย</label>
                       <select
@@ -1205,18 +1212,20 @@ export default function OrdersPage() {
                       </select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">
-                        เลขพัสดุจัดส่ง (Tracking No.)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="เช่น TH012345678 / Flash / Kerry"
-                        value={trackingNo}
-                        onChange={(e) => setTrackingNo(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
+                    {editingOrder && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          เลขพัสดุจัดส่ง (Tracking No.)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="เช่น TH012345678 / Flash / Kerry"
+                          value={trackingNo}
+                          onChange={(e) => setTrackingNo(e.target.value)}
+                          className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -1499,20 +1508,22 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">ช่องทางชำระเงิน</label>
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white"
-                      >
-                        <option value="โอนเงิน (Mobile Banking)">โอนเงิน (Mobile Banking / QR)</option>
-                        <option value="เงินสด (Cash)">เงินสด (Cash หน้าร้าน)</option>
-                        <option value="บัตรเครดิต/เดบิต">บัตรเครดิต/เดบิต (Credit Card)</option>
-                        <option value="เก็บเงินปลายทาง (COD)">เก็บเงินปลายทาง (COD)</option>
-                      </select>
-                    </div>
+                  <div className={`grid grid-cols-1 ${editingOrder ? 'sm:grid-cols-2' : ''} gap-3 pt-2`}>
+                    {editingOrder && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">ช่องทางชำระเงิน</label>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="w-full px-3.5 py-2.5 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white"
+                        >
+                          <option value="โอนเงิน (Mobile Banking)">โอนเงิน (Mobile Banking / QR)</option>
+                          <option value="เงินสด (Cash)">เงินสด (Cash หน้าร้าน)</option>
+                          <option value="บัตรเครดิต/เดบิต">บัตรเครดิต/เดบิต (Credit Card)</option>
+                          <option value="เก็บเงินปลายทาง (COD)">เก็บเงินปลายทาง (COD)</option>
+                        </select>
+                      </div>
+                    )}
 
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-700">หมายเหตุบิล</label>
