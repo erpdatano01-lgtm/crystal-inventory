@@ -20,6 +20,7 @@ import {
   Gift,
   Box,
   Megaphone,
+  Lock,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -305,6 +306,18 @@ export default function Navbar() {
               </span>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch('/api/auth/passcode', { method: 'DELETE' });
+              window.location.href = '/login';
+            }}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/80 transition"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>ล็อคหน้าเว็บ (ออกจากระบบ)</span>
+          </button>
 
           <div className="text-center pt-1">
             <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
