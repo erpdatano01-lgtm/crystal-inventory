@@ -99,34 +99,6 @@ const FREEBIE_ORDERS: FreebieOrder[] = [
       'GIFT-NEKO-004', 'GIFT-NEKO-005', 'GIFT-NEKO-006',
     ],
   },
-  {
-    id: 'ORDER-4',
-    orderNumber: 4,
-    title: 'ถุงซีล 7x10 cm ลายคริสต์มาส (FDC Group 2 แพ็ค / 200 ใบ)',
-    shortTitle: 'บิล 4: ถุงซีลคริสต์มาส 7x10 cm (฿57 • 200 ใบ)',
-    amount: 57,
-    itemCount: 2,
-    files: 'File 28',
-    vendor: 'Shopee (FDC Group)',
-    receiptUrls: [
-      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_28.jpg',
-    ],
-    skus: ['PKG-BAG-002', 'PKG-BAG-003'],
-  },
-  {
-    id: 'ORDER-5',
-    orderNumber: 5,
-    title: 'ถุงฝากาวลายดอกไม้ 7x7 cm (EveryPack 1 แพ็ค / 100 ใบ)',
-    shortTitle: 'บิล 5: ถุงฝากาวลายดอกไม้ 7x7 cm (฿18 • 100 ใบ)',
-    amount: 18,
-    itemCount: 1,
-    files: 'File 22',
-    vendor: 'Shopee (EveryPack)',
-    receiptUrls: [
-      'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_22.jpg',
-    ],
-    skus: ['PKG-BAG-001'],
-  },
 ];
 
 function getOrderForItem(sku: string): FreebieOrder | undefined {
