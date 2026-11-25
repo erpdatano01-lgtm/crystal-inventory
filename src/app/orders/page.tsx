@@ -49,6 +49,7 @@ import {
   Video,
   Zap,
   Pencil,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function OrdersPage() {
@@ -100,6 +101,13 @@ export default function OrdersPage() {
   const [boxExtraPayMethod, setBoxExtraPayMethod] = useState('โอนเงิน (Mobile Banking)');
   const [boxExtraNote, setBoxExtraNote] = useState('');
   const [isSavingBoxAdd, setIsSavingBoxAdd] = useState(false);
+
+  // Payment Modal state (opened when clicking ชำระเงิน or selecting PAID)
+  const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+  const [payModalMethod, setPayModalMethod] = useState('โอนเงิน (Mobile Banking)');
+  const [payModalSlipUrls, setPayModalSlipUrls] = useState<string[]>([]);
+  const [payModalNote, setPayModalNote] = useState('');
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   // Load data
   const loadData = async () => {
@@ -409,8 +417,97 @@ export default function OrdersPage() {
     }
   };
 
+  // Open dedicated Payment Modal (Payment Method + Slip upload)
+  const openPaymentModal = (ord: Order) => {
+    setPayingOrder(ord);
+    setPayModalMethod(ord.payment_method && ord.payment_method !== 'รอชำระเงิน' ? ord.payment_method : 'โอนเงิน (Mobile Banking)');
+    setPayModalSlipUrls(ord.slip_url ? [ord.slip_url] : []);
+    setPayModalNote('');
+  };
+
+  const handleConfirmPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payingOrder) return;
+    setIsSavingPayment(true);
+    try {
+      const slipUrl = payModalSlipUrls[0] || null;
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: payingOrder.id,
+          order_no: payingOrder.order_no,
+          status: 'PAID',
+          is_open_box: false,
+          payment_method: payModalMethod,
+          slip_url: slipUrl,
+          appendPayment: {
+            date: new Date().toISOString().slice(0, 10),
+            amount: payingOrder.total_amount,
+            method: payModalMethod,
+            slip_url: slipUrl,
+            note: payModalNote || 'รับชำระเงินแล้ว',
+          },
+        }),
+      });
+      if (!res.ok) throw new Error('Payment update failed');
+      setPayingOrder(null);
+      setPayModalSlipUrls([]);
+      setPayModalNote('');
+      await loadData();
+    } catch {
+      alert('ไม่สามารถบันทึกการชำระเงินได้');
+    } finally {
+      setIsSavingPayment(false);
+    }
+  };
+
+  // Reset order back to PENDING (clears payment, slip, tracking)
+  const handleResetOrderToPending = async (ord: Order) => {
+    if (
+      !confirm(
+        `รีเซ็ตบิล "${ord.order_no}" กลับเป็นสถานะ "รอดำเนินการ"?\n\nข้อมูลการชำระเงิน, สลิป และเลขพัสดุของบิลนี้จะถูกล้างกลับเป็นค่าเริ่มต้น`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: ord.id,
+          order_no: ord.order_no,
+          status: 'PENDING',
+          is_open_box: false,
+          slip_url: null,
+          tracking_no: null,
+          payment_method: 'รอชำระเงิน',
+          payment_logs: [],
+        }),
+      });
+      if (res.ok) {
+        await loadData();
+      } else {
+        alert('ไม่สามารถรีเซ็ตบิลได้');
+      }
+    } catch {
+      alert('เกิดข้อผิดพลาดในการรีเซ็ตบิล');
+    }
+  };
+
   // FlowAccount-style quick status update on any order row
   const handleQuickOrderStatusChange = async (ord: Order, nextStatus: OrderStatus) => {
+    // Cannot switch back to PENDING directly via dropdown (must use Reset button)
+    if (nextStatus === 'PENDING' && ord.status !== 'PENDING') {
+      alert('กรุณากดปุ่ม "🔄 รีเซ็ต" เพื่อล้างข้อมูลและย้อนกลับไปสถานะรอดำเนินการ');
+      return;
+    }
+    // Switching to PAID opens the dedicated Payment + Slip Modal
+    if (nextStatus === 'PAID' && ord.status !== 'PAID') {
+      openPaymentModal(ord);
+      return;
+    }
     try {
       const res = await fetch('/api/orders', {
         method: 'PATCH',
@@ -869,7 +966,12 @@ export default function OrdersPage() {
                               className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer outline-none ${statusConfig.badgeClass}`}
                             >
                               {Object.entries(ORDER_STATUS_CONFIG).map(([k, cfg]) => (
-                                <option key={k} value={k} className="bg-white text-slate-900">
+                                <option
+                                  key={k}
+                                  value={k}
+                                  disabled={k === 'PENDING' && ord.status !== 'PENDING'}
+                                  className="bg-white text-slate-900"
+                                >
                                   {cfg.label}
                                 </option>
                               ))}
@@ -1015,6 +1117,32 @@ export default function OrdersPage() {
                                 title="ดูสลิปโอนเงิน R2"
                               >
                                 <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Payment Button (Only when PENDING or WAITING_PAYMENT) */}
+                            {(ord.status === 'PENDING' || ord.status === 'WAITING_PAYMENT') && (
+                              <button
+                                type="button"
+                                onClick={() => openPaymentModal(ord)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                                title="รับชำระเงิน & แนบสลิป"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                <span>ชำระเงิน</span>
+                              </button>
+                            )}
+
+                            {/* Reset back to PENDING Button (When not PENDING) */}
+                            {ord.status !== 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetOrderToPending(ord)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300 rounded-xl text-xs font-bold transition"
+                                title="รีเซ็ตข้อมูลชำระเงิน/จัดส่ง กลับไปเป็นสถานะรอดำเนินการ"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>รีเซ็ต</span>
                               </button>
                             )}
 
@@ -1536,21 +1664,6 @@ export default function OrdersPage() {
                       />
                     </div>
                   </div>
-
-                  {/* Slip Upload */}
-                  <div className="pt-2">
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">
-                      แนบสลิปโอนเงินลูกค้า (Cloudflare R2 WebP)
-                    </label>
-                    <ImageUploader
-                      folder="receipts"
-                      maxFiles={1}
-                      images={orderSlipUrls}
-                      onChange={setOrderSlipUrls}
-                      label="สลิปโอนเงิน (WebP อัตโนมัติ)"
-                      allowCamera={true}
-                    />
-                  </div>
                 </div>
                 </div>
 
@@ -1900,6 +2013,101 @@ export default function OrdersPage() {
                     className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50"
                   >
                     {isSavingBoxAdd ? 'กำลังบันทึก...' : 'บันทึกเพิ่มเข้ากล่อง & ตัดสต็อก'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Dedicated Payment & Slip Upload Modal */}
+        {payingOrder && (
+          <div
+            onClick={() => setPayingOrder(null)}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden"
+            >
+              <div className="p-5 bg-emerald-700 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-base flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    <span>รับชำระเงินบิล {payingOrder.order_no}</span>
+                  </h3>
+                  <p className="text-xs text-emerald-100 mt-0.5">
+                    ลูกค้า: {payingOrder.customer_name} • ยอดสุทธิ ฿
+                    {payingOrder.total_amount.toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPayingOrder(null)}
+                  className="p-1.5 rounded-full hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmPayment} className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    ช่องทางชำระเงิน
+                  </label>
+                  <select
+                    value={payModalMethod}
+                    onChange={(e) => setPayModalMethod(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="โอนเงิน (Mobile Banking)">โอนเงิน (Mobile Banking / QR)</option>
+                    <option value="เงินสด (Cash)">เงินสด (Cash หน้าร้าน)</option>
+                    <option value="บัตรเครดิต/เดบิต">บัตรเครดิต/เดบิต (Credit Card)</option>
+                    <option value="เก็บเงินปลายทาง (COD)">เก็บเงินปลายทาง (COD)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    แนบสลิปโอนเงินลูกค้า (Cloudflare R2 WebP)
+                  </label>
+                  <ImageUploader
+                    folder="receipts"
+                    maxFiles={1}
+                    images={payModalSlipUrls}
+                    onChange={setPayModalSlipUrls}
+                    label="อัปโหลดสลิปโอนเงิน"
+                    allowCamera={true}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    หมายเหตุการรับเงิน (ไม่บังคับ)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น โอนเข้าบัญชี KBANK เวลา 14:30"
+                    value={payModalNote}
+                    onChange={(e) => setPayModalNote(e.target.value)}
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setPayingOrder(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingPayment}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition disabled:opacity-50"
+                  >
+                    {isSavingPayment ? 'กำลังบันทึก...' : '✅ ยืนยันรับชำระเงิน'}
                   </button>
                 </div>
               </form>

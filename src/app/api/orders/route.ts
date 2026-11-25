@@ -209,6 +209,7 @@ export async function PATCH(request: NextRequest) {
       payment_method,
       slip_url,
       order_date,
+      payment_logs,
       replaceItems,
       appendItems,
       appendPayment,
@@ -236,6 +237,7 @@ export async function PATCH(request: NextRequest) {
     if (payment_method !== undefined) updatePayload.payment_method = payment_method;
     if (slip_url !== undefined) updatePayload.slip_url = slip_url;
     if (order_date !== undefined) updatePayload.order_date = order_date;
+    if (payment_logs !== undefined) updatePayload.payment_logs = payment_logs;
 
     let updatedOrder: Order | null = null;
 
