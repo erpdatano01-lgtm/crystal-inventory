@@ -48,6 +48,7 @@ import {
   QrCode,
   Video,
   Zap,
+  Pencil,
 } from 'lucide-react';
 
 export default function OrdersPage() {
@@ -90,6 +91,7 @@ export default function OrdersPage() {
   const [isOpenBoxMode, setIsOpenBoxMode] = useState(false);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(1500);
   const [initialOrderStatus, setInitialOrderStatus] = useState<OrderStatus>('PENDING');
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   // Add-to-Open-Box Modal state
   const [addingToBoxOrder, setAddingToBoxOrder] = useState<Order | null>(null);
@@ -251,7 +253,27 @@ export default function OrdersPage() {
   const orderTotalAmount = Math.max(0, subtotal - discount + shippingFee);
   const orderProfit = orderTotalAmount - orderTotalCost;
 
-  // Submit Order
+  // Open Edit Modal for PENDING orders
+  const openEditOrderModal = (ord: Order) => {
+    setEditingOrder(ord);
+    setCustomerName(ord.customer_name || '');
+    setCustomerPhone(ord.customer_phone || '');
+    setCustomerAddress(ord.customer_address || '');
+    setChannel(ord.channel || 'WALK_IN');
+    setPaymentMethod(ord.payment_method || 'โอนเงิน (Mobile Banking)');
+    setTrackingNo(ord.tracking_no || '');
+    setNotes(ord.notes || '');
+    setDiscount(Number(ord.discount) || 0);
+    setShippingFee(Number(ord.shipping_fee) || 0);
+    setOrderSlipUrls(ord.slip_url ? [ord.slip_url] : []);
+    setSelectedItems(ord.items || []);
+    setIsOpenBoxMode(ord.status === 'OPEN_BOX' || Boolean(ord.is_open_box));
+    setFreeShippingThreshold(Number(ord.free_shipping_threshold) || 1500);
+    setInitialOrderStatus(ord.status || 'PENDING');
+    setShowCreateModal(true);
+  };
+
+  // Submit Order (Create or Edit when PENDING)
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedItems.length === 0) {
@@ -266,6 +288,56 @@ export default function OrdersPage() {
     setIsSubmitting(true);
     try {
       const targetStatus: OrderStatus = isOpenBoxMode ? 'OPEN_BOX' : initialOrderStatus;
+
+      if (editingOrder) {
+        const res = await fetch('/api/orders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingOrder.id,
+            order_no: editingOrder.order_no,
+            customer_name: customerName,
+            customer_phone: customerPhone || null,
+            customer_address: customerAddress || null,
+            channel,
+            payment_method: paymentMethod,
+            slip_url: orderSlipUrls[0] || null,
+            tracking_no: trackingNo || null,
+            notes: notes || null,
+            discount,
+            shipping_fee: shippingFee,
+            status: targetStatus,
+            is_open_box: isOpenBoxMode,
+            free_shipping_threshold: isOpenBoxMode ? freeShippingThreshold : null,
+            replaceItems: selectedItems,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to update order');
+        }
+
+        const editedNo = editingOrder.order_no;
+        setEditingOrder(null);
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerAddress('');
+        setSelectedItems([]);
+        setDiscount(0);
+        setShippingFee(0);
+        setTrackingNo('');
+        setNotes('');
+        setOrderSlipUrls([]);
+        setIsOpenBoxMode(false);
+        setInitialOrderStatus('PENDING');
+        setShowCreateModal(false);
+
+        await loadData();
+        alert(`แก้ไขบิล ${editedNo} เรียบร้อยแล้ว`);
+        return;
+      }
+
       const orderPayload: Partial<Order> = {
         order_date: new Date().toISOString().slice(0, 10),
         customer_name: customerName,
@@ -946,6 +1018,19 @@ export default function OrdersPage() {
                               </button>
                             )}
 
+                            {/* Edit Order Button (Allowed when status is PENDING) */}
+                            {ord.status === 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => openEditOrderModal(ord)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition"
+                                title="แก้ไขบิล (ทำได้ขณะที่สถานะเป็นรอดำเนินการ)"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>แก้ไข</span>
+                              </button>
+                            )}
+
                             {/* Delete Order Button */}
                             <button
                               onClick={() => handleDeleteOrder(ord.id, ord.order_no)}
@@ -973,10 +1058,16 @@ export default function OrdersPage() {
                 <div className="min-w-0">
                   <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                     <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
-                    <span className="truncate">เปิดบิลขายใหม่ (New Sales Invoice)</span>
+                    <span className="truncate">
+                      {editingOrder
+                        ? `แก้ไขบิล ${editingOrder.order_no}`
+                        : 'เปิดบิลขายใหม่ (New Sales Invoice)'}
+                    </span>
                   </h3>
                   <p className="text-xs text-purple-200 mt-0.5 truncate">
-                    เลือกหินที่ขาย ระบบจะตัดสต็อกเป็น SOLD อัตโนมัติและออกใบเสร็จรับเงิน
+                    {editingOrder
+                      ? 'แก้ไขข้อมูลลูกค้า รายการสินค้า หรือส่วนลดได้ขณะที่สถานะเป็นรอดำเนินการ'
+                      : 'เลือกหินที่ขาย ระบบจะตัดสต็อกและบันทึกลงบัญชีอัตโนมัติ'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -986,11 +1077,14 @@ export default function OrdersPage() {
                     disabled={isSubmitting || selectedItems.length === 0}
                     className="px-3.5 py-2 min-h-[38px] text-xs font-bold rounded-xl bg-white/20 hover:bg-white/30 text-white active:scale-95 transition disabled:opacity-40"
                   >
-                    {isSubmitting ? 'กำลังบันทึก...' : 'บันทึก'}
+                    {isSubmitting ? 'กำลังบันทึก...' : editingOrder ? 'บันทึกการแก้ไข' : 'บันทึก'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setEditingOrder(null);
+                    }}
                     className="p-2 rounded-full hover:bg-white/10 text-white shrink-0"
                     aria-label="ปิดหน้าต่าง"
                   >

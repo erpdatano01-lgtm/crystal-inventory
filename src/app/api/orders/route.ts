@@ -205,6 +205,11 @@ export async function PATCH(request: NextRequest) {
       free_shipping_threshold,
       shipping_fee,
       discount,
+      channel,
+      payment_method,
+      slip_url,
+      order_date,
+      replaceItems,
       appendItems,
       appendPayment,
     } = body || {};
@@ -227,6 +232,10 @@ export async function PATCH(request: NextRequest) {
     if (free_shipping_threshold !== undefined) updatePayload.free_shipping_threshold = free_shipping_threshold;
     if (shipping_fee !== undefined) updatePayload.shipping_fee = shipping_fee;
     if (discount !== undefined) updatePayload.discount = discount;
+    if (channel !== undefined) updatePayload.channel = channel;
+    if (payment_method !== undefined) updatePayload.payment_method = payment_method;
+    if (slip_url !== undefined) updatePayload.slip_url = slip_url;
+    if (order_date !== undefined) updatePayload.order_date = order_date;
 
     let updatedOrder: Order | null = null;
 
@@ -251,6 +260,9 @@ export async function PATCH(request: NextRequest) {
       .from('stock_movements')
       .select('*, products(*)')
       .eq('reason', 'SOLD');
+
+    const matchedMovementIds: string[] = [];
+    let previousOrderSnapshot: Order | null = null;
 
     for (const m of movements || []) {
       try {
@@ -304,9 +316,13 @@ export async function PATCH(request: NextRequest) {
         const matchOrderNo = Boolean(order_no && parsed && parsed.order_no === order_no);
 
         if (matchId || matchOrderNo) {
+          matchedMovementIds.push(m.id);
           const baseOrder: any = parsed || {};
-          const extraItems = Array.isArray(appendItems) ? appendItems : [];
-          const combinedItems = [...(baseOrder.items || []), ...extraItems];
+          if (!previousOrderSnapshot) previousOrderSnapshot = baseOrder;
+
+          const combinedItems = Array.isArray(replaceItems)
+            ? replaceItems
+            : [...(baseOrder.items || []), ...(Array.isArray(appendItems) ? appendItems : [])];
 
           const nextDiscount =
             updatePayload.discount !== undefined
@@ -344,13 +360,71 @@ export async function PATCH(request: NextRequest) {
             payment_logs: nextLogs,
           };
           updatedOrder = merged;
-          await supabaseAdmin
-            .from('stock_movements')
-            .update({ note: JSON.stringify(merged) })
-            .eq('id', m.id);
+          if (!Array.isArray(replaceItems)) {
+            await supabaseAdmin
+              .from('stock_movements')
+              .update({ note: JSON.stringify(merged) })
+              .eq('id', m.id);
+          }
         }
       } catch {
         // continue
+      }
+    }
+
+    // If replaceItems is provided (Edit Mode), reconcile stock diffs & rewrite movements cleanly
+    if (updatedOrder && Array.isArray(replaceItems)) {
+      const oldQtyMap = new Map<string, number>();
+      for (const it of previousOrderSnapshot?.items || []) {
+        oldQtyMap.set(it.product_id, (oldQtyMap.get(it.product_id) || 0) + (Number(it.qty) || 1));
+      }
+      const newQtyMap = new Map<string, number>();
+      for (const it of replaceItems) {
+        newQtyMap.set(it.product_id, (newQtyMap.get(it.product_id) || 0) + (Number(it.qty) || 1));
+      }
+
+      const allPids = Array.from(
+        new Set([...Array.from(oldQtyMap.keys()), ...Array.from(newQtyMap.keys())])
+      );
+      for (const pid of allPids) {
+        const oldQ = oldQtyMap.get(pid) || 0;
+        const newQ = newQtyMap.get(pid) || 0;
+        const delta = newQ - oldQ; // >0 means need to deduct more, <0 means restore stock
+        if (delta === 0) continue;
+
+        const { data: curProd } = await supabaseAdmin
+          .from('products')
+          .select('qty_on_hand')
+          .eq('id', pid)
+          .single();
+
+        const currentQty = typeof curProd?.qty_on_hand === 'number' ? curProd.qty_on_hand : 0;
+        const nextQty = Math.max(0, currentQty - delta);
+        const nextStatus = nextQty === 0 ? 'SOLD' : 'AVAILABLE';
+
+        await supabaseAdmin
+          .from('products')
+          .update({
+            status: nextStatus,
+            qty_on_hand: nextQty,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', pid);
+      }
+
+      // Replace old SOLD movements for this order with fresh ones
+      for (const oldMid of matchedMovementIds) {
+        await supabaseAdmin.from('stock_movements').delete().eq('id', oldMid);
+      }
+      for (const it of replaceItems) {
+        await supabaseAdmin.from('stock_movements').insert([
+          {
+            product_id: it.product_id,
+            change_qty: -(Number(it.qty) || 1),
+            reason: 'SOLD',
+            note: JSON.stringify(updatedOrder),
+          },
+        ]);
       }
     }
 
