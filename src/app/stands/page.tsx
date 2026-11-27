@@ -23,6 +23,20 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
+const STAND_RECEIPT_URLS: Record<string, string> = {
+  'STN-ACR-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_38.jpg',
+  'STN-GLS-04': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_50.jpg',
+  'STN-GLS-06': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_50.jpg',
+  'STN-GLS-07': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_50.jpg',
+  'STN-SPH-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_51.jpg',
+  'STN-SPH-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_51.jpg',
+  'STN-SPH-L': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_51.jpg',
+  'STN-MIN-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_56.jpg',
+  'STN-MIN-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_56.jpg',
+  'STN-PRP-02': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_65.jpg',
+  'STN-PRP-N': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_65.jpg',
+};
+
 export default function StandsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -329,9 +343,9 @@ export default function StandsPage() {
                   {item.grade_origin && (
                     <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                       <span>{item.grade_origin}</span>
-                      {item.r2_thumbnail_url && (
+                      {(STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url) && (
                         <a
-                          href={item.r2_thumbnail_url}
+                          href={STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url!}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-indigo-600 hover:underline font-semibold"
