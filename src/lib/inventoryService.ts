@@ -556,13 +556,32 @@ export function isPackagingItem(
 }
 
 /**
+ * Determine whether a product is a crystal stand / display prop (STN-*)
+ * belonging in /stands.
+ */
+export function isStandItem(
+  p: Pick<Product, 'sku' | 'stone_type'>
+): boolean {
+  const sku = (p.sku || '').toUpperCase();
+  const cat = p.stone_type || '';
+  return Boolean(
+    sku.startsWith('STN-') ||
+      cat === 'ขาตั้งอะคริลิค' ||
+      cat === 'ฐานแก้วลูกแก้ว' ||
+      cat === 'ฐานอะคริลิคลูกแก้ว' ||
+      cat === 'แท่นวางมินิมอล' ||
+      cat === 'พร็อพแท่นวาง'
+  );
+}
+
+/**
  * Determine whether a product is a natural crystal / stone item
  * belonging in the Stone Warehouse (/products).
  */
 export function isStoneProduct(
   p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'>
 ): boolean {
-  return !isNonStoneFreebie(p) && !isPackagingItem(p);
+  return !isNonStoneFreebie(p) && !isPackagingItem(p) && !isStandItem(p);
 }
 
 /**

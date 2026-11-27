@@ -10,6 +10,7 @@ import {
   isNonStoneFreebie,
   isPackagingItem,
   isStoneProduct,
+  isStandItem,
 } from '@/lib/inventoryService';
 import { Product, Expense, StockLot, STATUS_CONFIG, EXPENSE_CATEGORIES_CONFIG } from '@/types';
 import {
@@ -110,7 +111,7 @@ export default function DashboardPage() {
 
   // 6. แจ้งเตือนสต็อกใกล้หมด (เฉพาะสินค้าแบบ BULK เท่านั้น ไม่นับหิน Unique หรือของแถมชิ้นเดียว)
   const lowStockBulkItems = products.filter((p) => {
-    if (p.item_type !== 'BULK') return false;
+    if (p.item_type !== 'BULK' || isStandItem(p)) return false;
     const qty = Number(p.qty_on_hand ?? 0);
     const threshold =
       p.stone_type === 'กล่องพัสดุ' || p.stone_type === 'การ์ดขอบคุณ' ? 10 : 15;

@@ -21,6 +21,7 @@ import {
   Box,
   Megaphone,
   Lock,
+  Layers,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import GoogleSheetsModal from '@/components/GoogleSheetsModal';
@@ -107,6 +108,13 @@ export default function Navbar() {
           mobileLabel: 'แพ็คเกจ',
           sublabel: 'กล่องพัสดุ, ถุงซิป & การ์ด',
           icon: Box,
+        },
+        {
+          href: '/stands',
+          label: 'คลังขาตั้ง & ฐานวาง',
+          mobileLabel: 'ขาตั้ง',
+          sublabel: 'ฐานลูกแก้ว, ขาตั้งอะคริลิค',
+          icon: Layers,
         },
       ],
     },
