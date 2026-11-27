@@ -1270,18 +1270,27 @@ export default function OrdersPage() {
                             )}
 
                             {/* Packing Video Link if recorded */}
-                            {ord.packing_video_url && (
-                              <a
-                                href={ord.packing_video_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition"
-                                title="เปิดดูคลิปวิดีโอหลักฐานการแพ็กของบิลนี้"
-                              >
-                                <Video className="w-3 h-3" />
-                                <span>ดูคลิปแพ็ก</span>
-                              </a>
-                            )}
+                            {ord.packing_video_url &&
+                              (ord.packing_video_url.startsWith('blob:') ? (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold"
+                                  title="คลิปนี้อัดไว้ก่อนอัปเกรดระบบคลาวด์ (ไม่ได้อัปโหลดขึ้น R2)"
+                                >
+                                  <Video className="w-3 h-3" />
+                                  <span>คลิปเก่าไม่อยู่บนคลาวด์</span>
+                                </span>
+                              ) : (
+                                <a
+                                  href={ord.packing_video_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition"
+                                  title="เปิดดูคลิปวิดีโอหลักฐานการแพ็กของบิลนี้"
+                                >
+                                  <Video className="w-3 h-3" />
+                                  <span>ดูคลิปแพ็ก</span>
+                                </a>
+                              ))}
                           </div>
                         </td>
 

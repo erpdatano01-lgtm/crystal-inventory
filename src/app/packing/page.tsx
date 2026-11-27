@@ -1156,34 +1156,74 @@ export default function PackingPage() {
     let finalUrl = localUrl;
 
     const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const contentType = blob.type || (ext === 'mp4' ? 'video/mp4' : 'video/webm');
     const cleanTrack = target.trackingNo ? target.trackingNo.replace(/[^a-zA-Z0-9_-]/g, '') : '';
     const cleanOrder = target.order?.order_no ? target.order.order_no.replace(/[^a-zA-Z0-9_-]/g, '') : '';
     const cleanSku = target.sku ? target.sku.replace(/[^a-zA-Z0-9_-]/g, '') : '';
 
     const fileName = `PACK_${cleanTrack ? cleanTrack + '_' : ''}${cleanOrder ? cleanOrder + '_' : ''}${cleanSku ? cleanSku + '_' : ''}${Date.now()}.${ext}`;
+    let uploadedCloudUrl: string | null = null;
 
     try {
-      const formData = new FormData();
-      formData.append('file', blob, fileName);
-      formData.append('folder', 'packing');
-      if (cleanSku) formData.append('sku', cleanSku);
-
-      const res = await fetch('/api/upload', {
+      // 1. Prefer direct presigned R2 upload (bypasses Vercel 4.5MB body limit for videos!)
+      const preRes = await fetch('/api/upload-presigned', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName,
+          folder: 'packing',
+          sku: cleanSku || undefined,
+          contentType,
+        }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) finalUrl = data.url;
+      if (preRes.ok) {
+        const { uploadUrl, publicUrl } = await preRes.json();
+        if (uploadUrl && publicUrl) {
+          const putRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': contentType },
+            body: blob,
+          });
+          if (putRes.ok) {
+            uploadedCloudUrl = publicUrl;
+          }
+        }
+      }
+
+      // 2. Fallback to /api/upload only for small clips (<4MB) if presigned failed
+      if (!uploadedCloudUrl && blob.size < 4 * 1024 * 1024) {
+        const formData = new FormData();
+        formData.append('file', blob, fileName);
+        formData.append('folder', 'packing');
+        if (cleanSku) formData.append('sku', cleanSku);
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url && data.url.startsWith('http')) {
+            uploadedCloudUrl = data.url;
+          }
+        }
+      }
+
+      if (uploadedCloudUrl) {
+        finalUrl = uploadedCloudUrl;
+        showToast('☁️ อัปโหลดคลิปแพ็กของขึ้น Cloudflare R2 สำเร็จ!');
+      } else {
+        showToast('⚠️ อัปโหลดคลิปขึ้นคลาวด์ไม่สำเร็จ กรุณากดดาวน์โหลดคลิปเก็บไว้');
       }
     } catch (e) {
-      console.warn('Background upload error, falling back to local URL:', e);
+      console.warn('Video upload error:', e);
+      showToast('⚠️ อัปโหลดคลิปขึ้นคลาวด์ไม่สำเร็จ กรุณากดดาวน์โหลดคลิปเก็บไว้');
     } finally {
       setIsUploading(false);
     }
 
-    setUploadedPublicUrl(finalUrl);
+    setUploadedPublicUrl(uploadedCloudUrl);
 
     const packedAtIso = new Date().toISOString();
     const itemsLog: PackedItemLogEntry[] = target.order
@@ -1230,7 +1270,7 @@ export default function PackingPage() {
             id: target.order.id,
             order_no: target.order.order_no,
             status: finalTracking ? 'SHIPPED' : target.order.status,
-            packing_video_url: finalUrl,
+            packing_video_url: uploadedCloudUrl || undefined,
             packed_at: packedAtIso,
             packed_items_log: itemsLog,
             tracking_no: finalTracking,
