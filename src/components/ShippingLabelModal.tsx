@@ -19,6 +19,7 @@ import {
   CheckSquare,
   Sparkles,
   FileText,
+  Download,
 } from 'lucide-react';
 
 interface ShippingLabelModalProps {
@@ -38,6 +39,7 @@ export default function ShippingLabelModal({
   const [labelFormat, setLabelFormat] = useState<LabelFormat>('100x150');
   const [qrMode, setQrMode] = useState<QrPayloadMode>('order_no');
   const [senderPhone, setSenderPhone] = useState('08x-xxx-xxxx');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const encodedOrderBarcode = useMemo(() => {
     if (!order) return null;
@@ -68,6 +70,293 @@ export default function ShippingLabelModal({
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?format=svg&size=240x240&margin=0&data=${encodeURIComponent(
     qrDataString
   )}`;
+
+  const loadQrImage = async (): Promise<HTMLImageElement | null> => {
+    try {
+      const res = await fetch(qrImageUrl);
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      return await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(objUrl);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objUrl);
+          resolve(null);
+        };
+        img.src = objUrl;
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  const handleDownloadLabelPng = async () => {
+    setIsDownloading(true);
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // High-DPI dimensions matching labelFormat
+      const sizeMap: Record<LabelFormat, { w: number; h: number }> = {
+        '100x150': { w: 1000, h: 1500 },
+        '50x50': { w: 700, h: 700 },
+        '50x30': { w: 750, h: 450 },
+      };
+      const { w, h } = sizeMap[labelFormat];
+      canvas.width = w;
+      canvas.height = h;
+
+      // White background & crisp outer border
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(12, 12, w - 24, h - 24);
+
+      const qrImg = await loadQrImage();
+
+      const drawBarcode = (
+        code: string,
+        x: number,
+        y: number,
+        bw: number,
+        bh: number
+      ) => {
+        const enc = encodeCode128B(code);
+        if (!enc) return;
+        const unit = bw / enc.totalModules;
+        ctx.fillStyle = '#000000';
+        for (const bar of enc.bars) {
+          ctx.fillRect(x + bar.x * unit, y, bar.width * unit, bh);
+        }
+      };
+
+      const wrapLines = (text: string, maxW: number): string[] => {
+        const words = text.split(/\s+/);
+        const lines: string[] = [];
+        let cur = '';
+        for (const wd of words) {
+          const test = cur ? `${cur} ${wd}` : wd;
+          if (ctx.measureText(test).width > maxW && cur) {
+            lines.push(cur);
+            cur = wd;
+          } else {
+            cur = test;
+          }
+        }
+        if (cur) lines.push(cur);
+        return lines;
+      };
+
+      if (labelFormat === '100x150') {
+        // Header
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 34px system-ui, -apple-system, sans-serif';
+        ctx.fillText('VIVIDA CRYSTAL', 44, 78);
+        ctx.font = '600 20px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = '#475569';
+        ctx.fillText(`Packing & Shipping • ${order.order_date}`, 44, 110);
+
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 28px monospace';
+        ctx.fillText(order.order_no, w - 44, 78);
+        ctx.font = '700 20px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = '#475569';
+        ctx.fillText(
+          `${SALES_CHANNELS_CONFIG[order.channel]?.label || order.channel}`,
+          w - 44,
+          110
+        );
+        ctx.textAlign = 'left';
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(40, 134);
+        ctx.lineTo(w - 40, 134);
+        ctx.stroke();
+
+        // Recipient box
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(40, 156, w - 80, 260);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(40, 156, w - 80, 260);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '800 18px system-ui, -apple-system, sans-serif';
+        ctx.fillText('ผู้รับ (TO RECIPIENT)', 64, 192);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 36px system-ui, -apple-system, sans-serif';
+        ctx.fillText(order.customer_name, 64, 240);
+
+        let ry = 278;
+        if (order.customer_phone) {
+          ctx.font = '700 24px system-ui, -apple-system, sans-serif';
+          ctx.fillStyle = '#1e293b';
+          ctx.fillText(`Tel: ${order.customer_phone}`, 64, ry);
+          ry += 34;
+        }
+        ctx.font = '500 22px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = '#334155';
+        const addrLines = wrapLines(
+          order.customer_address || 'รับหน้าร้าน / ไม่ระบุที่อยู่จัดส่ง',
+          w - 130
+        ).slice(0, 3);
+        for (const ln of addrLines) {
+          ctx.fillText(ln, 64, ry);
+          ry += 28;
+        }
+
+        // QR & Barcode Section
+        if (qrImg) {
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(40, 440, 230, 230);
+          ctx.drawImage(qrImg, 52, 452, 206, 206);
+        }
+
+        ctx.fillStyle = '#475569';
+        ctx.font = '800 20px system-ui, -apple-system, sans-serif';
+        ctx.fillText('สแกนเข้าหน้าแพ็กของ (Packing Station)', 294, 466);
+        drawBarcode(order.order_no, 294, 484, w - 340, 100);
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '800 24px monospace';
+        ctx.fillText(order.order_no, 294, 616);
+
+        if (order.tracking_no) {
+          ctx.fillStyle = '#1d4ed8';
+          ctx.font = '800 22px monospace';
+          ctx.fillText(`Tracking: ${order.tracking_no}`, 294, 656);
+        }
+
+        // Checklist Box
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(40, 696);
+        ctx.lineTo(w - 40, 696);
+        ctx.stroke();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 24px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`รายการเช็กของลงกล่อง (รวม ${totalAllQty} ชิ้น)`, 44, 738);
+
+        let cy = 784;
+        for (const it of order.items.slice(0, 16)) {
+          ctx.fillStyle = '#0f172a';
+          ctx.font = '700 20px monospace';
+          ctx.fillText(`☐  ${it.sku}`, 44, cy);
+          ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+          const labelName = it.sku?.startsWith('GIFT') ? `[ของแถม] ${it.name}` : it.name;
+          ctx.fillText(labelName.slice(0, 32), 270, cy);
+          ctx.textAlign = 'right';
+          ctx.font = '800 22px system-ui, -apple-system, sans-serif';
+          ctx.fillText(`x${it.qty || 1}`, w - 44, cy);
+          ctx.textAlign = 'left';
+          cy += 38;
+        }
+
+        // Footer
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 18px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`ผู้ส่ง: Vivida Crystal (${senderPhone})`, 44, h - 42);
+      } else if (labelFormat === '50x50') {
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 26px system-ui, -apple-system, sans-serif';
+        ctx.fillText('VIVIDA CRYSTAL', 36, 62);
+        ctx.textAlign = 'right';
+        ctx.font = '700 20px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = '#475569';
+        ctx.fillText(order.order_date, w - 36, 62);
+        ctx.textAlign = 'left';
+
+        if (qrImg) {
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(36, 94, 240, 240);
+          ctx.drawImage(qrImg, 48, 106, 216, 216);
+        }
+
+        ctx.fillStyle = '#6b21a8';
+        ctx.font = '900 26px monospace';
+        ctx.fillText(order.order_no, 298, 134);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 30px system-ui, -apple-system, sans-serif';
+        ctx.fillText(order.customer_name.slice(0, 18), 298, 184);
+
+        if (order.customer_phone) {
+          ctx.fillStyle = '#475569';
+          ctx.font = '700 22px system-ui, -apple-system, sans-serif';
+          ctx.fillText(order.customer_phone, 298, 224);
+        }
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '800 22px system-ui, -apple-system, sans-serif';
+        ctx.fillText(
+          `หิน ${totalMainQty}${totalGiftQty > 0 ? ` + แถม ${totalGiftQty}` : ''} ชิ้น`,
+          298,
+          270
+        );
+
+        drawBarcode(order.order_no, 36, 378, w - 72, 160);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#475569';
+        ctx.font = '700 22px system-ui, -apple-system, sans-serif';
+        ctx.fillText('สแกนเพื่อเริ่มแพ็ก & อัดคลิปพัสดุ', w / 2, 586);
+        ctx.textAlign = 'left';
+      } else {
+        // 50x30 mini
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 24px system-ui, -apple-system, sans-serif';
+        ctx.fillText('VIVIDA CRYSTAL', 32, 56);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#6b21a8';
+        ctx.font = '900 24px monospace';
+        ctx.fillText(order.order_no, w - 32, 56);
+        ctx.textAlign = 'left';
+
+        if (qrImg) {
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(32, 86, 220, 220);
+          ctx.drawImage(qrImg, 42, 96, 200, 200);
+        }
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 28px system-ui, -apple-system, sans-serif';
+        ctx.fillText(order.customer_name.slice(0, 18), 274, 130);
+        ctx.fillStyle = '#475569';
+        ctx.font = '700 22px system-ui, -apple-system, sans-serif';
+        ctx.fillText(
+          `หิน ${totalMainQty}${totalGiftQty > 0 ? ` • แถม ${totalGiftQty}` : ''} (รวม ${totalAllQty} ชิ้น)`,
+          274,
+          172
+        );
+        drawBarcode(order.order_no, 274, 204, w - 310, 102);
+      }
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `${order.order_no}_${labelFormat}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download label error:', err);
+      alert('ไม่สามารถดาวน์โหลดรูปใบปะหน้าได้ กรุณาลองใหม่');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Open a dedicated clean print window sized strictly to the selected thermal sticker
   const handlePrintThermalLabel = () => {
@@ -337,6 +626,17 @@ export default function ShippingLabelModal({
               <Video className="w-3.5 h-3.5" />
               <span>ไปหน้าอัดคลิปแพ็กบิลนี้</span>
             </Link>
+
+            <button
+              type="button"
+              onClick={handleDownloadLabelPng}
+              disabled={isDownloading}
+              className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+              title="ดาวน์โหลดใบปะหน้าเป็นไฟล์รูปภาพ PNG"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isDownloading ? 'กำลังสร้างรูป...' : 'ดาวน์โหลด PNG'}</span>
+            </button>
 
             <button
               type="button"
