@@ -53,13 +53,6 @@ const STAND_RECEIPT_URLS: Record<string, string> = {
   'STN-BLK-3X3': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_55.jpg',
   'STN-BLK-2X2': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_55.jpg',
   'STN-CIR-22': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_55.jpg',
-  'STN-MRB-OVL': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_67.jpg',
-  'STN-MRB-TRY': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_67.jpg',
-  'STN-TRY-WV': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_69.jpg',
-  'STN-TRY-OV': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_69.jpg',
-  'STN-TRY-ARC': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_04.jpg',
-  'STN-ROT-30': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_73.jpg',
-  'STN-ROT-20': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_73.jpg',
 };
 
 export default function StandsPage() {
