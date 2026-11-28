@@ -3,7 +3,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import ShippingLabelModal from '@/components/ShippingLabelModal';
-import { fetchProducts, isPackagingItem } from '@/lib/inventoryService';
+import {
+  fetchProducts,
+  isPackagingItem,
+  isStoneFreebie,
+  isNonStoneFreebie,
+  isStandItem,
+  formatUnitCost,
+} from '@/lib/inventoryService';
 import { encodeCode128B } from '@/lib/barcodeGenerator';
 import { Product, Order, PackingLog, PackedItemLogEntry } from '@/types';
 import {
@@ -47,6 +54,10 @@ import {
   Construction,
   QrCode,
   Smartphone,
+  Gift,
+  Gem,
+  Plus,
+  Minus,
 } from 'lucide-react';
 
 const LS_PACKING_RECORDS = 'crystal_packing_records_v1';
@@ -121,6 +132,15 @@ export default function PackingPage() {
   // Packaging supplies selection & deduction per parcel
   const [selectedPackagingQtys, setSelectedPackagingQtys] = useState<Record<string, number>>({});
   const [packagingDeducted, setPackagingDeducted] = useState<boolean>(false);
+
+  // Add Freebies & Stands into box (card picker modal + cost accounting)
+  const [showExtraBoxPickerModal, setShowExtraBoxPickerModal] = useState<boolean>(false);
+  const [extraPickerTab, setExtraPickerTab] = useState<
+    'STONE_FREEBIE' | 'GIFT_NON_STONE' | 'STAND'
+  >('STONE_FREEBIE');
+  const [extraPickerSearch, setExtraPickerSearch] = useState<string>('');
+  const [extraPickerQtys, setExtraPickerQtys] = useState<Record<string, number>>({});
+  const [isSavingExtraItems, setIsSavingExtraItems] = useState<boolean>(false);
 
   // Past Packing Records & Search
   const [packingRecords, setPackingRecords] = useState<PackingLog[]>([]);
@@ -981,6 +1001,144 @@ export default function PackingPage() {
   const packagingItems = useMemo(() => {
     return products.filter((p) => isPackagingItem(p));
   }, [products]);
+
+  const extraCatalog = useMemo(() => {
+    const inStock = (p: Product) =>
+      p.status !== 'SOLD' && (Number(p.qty_on_hand) || 0) > 0;
+    return {
+      STONE_FREEBIE: products.filter((p) => isStoneFreebie(p) && inStock(p)),
+      GIFT_NON_STONE: products.filter((p) => isNonStoneFreebie(p) && inStock(p)),
+      STAND: products.filter((p) => isStandItem(p) && inStock(p)),
+    };
+  }, [products]);
+
+  const filteredExtraCatalog = useMemo(() => {
+    const list = extraCatalog[extraPickerTab] || [];
+    const q = extraPickerSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (p) =>
+        p.sku.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        (p.stone_type || '').toLowerCase().includes(q)
+    );
+  }, [extraCatalog, extraPickerTab, extraPickerSearch]);
+
+  const selectedExtraSummary = useMemo(() => {
+    let count = 0;
+    let totalCost = 0;
+    const list: Array<{ product: Product; qty: number }> = [];
+    for (const [pid, qty] of Object.entries(extraPickerQtys)) {
+      if (qty > 0) {
+        const prod = products.find((p) => p.id === pid);
+        if (prod) {
+          count += qty;
+          totalCost += (Number(prod.cost_price) || 0) * qty;
+          list.push({ product: prod, qty });
+        }
+      }
+    }
+    return { count, totalCost, list };
+  }, [extraPickerQtys, products]);
+
+  const adjustExtraPickerQty = (product: Product, delta: number) => {
+    const maxQty = Math.max(0, Number(product.qty_on_hand) || 0);
+    setExtraPickerQtys((prev) => {
+      const nextVal = Math.min(maxQty, Math.max(0, (prev[product.id] || 0) + delta));
+      const next = { ...prev };
+      if (nextVal === 0) {
+        delete next[product.id];
+      } else {
+        next[product.id] = nextVal;
+      }
+      return next;
+    });
+  };
+
+  const openExtraBoxPicker = (tab: 'STONE_FREEBIE' | 'GIFT_NON_STONE' | 'STAND') => {
+    setExtraPickerTab(tab);
+    setExtraPickerSearch('');
+    setExtraPickerQtys({});
+    setShowExtraBoxPickerModal(true);
+  };
+
+  const handleConfirmAddExtraItems = async () => {
+    if (!selectedOrder || selectedExtraSummary.list.length === 0) return;
+    setIsSavingExtraItems(true);
+    try {
+      const appendItems = selectedExtraSummary.list.map(({ product, qty }) => ({
+        product_id: product.id,
+        sku: product.sku,
+        name: product.name,
+        qty,
+        unit_price: 0,
+        cost_price: Number(product.cost_price) || 0,
+      }));
+
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedOrder.id,
+          order_no: selectedOrder.order_no,
+          appendItems,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'ไม่สามารถเพิ่มรายการลงบิลได้');
+      }
+
+      const data = await res.json();
+      const updatedOrder: Order | undefined = data?.order;
+
+      if (updatedOrder) {
+        const startIdx = (selectedOrder.items || []).length;
+        setSelectedOrder(updatedOrder);
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === updatedOrder.id || o.order_no === updatedOrder.order_no
+              ? updatedOrder
+              : o
+          )
+        );
+
+        // Auto-mark newly added gifts/stands as packed in the active box checklist
+        setCheckedItemSkus((prev) => {
+          const next = { ...prev };
+          for (let i = startIdx; i < (updatedOrder.items || []).length; i++) {
+            next[updatedOrder.items[i].sku] = true;
+          }
+          return next;
+        });
+      }
+
+      // Update local stock counts immediately
+      setProducts((prev) =>
+        prev.map((p) => {
+          const picked = selectedExtraSummary.list.find((x) => x.product.id === p.id);
+          if (!picked) return p;
+          const nextQty = Math.max(0, (Number(p.qty_on_hand) || 0) - picked.qty);
+          return {
+            ...p,
+            qty_on_hand: nextQty,
+            status: nextQty === 0 ? 'SOLD' : 'AVAILABLE',
+          };
+        })
+      );
+
+      showToast(
+        `🎁 เพิ่มลงกล่อง ${selectedExtraSummary.count} ชิ้นเรียบร้อย (ต้นทุนเพิ่ม +฿${selectedExtraSummary.totalCost.toFixed(2)})`
+      );
+      setShowExtraBoxPickerModal(false);
+      setExtraPickerQtys({});
+    } catch (err: any) {
+      alert(`เพิ่มของแถม/ขาตั้งไม่สำเร็จ: ${err?.message || ''}`);
+    } finally {
+      setIsSavingExtraItems(false);
+    }
+  };
 
   const packagingBoxes = useMemo(() => {
     return packagingItems.filter((p) => p.stone_type === 'กล่องพัสดุ');
@@ -1887,6 +2045,7 @@ ${trackStr}
                       const isChecked = Boolean(checkedItemSkus[item.sku]);
                       const verifiedAtSec = itemVerifiedTimestamps[item.sku];
                       const isGift = Boolean(item.sku?.startsWith('GIFT'));
+                      const isStand = Boolean(item.sku?.startsWith('STN-'));
                       return (
                         <div
                           key={idx}
@@ -1917,6 +2076,11 @@ ${trackStr}
                                 {isGift && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                                     🎁 ของแถม
+                                  </span>
+                                )}
+                                {isStand && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 border border-purple-300">
+                                    🪵 ขาตั้ง
                                   </span>
                                 )}
                                 <span className="text-[10px] font-black text-slate-500">
@@ -1953,6 +2117,47 @@ ${trackStr}
                       );
                     })}
                   </div>
+
+                  {/* Add Freebies & Stands directly while packing (updates order cost) */}
+                  {selectedOrder && (
+                    <div className="p-3 bg-emerald-50/70 rounded-2xl border border-emerald-200/90 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] gap-2">
+                        <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                          <Gift className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>เพิ่มของแถม / ขาตั้งลงกล่อง</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          ต้นทุนบิลนี้ ฿{Number(selectedOrder.total_cost || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openExtraBoxPicker('STONE_FREEBIE')}
+                          className="py-2 px-2 rounded-xl bg-white hover:bg-emerald-100/80 border border-emerald-200 text-emerald-900 font-bold text-[11px] flex items-center justify-center gap-1 transition active:scale-95"
+                        >
+                          <Gem className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">+ หินของแถม</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openExtraBoxPicker('GIFT_NON_STONE')}
+                          className="py-2 px-2 rounded-xl bg-white hover:bg-teal-100/80 border border-teal-200 text-teal-900 font-bold text-[11px] flex items-center justify-center gap-1 transition active:scale-95"
+                        >
+                          <Gift className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          <span className="truncate">+ ของแถม</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openExtraBoxPicker('STAND')}
+                          className="py-2 px-2 rounded-xl bg-white hover:bg-purple-100/80 border border-purple-200 text-purple-900 font-bold text-[11px] flex items-center justify-center gap-1 transition active:scale-95"
+                        >
+                          <Layers className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                          <span className="truncate">+ ขาตั้ง</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Flexible Tracking Number Box (Can fill now or later) */}
                   <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-1.5">
@@ -2413,6 +2618,216 @@ ${trackStr}
         order={labelModalOrder}
         onClose={() => setLabelModalOrder(null)}
       />
+
+      {/* Card Picker Modal: Add Freebies & Stands into Box */}
+      {showExtraBoxPickerModal && selectedOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90dvh]">
+            <div className="px-5 py-4 bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white flex items-center justify-between gap-3 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-emerald-300" />
+                  <span>เลือกของแถม / ขาตั้งใส่ลงกล่อง</span>
+                </h3>
+                <p className="text-[11px] text-emerald-100/90 mt-0.5">
+                  บิล {selectedOrder.order_no} • ระบบจะตัดสต็อกและนำต้นทุนไปคำนวณในบิลให้อัตโนมัติ
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExtraBoxPickerModal(false)}
+                className="p-2 rounded-full hover:bg-white/10 text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-3 border-b border-slate-100 shrink-0">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExtraPickerTab('STONE_FREEBIE')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                    extraPickerTab === 'STONE_FREEBIE'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <Gem className="w-3.5 h-3.5" />
+                  <span>หินของแถม ({extraCatalog.STONE_FREEBIE.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExtraPickerTab('GIFT_NON_STONE')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                    extraPickerTab === 'GIFT_NON_STONE'
+                      ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <Gift className="w-3.5 h-3.5" />
+                  <span>ของแถม ({extraCatalog.GIFT_NON_STONE.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExtraPickerTab('STAND')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                    extraPickerTab === 'STAND'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>ขาตั้ง ({extraCatalog.STAND.length})</span>
+                </button>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={extraPickerSearch}
+                  onChange={(e) => setExtraPickerSearch(e.target.value)}
+                  placeholder="ค้นหา SKU, ชื่อรายการ หรือหมวดหมู่..."
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 bg-slate-50/70">
+              {filteredExtraCatalog.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">
+                  ไม่มีรายการคงเหลือในหมวดนี้
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {filteredExtraCatalog.map((item) => {
+                    const qty = extraPickerQtys[item.id] || 0;
+                    const maxQty = Number(item.qty_on_hand) || 0;
+                    const selected = qty > 0;
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          if (qty === 0) adjustExtraPickerQty(item, 1);
+                        }}
+                        className={`rounded-2xl border p-3 bg-white transition flex flex-col justify-between gap-2.5 cursor-pointer ${
+                          selected
+                            ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                            : 'border-slate-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        <div className="flex gap-2.5 items-start">
+                          <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                            {item.r2_thumbnail_url ? (
+                              <img
+                                src={item.r2_thumbnail_url}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : extraPickerTab === 'STAND' ? (
+                              <Layers className="w-6 h-6 text-purple-400" />
+                            ) : extraPickerTab === 'STONE_FREEBIE' ? (
+                              <Gem className="w-6 h-6 text-emerald-400" />
+                            ) : (
+                              <Gift className="w-6 h-6 text-teal-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 truncate">
+                                {item.sku}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-500 shrink-0">
+                                เหลือ {maxQty}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-900 mt-1 line-clamp-2">
+                              {item.name}
+                            </h4>
+                            <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                              {item.stone_type || '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div
+                          className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="text-[11px] font-bold text-slate-700">
+                            ต้นทุน ฿{formatUnitCost(item.cost_price)}
+                          </span>
+                          {qty === 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => adjustExtraPickerQty(item, 1)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] transition"
+                            >
+                              + เลือก
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => adjustExtraPickerQty(item, -1)}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="min-w-[1.5rem] text-center text-xs font-black text-emerald-700">
+                                {qty}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={qty >= maxQty}
+                                onClick={() => adjustExtraPickerQty(item, 1)}
+                                className="w-7 h-7 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center disabled:opacity-40"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="text-xs font-bold text-slate-700">
+                เลือกแล้ว{' '}
+                <span className="text-emerald-700">{selectedExtraSummary.count} ชิ้น</span>{' '}
+                • คิดต้นทุนเพิ่ม{' '}
+                <span className="text-rose-600">
+                  +฿{selectedExtraSummary.totalCost.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExtraBoxPickerModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingExtraItems || selectedExtraSummary.count === 0}
+                  onClick={handleConfirmAddExtraItems}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm disabled:opacity-40 transition"
+                >
+                  {isSavingExtraItems
+                    ? 'กำลังบันทึก...'
+                    : 'ยืนยันใส่ลงกล่อง & คิดต้นทุน'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Toast Notification */}
       {toastMessage && (
