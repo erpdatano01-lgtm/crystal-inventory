@@ -18,9 +18,9 @@ import {
   X,
   Save,
   ArrowRight,
-  DollarSign,
-  Package,
   ExternalLink,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 const STAND_RECEIPT_URLS: Record<string, string> = {
@@ -60,6 +60,7 @@ export default function StandsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const [editingItem, setEditingItem] = useState<Product | null>(null);
@@ -196,78 +197,96 @@ export default function StandsPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Hero Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-indigo-800 via-purple-800 to-slate-900 text-white p-6 sm:p-7 rounded-3xl shadow-lg">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-bold">
-              <Layers className="w-3.5 h-3.5" />
-              <span>รหัสหมวด STN-* • ขาตั้ง, ฐานลูกแก้ว และพร็อพแท่นวาง</span>
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 flex-1">
+        {/* Header Card (Matches Stone Warehouse) */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2">
+              <Layers className="w-6 h-6 text-indigo-600" />
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                คลังขาตั้ง &amp; ฐานวางหิน (Stand Inventory)
+              </h2>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-white">
-              คลังขาตั้ง &amp; ฐานวางหิน
-            </h2>
-            <p className="text-xs sm:text-sm text-indigo-100 max-w-xl">
-              รวมสต็อกขาตั้งอะคริลิค ฐานแก้วลูกแก้ว แท่นวางมินิมอล และชุดพร็อพ พร้อมต้นทุนสุทธิจริงหลังหักส่วนลด Shopee
+            <p className="text-xs text-slate-500 mt-1">
+              พบ {filteredList.length} รายการ • คงเหลือ {totalUnits.toLocaleString()} ชิ้น • มูลค่าต้นทุนสุทธิรวม ฿
+              {Math.round(totalCostValue).toLocaleString()}
             </p>
           </div>
 
-          <Link
-            href="/products"
-            className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-2 shrink-0"
-          >
-            <span>💎 สลับไปคลังหิน</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {/* 3 Summary KPI Cards */}
-        <div className="grid grid-cols-3 gap-3.5 sm:gap-4">
-          <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-slate-500">รายการแบบขาตั้ง</span>
-              <Layers className="w-4 h-4 text-indigo-600" />
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900">
-              {standList.length}
-            </div>
-            <span className="text-[11px] text-slate-400">SKU (STN-*)</span>
-          </div>
-
-          <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-slate-500">จำนวนคงเหลือรวม</span>
-              <Package className="w-4 h-4 text-purple-600" />
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-purple-700">
-              {totalUnits}
-            </div>
-            <span className="text-[11px] text-slate-400">ชิ้น / ชุด</span>
-          </div>
-
-          <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-slate-500">มูลค่าต้นทุนสุทธิรวม</span>
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-700">
-              ฿{totalCostValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-            </div>
-            <span className="text-[11px] text-slate-400">อ้างอิงตามบิล Shopee</span>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+            <Link
+              href="/products"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+            >
+              <span>💎 สลับไปคลังหินขาย</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
 
-        {/* Search & Category Pills */}
+        {/* Search, Filter & Layout bar */}
         <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="ค้นหา SKU (เช่น STN-GLS-04), ชื่อขาตั้ง, หรือร้านค้า..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-            />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-indigo-50/60 border border-indigo-200/60 rounded-2xl w-full">
+            <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-indigo-900">
+              <span className="p-1 rounded-lg bg-indigo-200 text-indigo-800">🪵</span>
+              <span>
+                ขาตั้ง &amp; ฐานวางหินทั้งหมด ({standList.length} รายการ • {totalUnits} ชิ้น)
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-indigo-700 px-3">
+              รหัสหมวด STN-* • ต้นทุนสุทธิจากใบเสร็จ Shopee
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="ค้นหา SKU (เช่น STN-GLS-04), ชื่อขาตั้ง, หรือร้านค้า..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-indigo-700 shadow-sm font-semibold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="การ์ดรูปภาพ (Grid)"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-lg transition ${
+                    viewMode === 'table'
+                      ? 'bg-white text-indigo-700 shadow-sm font-semibold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="ตาราง (Table)"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -299,120 +318,233 @@ export default function StandsPage() {
           </div>
         </div>
 
-        {/* Cards Grid */}
+        {/* Content */}
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-sm">กำลังโหลดข้อมูล...</div>
+          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-400 text-sm">
+            กำลังโหลดข้อมูล...
+          </div>
         ) : filteredList.length === 0 ? (
           <div className="p-12 text-center text-slate-400 text-sm bg-white rounded-3xl border border-slate-200">
             ไม่พบรายการขาตั้งที่ตรงกับเงื่อนไข
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredList.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition"
-              >
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {item.r2_thumbnail_url ? (
-                        <a
-                          href={item.r2_thumbnail_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="ดูรูปใบเสร็จ Shopee"
-                          className="shrink-0"
-                        >
-                          <img
-                            src={item.r2_thumbnail_url}
-                            alt={item.name}
-                            className="w-14 h-14 rounded-2xl object-cover border border-slate-200"
-                          />
-                        </a>
-                      ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0">
-                          <Layers className="w-6 h-6" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <span className="font-mono text-xs font-black text-indigo-700 block">
-                          {item.sku}
-                        </span>
-                        <h3 className="font-bold text-sm text-slate-900 line-clamp-2">
-                          {item.name}
-                        </h3>
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">
-                          {item.stone_type}
-                        </span>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredList.map((item) => {
+              const qty = Number(item.qty_on_hand) || 0;
+              const isOut = qty === 0 || item.status === 'SOLD';
+              const receiptUrl = STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url;
+              return (
+                <div
+                  key={item.id}
+                  className={`bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between group ${
+                    isOut ? 'opacity-75' : ''
+                  }`}
+                >
+                  <div className="relative aspect-square bg-slate-100 overflow-hidden">
+                    {item.r2_thumbnail_url ? (
+                      <img
+                        src={item.r2_thumbnail_url}
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-slate-100">
+                        <Layers className="w-12 h-12 text-indigo-300" />
                       </div>
+                    )}
+
+                    <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-black/75 text-white backdrop-blur">
+                        {item.sku}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full border backdrop-blur ${
+                          isOut
+                            ? 'bg-slate-100/95 text-slate-600 border-slate-300'
+                            : 'bg-indigo-100/95 text-indigo-800 border-indigo-300'
+                        }`}
+                      >
+                        {isOut ? 'หมดแล้ว' : 'พร้อมใช้งาน'}
+                      </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => openEdit(item)}
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
-                      title="แก้ไขข้อมูล / ตั้งราคาขาย"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {item.grade_origin && (
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                      <span>{item.grade_origin}</span>
-                      {(STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url) && (
-                        <a
-                          href={STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url!}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-indigo-600 hover:underline font-semibold"
-                        >
-                          <span>ดูใบเสร็จ</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
+                    <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 bg-white/90 backdrop-blur rounded-md text-[10px] font-bold text-slate-800 shadow-sm">
+                      {qty} ชิ้น
                     </div>
-                  )}
-                </div>
 
-                <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] text-slate-400">ทุนสุทธิ/ชิ้น</p>
-                    <p className="text-sm font-black text-emerald-700">
-                      ฿{formatUnitCost(Number(item.cost_price) || 0)}
-                    </p>
-                    {Number(item.selling_price) > 0 && (
-                      <p className="text-[10px] font-bold text-purple-700">
-                        ขาย ฿{Number(item.selling_price).toLocaleString()}
-                      </p>
+                    {receiptUrl && (
+                      <a
+                        href={receiptUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute bottom-2.5 right-2.5 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-md transition"
+                        title="ดูรูปใบเสร็จ Shopee"
+                      >
+                        <span>ใบเสร็จ</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-2xl border border-slate-200">
-                    <button
-                      type="button"
-                      disabled={updatingId === item.id || (item.qty_on_hand || 0) <= 0}
-                      onClick={() => handleQuickQtyChange(item, -1)}
-                      className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 disabled:opacity-30"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-8 text-center font-mono font-black text-sm text-slate-900">
-                      {item.qty_on_hand ?? 0}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={updatingId === item.id}
-                      onClick={() => handleQuickQtyChange(item, 1)}
-                      className="w-7 h-7 rounded-xl bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-800 disabled:opacity-30"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="text-[11px] text-indigo-700 font-bold mb-0.5">
+                        {item.stone_type}
+                      </div>
+                      <h3 className="font-bold text-sm text-slate-900 line-clamp-1 group-hover:text-indigo-700 transition">
+                        {item.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        {item.grade_origin || '-'}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">ทุนสุทธิ/ชิ้น</span>
+                        <span className="font-black text-emerald-700">
+                          ฿{formatUnitCost(Number(item.cost_price) || 0)}
+                        </span>
+                      </div>
+                      {Number(item.selling_price) > 0 && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400">ราคาขาย</span>
+                          <span className="font-bold text-purple-700">
+                            ฿{Number(item.selling_price).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={updatingId === item.id || qty <= 0}
+                          onClick={() => handleQuickQtyChange(item, -1)}
+                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 disabled:opacity-30"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="min-w-[2rem] text-center font-mono font-black text-xs text-slate-900">
+                          {qty}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={updatingId === item.id}
+                          onClick={() => handleQuickQtyChange(item, 1)}
+                          className="w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-800 disabled:opacity-30"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(item)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>แก้ไข</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                    <th className="py-3 px-4">รูป / SKU</th>
+                    <th className="py-3 px-4">ชื่อขาตั้ง &amp; ฐานวาง</th>
+                    <th className="py-3 px-4">หมวดหมู่</th>
+                    <th className="py-3 px-4 text-right">ทุนสุทธิ/ชิ้น</th>
+                    <th className="py-3 px-4 text-center">คงเหลือ</th>
+                    <th className="py-3 px-4 text-right">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredList.map((item) => {
+                    const qty = Number(item.qty_on_hand) || 0;
+                    const receiptUrl = STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url;
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
+                              {item.r2_thumbnail_url ? (
+                                <img
+                                  src={item.r2_thumbnail_url}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Layers className="w-4 h-4 text-indigo-400" />
+                              )}
+                            </div>
+                            <span className="font-mono font-bold text-indigo-700">
+                              {item.sku}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 font-semibold text-slate-900">
+                          {item.name}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-600">
+                          {item.stone_type || '-'}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
+                          ฿{formatUnitCost(Number(item.cost_price) || 0)}
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={updatingId === item.id || qty <= 0}
+                              onClick={() => handleQuickQtyChange(item, -1)}
+                              className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold disabled:opacity-40"
+                            >
+                              -
+                            </button>
+                            <span className="min-w-[1.75rem] font-black">{qty}</span>
+                            <button
+                              type="button"
+                              disabled={updatingId === item.id}
+                              onClick={() => handleQuickQtyChange(item, 1)}
+                              className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold disabled:opacity-40"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                          {receiptUrl && (
+                            <a
+                              href={receiptUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-[11px] hover:bg-indigo-100"
+                            >
+                              ใบเสร็จ
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openEdit(item)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
+                          >
+                            แก้ไข
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>

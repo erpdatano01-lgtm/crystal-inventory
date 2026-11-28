@@ -19,8 +19,8 @@ import {
   X,
   Save,
   ArrowRight,
-  DollarSign,
-  Package,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 export default function StoneFreebiesPage() {
@@ -28,6 +28,7 @@ export default function StoneFreebiesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const [editingItem, setEditingItem] = useState<Product | null>(null);
@@ -79,14 +80,6 @@ export default function StoneFreebiesPage() {
       return true;
     });
   }, [stoneFreebieList, selectedCategory, searchQuery]);
-
-  const availableCount = useMemo(
-    () =>
-      stoneFreebieList.filter(
-        (p) => p.status === 'AVAILABLE' && (Number(p.qty_on_hand) || 0) > 0
-      ).length,
-    [stoneFreebieList]
-  );
 
   const totalUnits = useMemo(
     () => stoneFreebieList.reduce((s, p) => s + (Number(p.qty_on_hand) || 0), 0),
@@ -174,107 +167,113 @@ export default function StoneFreebiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
+    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6 pb-24 lg:pb-8">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-3xl p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 flex-1">
+        {/* Header Card (Matches Stone Warehouse) */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
           <div>
-            <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">
-              <Gem className="w-4 h-4" />
-              <span>Stone Gift Warehouse</span>
+            <div className="flex items-center gap-2">
+              <Gem className="w-6 h-6 text-emerald-600" />
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                คลังหินของแถม (Stone Gift Inventory)
+              </h2>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              คลังหินของแถม
-            </h1>
-            <p className="text-xs sm:text-sm text-emerald-100/90 mt-1">
-              แยกหินที่ใช้แถมลูกค้า (หินกลิ้ง หินดิบ และหินที่เปลี่ยนเป็นของแถม) ออกจากสต็อกหินขายและคลังของแถมทั่วไป
+            <p className="text-xs text-slate-500 mt-1">
+              พบ {filteredList.length} รายการ • คงเหลือ {totalUnits.toLocaleString()} ชิ้น • มูลค่าต้นทุนรวม ฿
+              {Math.round(totalCostValue).toLocaleString()}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <Link
-              href="/products"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition"
-            >
-              <span>คลังหินขาย</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
             <Link
               href="/freebies"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-white text-emerald-900 hover:bg-emerald-50 text-xs font-bold shadow-sm transition"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs sm:text-sm transition"
             >
-              <Gift className="w-3.5 h-3.5" />
+              <Gift className="w-4 h-4 text-emerald-600" />
               <span>คลังของแถมทั่วไป</span>
+            </Link>
+            <Link
+              href="/products"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+            >
+              <span>💎 สลับไปคลังหินขาย</span>
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500">รายการหินของแถม</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">
-                {stoneFreebieList.length}{' '}
-                <span className="text-xs font-semibold text-slate-500">รายการ</span>
-              </p>
-              <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-                พร้อมแถม {availableCount} รายการ
-              </p>
+        {/* Search, Filter & Layout bar */}
+        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-emerald-50/60 border border-emerald-200/60 rounded-2xl w-full">
+            <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-emerald-900">
+              <span className="p-1 rounded-lg bg-emerald-200 text-emerald-800">🎁</span>
+              <span>
+                หินสำหรับแถมลูกค้าทั้งหมด ({stoneFreebieList.length} รายการ • {totalUnits} ชิ้น)
+              </span>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Gem className="w-5 h-5" />
+            <span className="text-[11px] font-semibold text-emerald-700 px-3">
+              แยกจากคลังหินขาย (ราคาขาย ฿0)
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ค้นหาตาม SKU, ชื่อหินของแถม, ชนิดแร่ หรือหมายเหตุ..."
+                className="w-full pl-10 pr-9 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-emerald-700 shadow-sm font-semibold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="การ์ดรูปภาพ (Grid)"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-lg transition ${
+                    viewMode === 'table'
+                      ? 'bg-white text-emerald-700 shadow-sm font-semibold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="ตาราง (Table)"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500">จำนวนชิ้นคงเหลือ</p>
-              <p className="text-2xl font-black text-teal-700 mt-1">
-                {totalUnits.toLocaleString()}{' '}
-                <span className="text-xs font-semibold text-slate-500">ชิ้น</span>
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                นับเฉพาะหินของแถม (ไม่ซ้ำคลังอื่น)
-              </p>
-            </div>
-            <div className="w-11 h-11 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
-              <Package className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500">มูลค่าต้นทุนคงเหลือ</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">
-                ฿{Math.round(totalCostValue).toLocaleString()}
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                ราคาขายตั้งไว้ ฿0 (สำหรับแถม)
-              </p>
-            </div>
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <DollarSign className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Search & Filter */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหา SKU, ชื่อหินของแถม, ชนิดหิน, หมายเหตุ..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             <button
+              type="button"
               onClick={() => setSelectedCategory('ALL')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                 selectedCategory === 'ALL'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -285,8 +284,9 @@ export default function StoneFreebiesPage() {
             {categories.map((cat) => (
               <button
                 key={cat}
+                type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                   selectedCategory === cat
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -298,112 +298,209 @@ export default function StoneFreebiesPage() {
           </div>
         </div>
 
-        {/* Product Grid */}
+        {/* Content */}
         {loading ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center">
-            <p className="text-sm font-semibold text-slate-500">
-              กำลังโหลดคลังหินของแถม...
-            </p>
+          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-sm font-semibold text-slate-500">
+            กำลังโหลดคลังหินของแถม...
           </div>
         ) : filteredList.length === 0 ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-2">
-            <Gem className="w-10 h-10 text-slate-300 mx-auto" />
+            <Gem className="w-12 h-12 text-emerald-200 mx-auto" />
             <p className="text-sm font-bold text-slate-600">
               ไม่พบรายการหินของแถมที่ตรงกับการค้นหา
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredList.map((item) => {
               const qty = Number(item.qty_on_hand) || 0;
               const isOut = qty === 0 || item.status === 'SOLD';
               return (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-2xl border p-4 shadow-xs transition flex flex-col justify-between gap-3 ${
-                    isOut ? 'border-slate-200 opacity-75' : 'border-emerald-100 hover:border-emerald-300'
+                  className={`bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between group ${
+                    isOut ? 'opacity-75' : ''
                   }`}
                 >
-                  <div className="flex gap-3">
-                    <div className="w-20 h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
-                      {item.r2_thumbnail_url ? (
-                        <img
-                          src={item.r2_thumbnail_url}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Gem className="w-7 h-7 text-slate-300" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 truncate">
-                          {item.sku}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                            isOut
-                              ? 'bg-slate-100 text-slate-500'
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          {isOut ? 'หมดแล้ว' : 'พร้อมแถม'}
-                        </span>
+                  <div className="relative aspect-square bg-slate-100 overflow-hidden">
+                    {item.r2_thumbnail_url ? (
+                      <img
+                        src={item.r2_thumbnail_url}
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-100">
+                        <Gem className="w-12 h-12 text-emerald-300" />
                       </div>
-                      <h3 className="text-sm font-bold text-slate-900 mt-1.5 line-clamp-2">
-                        {item.name}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                        {item.stone_type || 'หินธรรมชาติ'}
-                        {item.grade_origin ? ` • ${item.grade_origin}` : ''}
-                      </p>
+                    )}
+
+                    <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-black/75 text-white backdrop-blur">
+                        {item.sku}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full border backdrop-blur ${
+                          isOut
+                            ? 'bg-slate-100/95 text-slate-600 border-slate-300'
+                            : 'bg-emerald-100/95 text-emerald-800 border-emerald-300'
+                        }`}
+                      >
+                        {isOut ? 'หมดแล้ว' : 'พร้อมแถม'}
+                      </span>
+                    </div>
+
+                    <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 bg-white/90 backdrop-blur rounded-md text-[10px] font-bold text-slate-800 shadow-sm">
+                      {qty} ชิ้น
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                     <div>
-                      <p className="text-[11px] text-slate-400">ต้นทุน/ชิ้น</p>
-                      <p className="text-sm font-bold text-slate-800">
-                        ฿{formatUnitCost(item.cost_price)}
+                      <div className="text-[11px] text-emerald-700 font-bold mb-0.5">
+                        {item.stone_type || 'หินธรรมชาติ'}
+                      </div>
+                      <h3 className="font-bold text-sm text-slate-900 line-clamp-1 group-hover:text-emerald-700 transition">
+                        {item.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        {item.grade_origin || '-'}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        disabled={updatingId === item.id || qty <= 0}
-                        onClick={() => handleQuickQtyChange(item, -1)}
-                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center disabled:opacity-40 transition"
-                        title="ลดจำนวน 1 ชิ้น"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="min-w-[2.5rem] text-center text-sm font-black text-slate-900">
-                        {qty}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={updatingId === item.id}
-                        onClick={() => handleQuickQtyChange(item, 1)}
-                        className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center disabled:opacity-40 transition"
-                        title="เพิ่มจำนวน 1 ชิ้น"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">สถานะ</span>
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
+                          🎁 หินของแถม (฿0)
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">ต้นทุน/ชิ้น</span>
+                        <span className="font-bold text-slate-700">
+                          ฿{formatUnitCost(item.cost_price)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={updatingId === item.id || qty <= 0}
+                          onClick={() => handleQuickQtyChange(item, -1)}
+                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center disabled:opacity-40 transition"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="min-w-[2rem] text-center text-xs font-black text-slate-900">
+                          {qty}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={updatingId === item.id}
+                          onClick={() => handleQuickQtyChange(item, 1)}
+                          className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center disabled:opacity-40 transition"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() => openEdit(item)}
-                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center ml-1 transition"
-                        title="แก้ไขข้อมูล"
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Pencil className="w-3 h-3" />
+                        <span>แก้ไข</span>
                       </button>
                     </div>
                   </div>
                 </div>
               );
             })}
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                    <th className="py-3 px-4">รูป / SKU</th>
+                    <th className="py-3 px-4">ชื่อหินของแถม</th>
+                    <th className="py-3 px-4">ชนิดหิน</th>
+                    <th className="py-3 px-4 text-right">ต้นทุน/ชิ้น</th>
+                    <th className="py-3 px-4 text-center">คงเหลือ</th>
+                    <th className="py-3 px-4 text-right">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredList.map((item) => {
+                    const qty = Number(item.qty_on_hand) || 0;
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
+                              {item.r2_thumbnail_url ? (
+                                <img
+                                  src={item.r2_thumbnail_url}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Gem className="w-4 h-4 text-emerald-400" />
+                              )}
+                            </div>
+                            <span className="font-mono font-bold text-emerald-800">
+                              {item.sku}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 font-semibold text-slate-900">
+                          {item.name}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-600">
+                          {item.stone_type || '-'}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-bold text-slate-800">
+                          ฿{formatUnitCost(item.cost_price)}
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={updatingId === item.id || qty <= 0}
+                              onClick={() => handleQuickQtyChange(item, -1)}
+                              className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold disabled:opacity-40"
+                            >
+                              -
+                            </button>
+                            <span className="min-w-[1.75rem] font-black">{qty}</span>
+                            <button
+                              type="button"
+                              disabled={updatingId === item.id}
+                              onClick={() => handleQuickQtyChange(item, 1)}
+                              className="w-6 h-6 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold disabled:opacity-40"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(item)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
+                          >
+                            แก้ไข
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
