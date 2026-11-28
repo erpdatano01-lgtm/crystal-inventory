@@ -7,11 +7,13 @@ interface SoldOutSashProps {
 }
 
 export default function SoldOutSash({ label }: SoldOutSashProps) {
+  const displayWord = label === 'แตกเสียหาย' ? 'DAMAGED' : 'SOLD';
+
   return (
-    <div className="pointer-events-none absolute inset-0 bg-white/40 flex items-center justify-center overflow-hidden z-10">
-      <div className="w-[140%] -rotate-12 bg-zinc-900/90 text-white text-center py-1.5 text-[11px] font-semibold tracking-widest border-y border-white/20">
-        {label}
-      </div>
+    <div className="pointer-events-none absolute inset-0 backdrop-blur-[3px] bg-white/50 flex items-center justify-center z-10">
+      <span className="text-2xl sm:text-3xl font-semibold tracking-[0.22em] text-zinc-900 select-none">
+        {displayWord}
+      </span>
     </div>
   );
 }
