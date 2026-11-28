@@ -1501,38 +1501,35 @@ ${trackStr}
   }, [packingRecords, searchHistoryQuery]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:pl-64 pb-24 md:pb-12 text-slate-800">
+    <div className="min-h-screen bg-[#fafafa] flex flex-col md:pl-64 pb-24 md:pb-16 text-zinc-800 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          <div className="space-y-6 animate-in fade-in">
-            {/* Top Status Banner */}
-            <div className="p-3.5 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
-              <div className="flex items-center gap-2 font-bold">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>สถานีบันทึกวิดีโอแพ็กของอัจฉริยะ (Smart Video Packing Station) • เชื่อมต่อระบบเปิดบิลอัตโนมัติ</span>
+      <main className="flex-1 max-w-6xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6">
+          <div className="space-y-6">
+            {/* Minimal Header */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-5 border-b border-zinc-200">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+                  สแกนแพ็คของ &amp; อัดวิดีโอ
+                </h1>
+                <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+                  สแกนบาร์โค้ดเช็กสินค้าลงกล่อง พร้อมบันทึกคลิปแนบบิล
+                </p>
               </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-zinc-700 border border-zinc-200 text-xs font-medium shrink-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>กล้องพร้อมทำงาน</span>
+              </span>
             </div>
 
             {/* Stepper Bar */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-zinc-200 space-y-4">
+              <div className="hidden">
                 <div>
-                  <span className="text-xs font-bold text-purple-600 uppercase tracking-wider block">
-                    Camera Barcode Detection & Guided Packing
-                  </span>
-                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
-                    <Scan className="w-6 h-6 text-purple-600" />
-                    <span>ระบบสแกนบาร์โค้ดผ่านกล้อง & ตรวจจับหินลงกล่อง</span>
-                  </h1>
+                  <h1 />
                 </div>
-
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                    <span>ตรวจจับบาร์โค้ดผ่านกล้อง: พร้อมทำงาน</span>
-                  </span>
+                <div>
 
                   <button
                     type="button"

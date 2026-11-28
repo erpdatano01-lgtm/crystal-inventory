@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import SoldOutSash from '@/components/SoldOutSash';
 import {
   fetchProducts,
   isStoneFreebie,
@@ -309,13 +310,14 @@ export default function StoneFreebiesPage() {
                       <img
                         src={item.r2_thumbnail_url}
                         alt={item.name}
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full object-cover ${isOut ? 'grayscale-[35%] opacity-75' : ''}`}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-zinc-50">
                         <Gem className="w-10 h-10 text-zinc-300" />
                       </div>
                     )}
+                    {isOut && <SoldOutSash label="หมดแล้ว" />}
 
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                       <span className="font-mono text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-900/80 text-white">

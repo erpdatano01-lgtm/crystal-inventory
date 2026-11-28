@@ -334,46 +334,37 @@ export default function ExpensesPage() {
   }, [filteredExpenses]);
 
   return (
-    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16 bg-[#fafafa] md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
-        {/* Header & Quick Action */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+      <main className="max-w-6xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6 flex-1">
+        {/* Minimal Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-5 border-b border-zinc-200">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Receipt className="w-6 h-6 text-purple-600" />
-              บันทึกค่าใช้จ่าย & เปิดล็อตหิน (Expenses & Stock Lots)
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              ค่าใช้จ่าย &amp; ล็อตนำเข้า
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              บันทึกบิลค่าใช้จ่ายร้านค้า แนบสลิป WebP ขึ้น Cloudflare R2 และเปิดรหัส Lot สำหรับหินนำเข้า
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1 tabular-nums">
+              ยอดรวมทั้งหมด <strong className="font-semibold text-zinc-900">฿{totalExpenseSum.toLocaleString()}</strong>
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="text-right">
-              <span className="text-[11px] text-slate-400 block">ยอดรวมค่าใช้จ่ายทั้งหมด</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-rose-600">
-                ฿{totalExpenseSum.toLocaleString()}
-              </span>
-            </div>
-
-            {/* Google Sheets Live Feed Button */}
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
             <button
               onClick={() => setShowSheetsModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs sm:text-sm transition active:scale-95 shadow-xs"
-              title="ดึงข้อมูลค่าใช้จ่ายและล็อตหินไปแสดงผลบน Google Sheets อัตโนมัติ"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs transition"
+              title="ดึงข้อมูลค่าใช้จ่ายและล็อตหินไปแสดงผลบน Google Sheets"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Google Sheets</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Sheets</span>
             </button>
 
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs transition"
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>{showAddForm ? 'ปิดแบบฟอร์ม' : '+ บันทึกค่าใช้จ่ายใหม่'}</span>
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>{showAddForm ? 'ปิดแบบฟอร์ม' : '+ บันทึกค่าใช้จ่าย'}</span>
             </button>
           </div>
         </div>

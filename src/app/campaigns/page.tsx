@@ -403,36 +403,32 @@ export default function CampaignsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#fafafa] pb-20 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6">
+        {/* Minimal Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-zinc-200">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-pink-600 uppercase tracking-wider mb-1">
-              <Megaphone className="w-4 h-4" />
-              <span>Ad Batches & Blended Pricing</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              จัดชุดถ่ายขาย & คละค่า Ads
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              จัดชุดขาย &amp; คละค่า Ads
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              ติดป้ายแยกชุดหินที่คัดไปถ่ายลงขาย ไม่ให้ปนกับชุดอื่น พร้อมคำนวณราคาขายเผื่อค่าโฆษณาและค่าแพ็กอัตโนมัติ
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+              แยกชุดถ่ายขายและคำนวณราคาเผื่อค่าโฆษณา
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <Link
               href="/products"
-              className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition"
+              className="px-3.5 py-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 font-medium text-xs transition"
             >
-              ดูคลังหินทั้งหมด
+              คลังหินทั้งหมด
             </Link>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-95 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-500/20 active:scale-95 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs transition"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>สร้างชุดขายใหม่</span>
             </button>
           </div>

@@ -449,31 +449,26 @@ export default function SettingsPage() {
   const computedSku = `${testShapeCode}-${testStoneCode}-${String(testNumber).padStart(3, '0')}`;
 
   return (
-    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16 bg-[#fafafa] md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold animate-in fade-in slide-in-from-bottom duration-200 border border-slate-700">
-          <Sparkles className="w-4 h-4 text-amber-400" />
+        <div className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-50 bg-zinc-900 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-medium border border-zinc-800">
+          <Sparkles className="w-4 h-4 text-zinc-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
-          <div>
-            <div className="flex items-center gap-2">
-              <Settings className="w-6 h-6 text-purple-600" />
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                ตั้งค่าระบบรับหิน & รหัส SKU
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              หมวดคลังสินค้า ➔ จัดการรูปทรงหิน (Shapes), ชนิดหิน (Stone Types) และปรับแต่งตัวย่อ SKU สำหรับการรับหินเข้าสต็อก
-            </p>
-          </div>
+      <main className="max-w-6xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6 flex-1">
+        {/* Minimal Header */}
+        <div className="pb-5 border-b border-zinc-200">
+          <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+            ตั้งค่าระบบรับหิน &amp; รหัส SKU
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+            จัดการรูปทรง ชนิดหิน และตัวย่อรหัสสินค้า
+          </p>
         </div>
 
         {/* Tab switcher */}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import SoldOutSash from '@/components/SoldOutSash';
 import { fetchProducts, isNonStoneFreebie, formatUnitCost } from '@/lib/inventoryService';
 import { Product, ProductStatus } from '@/types';
 import {
@@ -267,39 +268,35 @@ export default function FreebiesPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16 bg-[#fafafa] md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
-        {/* Banner Header with Separation Notice */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white p-6 sm:p-7 rounded-3xl shadow-lg relative overflow-hidden">
-          <div className="relative z-10 space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-xs">
-              <Gift className="w-3.5 h-3.5" />
-              <span>คลังเฉพาะของแถม & บรรจุภัณฑ์ (แยกต่างหากจากคลังหิน)</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-white">
-              คลังสต็อกของแถมลูกค้า
+      <main className="max-w-6xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6 flex-1">
+        {/* Minimal Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-5 border-b border-zinc-200">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              คลังของแถม
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-100 max-w-xl">
-              รวมสต็อกของแถมทุกชนิดไว้ในที่เดียว ทั้งหินของแถม โมเดลแมว แม่เหล็กติดตู้เย็น และของแจกลูกค้า
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1 tabular-nums">
+              {freebieList.length} รายการ · คงเหลือ {totalUnits.toLocaleString()} ชิ้น
             </p>
           </div>
 
-          <div className="relative z-10 flex items-center gap-2.5 flex-wrap">
-            <Link
-              href="/products/new?mode=freebie"
-              className="px-4 py-2.5 rounded-2xl bg-white text-emerald-800 hover:bg-emerald-50 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>ลงของแถมใหม่</span>
-            </Link>
+          <div className="flex items-center gap-2 flex-wrap">
             <Link
               href="/products"
-              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-2 backdrop-blur-xs shadow-xs"
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 font-medium text-xs transition flex items-center gap-1.5"
             >
-              <span>💎 สลับไปคลังหิน</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>คลังหินขาย</span>
+              <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
+            </Link>
+            <Link
+              href="/products/new?mode=freebie"
+              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs transition flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>ลงของแถมใหม่</span>
             </Link>
           </div>
         </div>
@@ -562,7 +559,7 @@ export default function FreebiesPage() {
           </div>
         ) : viewMode === 'grid' ? (
           /* Grid View */
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredList.map((item) => {
               const isOutOfStock = (Number(item.qty_on_hand) || 0) <= 0;
               const isProp = item.sku?.startsWith('PROP') || item.grade_origin === '[PROP]' || item.stone_type?.includes('พร็อพ');
@@ -570,50 +567,39 @@ export default function FreebiesPage() {
                 <div
                   key={item.id}
                   onClick={() => setActiveModalItem(item)}
-                  className={`bg-white rounded-2xl sm:rounded-3xl border transition overflow-hidden flex flex-col justify-between group cursor-pointer ${
-                    isProp
-                      ? 'border-indigo-200/90 hover:border-indigo-400 hover:shadow-md'
-                      : 'border-slate-200/80 hover:border-emerald-300 hover:shadow-md'
+                  className={`bg-white rounded-2xl border border-zinc-200 hover:border-zinc-300 transition overflow-hidden flex flex-col justify-between cursor-pointer ${
+                    isOutOfStock ? 'opacity-65' : ''
                   }`}
                 >
                   <div>
                     {/* Thumbnail */}
-                    <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">
+                    <div className="relative aspect-square w-full bg-zinc-100 overflow-hidden">
                       {item.r2_thumbnail_url ? (
                         <img
                           src={item.r2_thumbnail_url}
                           alt={item.name}
-                          className="w-full h-full object-contain p-2 group-hover:scale-105 transition"
+                          className={`w-full h-full object-contain p-2 ${
+                            isOutOfStock ? 'grayscale-[35%] opacity-75' : ''
+                          }`}
                           loading="lazy"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          {isProp ? <Sparkles className="w-10 h-10 text-indigo-300" /> : <Gift className="w-10 h-10" />}
+                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                          {isProp ? <Sparkles className="w-10 h-10 text-zinc-300" /> : <Gift className="w-10 h-10" />}
                         </div>
                       )}
+                      {isOutOfStock && <SoldOutSash label="หมดแล้ว" />}
                       {/* SKU Badge */}
-                      <div
-                        className={`absolute top-2 left-2 text-white text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg shadow-xs ${
-                          isProp
-                            ? 'bg-indigo-900/90 border border-indigo-400/40 text-indigo-100'
-                            : 'bg-black/75 backdrop-blur-xs'
-                        }`}
-                      >
-                        {isProp ? `📸 ${item.sku}` : item.sku}
+                      <div className="absolute top-2 left-2 bg-zinc-900/80 text-white text-[9px] font-mono font-medium px-2 py-0.5 rounded-md">
+                        {item.sku}
                       </div>
 
                       {/* Stock Status Badge */}
-                      <div
-                        className={`absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-xs ${
-                          isOutOfStock
-                            ? 'bg-rose-500 text-white'
-                            : isProp
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-emerald-500 text-white'
-                        }`}
-                      >
-                        {isOutOfStock ? 'หมด' : `คงเหลือ ${item.qty_on_hand}`}
-                      </div>
+                      {!isOutOfStock && (
+                        <div className="absolute top-2 right-2 text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/90 text-zinc-700 border border-zinc-200">
+                          เหลือ {item.qty_on_hand}
+                        </div>
+                      )}
                     </div>
 
                     {/* Content */}

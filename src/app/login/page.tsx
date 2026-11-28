@@ -45,31 +45,29 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-5">
+      <div className="w-full max-w-sm bg-white rounded-2xl border border-zinc-200 overflow-hidden">
         <div className="p-7 sm:p-8 space-y-6">
-          {/* Brand Header */}
+          {/* Minimal Brand Header */}
           <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-amber-400 p-0.5 shadow-lg shadow-purple-500/25 mx-auto">
-              <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-                <Gem className="w-8 h-8 text-purple-600" />
-              </div>
+            <div className="w-11 h-11 rounded-xl bg-zinc-900 text-white flex items-center justify-center mx-auto">
+              <Gem className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">
                 Vivida Crystal
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                ระบบจัดการคลังหินและบัญชีร้าน (สำหรับผู้ดูแลเท่านั้น)
+              <p className="text-xs text-zinc-500 mt-0.5">
+                เข้าสู่ระบบจัดการคลังและบัญชี
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-purple-600" />
-                <span>กรุณากรอกรหัสผ่านเข้าใช้งาน</span>
+              <label className="text-xs font-medium text-zinc-700 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                <span>รหัสผ่าน</span>
               </label>
 
               <div className="relative">
@@ -84,12 +82,12 @@ function LoginForm() {
                     setPasscode(e.target.value);
                     if (errorMsg) setErrorMsg(null);
                   }}
-                  className="w-full pl-4 pr-11 py-3.5 text-base font-mono font-bold tracking-widest bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-900"
+                  className="w-full pl-4 pr-11 py-3 text-base font-mono font-medium tracking-widest bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:outline-none focus:border-zinc-900 text-zinc-900"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasscode((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-700 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-zinc-700 transition"
                   aria-label="แสดง/ซ่อนรหัสผ่าน"
                 >
                   {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -98,7 +96,7 @@ function LoginForm() {
             </div>
 
             {errorMsg && (
-              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
@@ -107,16 +105,16 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-purple-600/25 active:scale-[0.99] transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <span>{loading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>จำสถานะการเข้าสู่ระบบอัตโนมัติ 30 วัน</span>
+          <div className="pt-3 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
+            <span>จำสถานะการเข้าสู่ระบบ 30 วัน</span>
           </div>
         </div>
       </div>
@@ -128,7 +126,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white text-sm">
+        <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-zinc-500 text-sm">
           กำลังโหลด...
         </div>
       }

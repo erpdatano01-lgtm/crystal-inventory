@@ -486,28 +486,25 @@ export default function NewProductPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+    <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16 bg-[#fafafa] md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
-      <main className="max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
-        {/* Header with back button */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/products"
-              className="p-2 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm transition"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <PlusCircle className="w-6 h-6 text-purple-600" />
-                รับหินเข้าสต็อก (New Product Intake)
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                เลือก Lot นำเข้า เจน SKU อัตโนมัติ ถ่ายรูป WebP และแนบลิงก์ Google Drive
-              </p>
-            </div>
+      <main className="max-w-4xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6 flex-1">
+        {/* Minimal Header with back button */}
+        <div className="flex items-center gap-3 pb-5 border-b border-zinc-200">
+          <Link
+            href="/products"
+            className="p-2 rounded-xl bg-white border border-zinc-200 text-zinc-600 hover:text-zinc-900 transition"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              รับหินเข้าสต็อก
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+              ผูกล็อตนำเข้า สร้าง SKU อัตโนมัติ และแนบรูป/คลิป
+            </p>
           </div>
         </div>
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import SoldOutSash from '@/components/SoldOutSash';
 import {
   fetchProducts,
   fetchStockLots,
@@ -811,8 +812,17 @@ export default function ProductsPage() {
                       src={thumb}
                       alt={p.name}
                       onClick={() => setActiveModalProduct(p)}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${
+                        p.status === 'SOLD' || p.grade_origin?.includes('[DAMAGED]') || (Number(p.qty_on_hand) ?? 1) === 0
+                          ? 'grayscale-[35%] opacity-75'
+                          : ''
+                      }`}
                     />
+                    {p.grade_origin?.includes('[DAMAGED]') ? (
+                      <SoldOutSash label="แตกเสียหาย" />
+                    ) : (p.status === 'SOLD' || (Number(p.qty_on_hand) ?? 1) === 0) ? (
+                      <SoldOutSash label="ขายแล้ว" />
+                    ) : null}
 
                     {/* Top Badges */}
                     <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">

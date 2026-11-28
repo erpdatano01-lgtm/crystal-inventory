@@ -809,25 +809,18 @@ export default function OrdersPage() {
   }, [periodOrders, searchQuery, selectedChannel, selectedStatus]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+    <div className="min-h-screen bg-[#fafafa] flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Page Title & Action Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-5 sm:px-8 lg:px-10 py-8 space-y-6">
+        {/* Minimal Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-5 border-b border-zinc-200">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 uppercase tracking-wide">
-                FlowAccount Style
-              </span>
-              <span className="text-xs text-slate-400">ระบบเปิดบิล & สรุปบัญชีร้านหิน</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1 flex items-center gap-2">
-              <ShoppingBag className="w-6 h-6 text-purple-600" />
-              เปิดบิลขาย & บัญชีกำไร-ขาดทุน (Sales & Billing)
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              เปิดบิลขาย &amp; บัญชี
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              เปิดบิลออเดอร์ลูกค้า ตัดสต็อกหินอัตโนมัติ ออกใบเสร็จรับเงิน และสรุปบัญชีรายรับ-รายจ่าย
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+              ออกบิล ตัดสต็อก พิมพ์ใบเสร็จ และติดตามยอดขาย
             </p>
           </div>
 
@@ -840,10 +833,10 @@ export default function OrdersPage() {
                 setBatchTrackInput('');
                 setShowBatchTrackingModal(true);
               }}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm active:scale-95 transition"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 font-medium text-xs transition"
             >
-              <Truck className="w-4 h-4 text-emerald-400" />
-              <span>ยิงเลขพัสดุรวดเดียว</span>
+              <Truck className="w-4 h-4 text-zinc-400" />
+              <span>ยิงเลขพัสดุ</span>
             </button>
 
             <button
@@ -851,9 +844,9 @@ export default function OrdersPage() {
                 setEditingOrder(null);
                 setShowCreateModal(true);
               }}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs transition"
             >
-              <PlusCircle className="w-5 h-5" />
+              <PlusCircle className="w-4 h-4" />
               <span>+ เปิดบิลขายใหม่</span>
             </button>
           </div>
