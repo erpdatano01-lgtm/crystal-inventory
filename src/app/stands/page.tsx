@@ -25,6 +25,8 @@ import {
 
 const STAND_RECEIPT_URLS: Record<string, string> = {
   'STN-ACR-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_38.jpg',
+  'STN-ACR-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_37.jpg',
+  'STN-ACR-L': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_37.jpg',
   'STN-GLS-04': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_50.jpg',
   'STN-GLS-06': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_50.jpg',
   'STN-GLS-07': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_50.jpg',
@@ -35,6 +37,29 @@ const STAND_RECEIPT_URLS: Record<string, string> = {
   'STN-MIN-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_56.jpg',
   'STN-PRP-02': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_65.jpg',
   'STN-PRP-N': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_65.jpg',
+  'STN-LVC-SV-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_41.jpg',
+  'STN-LVC-GD-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_41.jpg',
+  'STN-LVC-GD-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_41.jpg',
+  'STN-LVC-SV-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_42.jpg',
+  'STN-LVC-BK-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_42.jpg',
+  'STN-LVC-RG-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_42.jpg',
+  'STN-LVC-BK-S': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_42.jpg',
+  'STN-LVC-SV-L': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_42.jpg',
+  'STN-LVC-RG-M': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_42.jpg',
+  'STN-MRB-BR10': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_45.jpg',
+  'STN-MRB-GR10': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_45.jpg',
+  'STN-BLK-5X5': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_52.jpg',
+  'STN-BLK-5X3': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_52.jpg',
+  'STN-BLK-3X3': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_55.jpg',
+  'STN-BLK-2X2': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_55.jpg',
+  'STN-CIR-22': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_55.jpg',
+  'STN-MRB-OVL': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_67.jpg',
+  'STN-MRB-TRY': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_67.jpg',
+  'STN-TRY-WV': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_69.jpg',
+  'STN-TRY-OV': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_69.jpg',
+  'STN-TRY-ARC': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_04.jpg',
+  'STN-ROT-30': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_73.jpg',
+  'STN-ROT-20': 'https://pub-711c228c01bd46028816ac394ae8af33.r2.dev/receipts/2026-11/order_73.jpg',
 };
 
 export default function StandsPage() {
