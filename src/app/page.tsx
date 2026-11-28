@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import {
   fetchProducts,
   fetchExpenses,
   fetchStockLots,
+  classifyProductWarehouse,
   isNonStoneFreebie,
   isStoneFreebie,
   isPackagingItem,
   isStoneProduct,
   isStandItem,
+  WarehouseCategory,
 } from '@/lib/inventoryService';
 import { Product, Expense, StockLot, STATUS_CONFIG, EXPENSE_CATEGORIES_CONFIG } from '@/types';
 import {
@@ -27,6 +29,12 @@ import {
   ExternalLink,
   Layers,
   ShoppingBag,
+  Settings,
+  Bell,
+  Search,
+  X,
+  Save,
+  Check,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -37,21 +45,33 @@ export default function DashboardPage() {
   const [damagedCount, setDamagedCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
+  // Custom low-stock alert rules (productId -> min qty threshold)
+  const [lowStockRules, setLowStockRules] = useState<Record<string, number>>({});
+  const [showLowStockModal, setShowLowStockModal] = useState(false);
+  const [draftLowStockRules, setDraftLowStockRules] = useState<Record<string, number>>({});
+  const [lowStockSearch, setLowStockSearch] = useState('');
+  const [lowStockFilterCat, setLowStockFilterCat] = useState<'ALL' | 'SELECTED' | WarehouseCategory>('ALL');
+  const [savingLowStockRules, setSavingLowStockRules] = useState(false);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [p, e, l, d] = await Promise.all([
+        const [p, e, l, d, s] = await Promise.all([
           fetchProducts(),
           fetchExpenses(),
           fetchStockLots(),
           fetch('/api/products/handle-damaged').then((r) => r.json()).catch(() => ({ totalDamagedLoss: 0, count: 0 })),
+          fetch('/api/settings', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ lowStockRules: {} })),
         ]);
         setProducts(p);
         setExpenses(e);
         setLots(l);
         setDamagedLoss(Number(d?.totalDamagedLoss) || 0);
         setDamagedCount(Number(d?.count) || 0);
+        if (s?.lowStockRules && typeof s.lowStockRules === 'object') {
+          setLowStockRules(s.lowStockRules);
+        }
       } finally {
         setLoading(false);
       }
@@ -111,14 +131,83 @@ export default function DashboardPage() {
     0
   );
 
-  // 6. แจ้งเตือนสต็อกใกล้หมด (เฉพาะสินค้าแบบ BULK เท่านั้น ไม่นับหิน Unique หรือของแถมชิ้นเดียว)
-  const lowStockBulkItems = products.filter((p) => {
-    if (p.item_type !== 'BULK' || isStandItem(p)) return false;
-    const qty = Number(p.qty_on_hand ?? 0);
-    const threshold =
-      p.stone_type === 'กล่องพัสดุ' || p.stone_type === 'การ์ดขอบคุณ' ? 10 : 15;
-    return qty <= threshold;
-  });
+  // 6. แจ้งเตือนสต็อกใกล้หมด (เฉพาะรายการและเกณฑ์จำนวนที่ผู้ใช้เลือกตั้งค่าไว้เอง)
+  const lowStockWatchedCount = Object.keys(lowStockRules).length;
+  const lowStockItems = useMemo(() => {
+    return products
+      .filter((p) => {
+        const threshold = lowStockRules[p.id];
+        if (typeof threshold !== 'number') return false;
+        return Number(p.qty_on_hand ?? 0) <= threshold;
+      })
+      .map((p) => ({ product: p, threshold: lowStockRules[p.id] }));
+  }, [products, lowStockRules]);
+
+  const openLowStockModal = () => {
+    setDraftLowStockRules({ ...lowStockRules });
+    setLowStockSearch('');
+    setLowStockFilterCat('ALL');
+    setShowLowStockModal(true);
+  };
+
+  const toggleLowStockRule = (product: Product) => {
+    setDraftLowStockRules((prev) => {
+      const next = { ...prev };
+      if (typeof next[product.id] === 'number') {
+        delete next[product.id];
+      } else {
+        next[product.id] = 10;
+      }
+      return next;
+    });
+  };
+
+  const updateDraftThreshold = (productId: string, val: string) => {
+    const parsed = Math.max(0, parseInt(val, 10) || 0);
+    setDraftLowStockRules((prev) => ({
+      ...prev,
+      [productId]: parsed,
+    }));
+  };
+
+  const handleSaveLowStockRules = async () => {
+    setSavingLowStockRules(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lowStockRules: draftLowStockRules }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLowStockRules(data.lowStockRules || draftLowStockRules);
+        setShowLowStockModal(false);
+      } else {
+        alert('บันทึกการตั้งค่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      }
+    } finally {
+      setSavingLowStockRules(false);
+    }
+  };
+
+  const filteredConfigProducts = useMemo(() => {
+    const q = lowStockSearch.trim().toLowerCase();
+    return products.filter((p) => {
+      if (lowStockFilterCat === 'SELECTED') {
+        if (typeof draftLowStockRules[p.id] !== 'number') return false;
+      } else if (lowStockFilterCat !== 'ALL') {
+        if (classifyProductWarehouse(p) !== lowStockFilterCat) return false;
+      }
+      if (q) {
+        return (
+          p.sku.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          (p.stone_type || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [products, lowStockSearch, lowStockFilterCat, draftLowStockRules]);
 
   return (
     <div className="min-h-screen flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 bg-slate-50 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
@@ -308,15 +397,15 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Low Stock Alert for BULK supplies only (never triggers on 1-of-a-kind UNIQUE stones) */}
-        {!loading && lowStockBulkItems.length > 0 && (
+        {/* Custom Low Stock Alert (Only items & thresholds chosen by the user) */}
+        {!loading && lowStockItems.length > 0 && (
           <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div className="space-y-1">
               <h3 className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-1.5">
-                <span>⚠️ แจ้งเตือนแพ็คเกจ / ของแถมแบบนับจำนวนใกล้หมด ({lowStockBulkItems.length} รายการ)</span>
+                <span>⚠️ แจ้งเตือนสต็อกใกล้หมดตามรายการที่เลือก ({lowStockItems.length} รายการ)</span>
               </h3>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {lowStockBulkItems.map((item) => (
+                {lowStockItems.map(({ product: item, threshold }) => (
                   <span
                     key={item.id}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${
@@ -328,18 +417,55 @@ export default function DashboardPage() {
                     <span className="font-mono">{item.sku}</span>
                     <span className="truncate max-w-[160px]">{item.name}</span>
                     <span className="font-black">
-                      ({Number(item.qty_on_hand) === 0 ? 'หมด!' : `เหลือ ${item.qty_on_hand}`})
+                      ({Number(item.qty_on_hand) === 0 ? 'หมด!' : `เหลือ ${item.qty_on_hand}`} / ≤{threshold})
                     </span>
                   </span>
                 ))}
               </div>
             </div>
-            <Link
-              href="/packaging"
-              className="shrink-0 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition text-center"
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={openLowStockModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>ตั้งค่ารายการ</span>
+              </button>
+              <Link
+                href="/packaging"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition text-center"
+              >
+                เช็กสต็อกแพ็คเกจ →
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!loading && lowStockItems.length === 0 && (
+          <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Bell className="w-4 h-4 text-purple-600 shrink-0" />
+              <span>
+                {lowStockWatchedCount > 0 ? (
+                  <>
+                    แจ้งเตือนสต็อกใกล้หมด: กำลังติดตาม{' '}
+                    <strong className="text-slate-900">{lowStockWatchedCount} รายการ</strong>{' '}
+                    (ยังไม่มีรายการต่ำกว่าเกณฑ์)
+                  </>
+                ) : (
+                  'แจ้งเตือนสต็อกใกล้หมด: ยังไม่ได้เลือกรายการที่ต้องการให้แจ้งเตือน'
+                )}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={openLowStockModal}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-800 border border-slate-200 hover:border-purple-200 text-xs font-bold transition shrink-0"
             >
-              เช็กสต็อกแพ็คเกจ →
-            </Link>
+              <Settings className="w-3.5 h-3.5" />
+              <span>เลือกรายการ &amp; เกณฑ์แจ้งเตือน</span>
+            </button>
           </div>
         )}
 
@@ -465,6 +591,169 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal: Configure Custom Low-Stock Alerts */}
+      {showLowStockModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90dvh]">
+            <div className="px-5 py-4 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white flex items-center justify-between gap-3 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  <span>ตั้งค่าแจ้งเตือนของใกล้หมด</span>
+                </h3>
+                <p className="text-[11px] text-amber-100 mt-0.5">
+                  เลือกรายการที่ต้องการให้แจ้งเตือนและกำหนดจำนวนขั้นต่ำได้เอง (รายการที่ไม่ได้เลือกจะไม่แจ้งเตือน)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLowStockModal(false)}
+                className="p-2 rounded-full hover:bg-white/10 text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-3 border-b border-slate-100 shrink-0">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={lowStockSearch}
+                  onChange={(e) => setLowStockSearch(e.target.value)}
+                  placeholder="ค้นหา SKU, ชื่อสินค้า, แพ็คเกจ, ของแถม หรือขาตั้ง..."
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {(
+                  [
+                    { key: 'ALL', label: 'ทั้งหมด' },
+                    {
+                      key: 'SELECTED',
+                      label: `ที่เลือกไว้ (${Object.keys(draftLowStockRules).length})`,
+                    },
+                    { key: 'PACKAGING', label: 'แพ็คเกจจิ้ง' },
+                    { key: 'GIFT_NON_STONE', label: 'ของแถม' },
+                    { key: 'STONE_FREEBIE', label: 'หินของแถม' },
+                    { key: 'STAND', label: 'ขาตั้ง' },
+                    { key: 'STONE_SALE', label: 'หินขาย' },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setLowStockFilterCat(tab.key)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                      lowStockFilterCat === tab.key
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 bg-slate-50/70 space-y-2">
+              {filteredConfigProducts.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-400">
+                  ไม่พบรายการที่ตรงกับการค้นหา
+                </div>
+              ) : (
+                filteredConfigProducts.map((item) => {
+                  const enabled = typeof draftLowStockRules[item.id] === 'number';
+                  const threshold = enabled ? draftLowStockRules[item.id] : 10;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-2xl border bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
+                        enabled ? 'border-amber-400 ring-1 ring-amber-400/30' : 'border-slate-200'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleLowStockRule(item)}
+                        className="flex items-center gap-3 min-w-0 text-left flex-1"
+                      >
+                        <div
+                          className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition ${
+                            enabled
+                              ? 'bg-amber-600 border-amber-600 text-white'
+                              : 'bg-slate-50 border-slate-300 text-transparent'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                              {item.sku}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 truncate">
+                              {item.name}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {item.stone_type || '-'} • คงเหลือปัจจุบัน{' '}
+                            <strong className="text-slate-700">{item.qty_on_hand ?? 0} ชิ้น</strong>
+                          </p>
+                        </div>
+                      </button>
+
+                      {enabled && (
+                        <div className="flex items-center gap-2 shrink-0 pl-9 sm:pl-0">
+                          <span className="text-[11px] font-bold text-amber-900 whitespace-nowrap">
+                            แจ้งเตือนเมื่อเหลือ ≤
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={threshold}
+                            onChange={(e) => updateDraftThreshold(item.id, e.target.value)}
+                            className="w-20 px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50/50 text-center text-xs font-black text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          />
+                          <span className="text-[11px] text-slate-500">ชิ้น</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-5 py-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <span className="text-xs font-bold text-slate-600">
+                เลือกแจ้งเตือนทั้งหมด{' '}
+                <strong className="text-amber-700">
+                  {Object.keys(draftLowStockRules).length} รายการ
+                </strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLowStockModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={savingLowStockRules}
+                  onClick={handleSaveLowStockRules}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-sm disabled:opacity-50 transition"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{savingLowStockRules ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่าแจ้งเตือน'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
