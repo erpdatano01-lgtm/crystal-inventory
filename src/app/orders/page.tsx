@@ -398,7 +398,6 @@ export default function OrdersPage() {
             channel,
             payment_method: paymentMethod,
             slip_url: orderSlipUrls[0] || null,
-            tracking_no: trackingNo || null,
             notes: notes || null,
             discount,
             shipping_fee: shippingFee,
@@ -1567,36 +1566,19 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  <div className={`grid grid-cols-1 ${editingOrder ? 'sm:grid-cols-2' : ''} gap-3`}>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">ช่องทางจำหน่าย</label>
-                      <select
-                        value={channel}
-                        onChange={(e) => setChannel(e.target.value as SalesChannel)}
-                        className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      >
-                        {Object.entries(SALES_CHANNELS_CONFIG).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {editingOrder && (
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-700">
-                          เลขพัสดุจัดส่ง (Tracking No.)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="เช่น TH012345678 / Flash / Kerry"
-                          value={trackingNo}
-                          onChange={(e) => setTrackingNo(e.target.value)}
-                          className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                    )}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">ช่องทางจำหน่าย</label>
+                    <select
+                      value={channel}
+                      onChange={(e) => setChannel(e.target.value as SalesChannel)}
+                      className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      {Object.entries(SALES_CHANNELS_CONFIG).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-1">
