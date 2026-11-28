@@ -8,6 +8,7 @@ import {
   fetchExpenses,
   fetchStockLots,
   isNonStoneFreebie,
+  isStoneFreebie,
   isPackagingItem,
   isStoneProduct,
   isStandItem,
@@ -72,8 +73,9 @@ export default function DashboardPage() {
     .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
   const otherExpenseThisMonth = totalExpenseThisMonth - stoneExpenseThisMonth;
 
-  // แยกคลังหิน คลังของแถม และคลังแพ็คเกจจิ้งออกจากกัน
+  // แยกคลังหินขาย คลังหินของแถม คลังของแถม และคลังแพ็คเกจจิ้งออกจากกันแบบไม่ซ้ำซ้อน
   const stoneProducts = products.filter((p) => isStoneProduct(p));
+  const stoneFreebies = products.filter((p) => isStoneFreebie(p));
   const nonStoneFreebies = products.filter((p) => isNonStoneFreebie(p));
   const packagingItems = products.filter((p) => isPackagingItem(p));
   const sellingStones = stoneProducts.filter((p) => !p.sku?.startsWith('GIFT-'));
@@ -260,7 +262,7 @@ export default function DashboardPage() {
                 {availableCount} <span className="text-sm font-semibold text-slate-500">ชิ้น</span>
               </div>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
-                หิน {stoneProducts.length} • ของแถม {nonStoneFreebies.length} • แพ็คเกจ {packagingItems.length}
+                หินขาย {stoneProducts.length} • หินของแถม {stoneFreebies.length} • ของแถม {nonStoneFreebies.length} • แพ็คเกจ {packagingItems.length}
               </span>
             </div>
           </div>

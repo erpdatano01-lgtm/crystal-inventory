@@ -516,25 +516,108 @@ export async function resetTestData(target: 'all' | 'products' | 'expenses' = 'a
  * (models, magnets, bags, pouches, stands, etc.) that belongs in /freebies
  * rather than the Stone Warehouse (/products).
  */
-export function isNonStoneFreebie(
-  p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'> & { is_freebie?: boolean }
-): boolean {
+export type WarehouseCategory =
+  | 'STONE_SALE'
+  | 'STONE_FREEBIE'
+  | 'GIFT_NON_STONE'
+  | 'PACKAGING'
+  | 'STAND';
+
+const NON_STONE_GIFT_PREFIXES = [
+  'GIFT-SANTA-',
+  'GIFT-CAT-',
+  'GIFT-NEKO-',
+  'GIFT-MAG-',
+  'GIFT-POUCH-',
+  'GIFT-STAND-',
+  'GIFT-SAGE-',
+  'GIFT-STICKER-',
+  'GIFT-GIFT-',
+  'PROP-',
+];
+
+/**
+ * Single deterministic classifier so every product belongs to strictly ONE warehouse:
+ * PACKAGING -> STAND -> GIFT_NON_STONE -> STONE_FREEBIE -> STONE_SALE.
+ */
+export function classifyProductWarehouse(
+  p: Pick<Product, 'sku' | 'stone_type'> &
+    Partial<Pick<Product, 'grade_origin'>> & { is_freebie?: boolean }
+): WarehouseCategory {
   const sku = (p.sku || '').toUpperCase();
   const cat = p.stone_type || '';
   const grade = p.grade_origin || '';
-  return Boolean(
+
+  // 1. Packaging (highest priority)
+  if (
+    sku.startsWith('PKG-') ||
+    cat === 'กล่องพัสดุ' ||
+    cat === 'ถุงซิปล็อค' ||
+    cat === 'ถุงซีล & ถุงฝากาว' ||
+    cat === 'การ์ดขอบคุณ'
+  ) {
+    return 'PACKAGING';
+  }
+
+  // 2. Stands & sphere bases (checked before non-stone gifts so 'พร็อพแท่นวาง' stays in STAND)
+  if (
+    sku.startsWith('STN-') ||
+    cat === 'ขาตั้งอะคริลิค' ||
+    cat === 'ฐานแก้วลูกแก้ว' ||
+    cat === 'ฐานอะคริลิคลูกแก้ว' ||
+    cat === 'แท่นวางมินิมอล' ||
+    cat === 'พร็อพแท่นวาง'
+  ) {
+    return 'STAND';
+  }
+
+  // 3. Non-stone gifts (models, magnets, seasonal props, accessories)
+  if (
+    NON_STONE_GIFT_PREFIXES.some((prefix) => sku.startsWith(prefix)) ||
+    grade === '[PROP]' ||
+    cat === 'โมเดล & ฟิกเกอร์' ||
+    cat === 'แม่เหล็กติดตู้เย็น' ||
+    cat === 'ของตกแต่งเทศกาล' ||
+    cat === 'Accessory' ||
+    cat.includes('พร็อพ')
+  ) {
+    return 'GIFT_NON_STONE';
+  }
+
+  // 4. Stone freebies (crystal/stone gifts & broken stones converted to freebies)
+  if (
     p.is_freebie ||
-      sku.startsWith('GIFT-') ||
-      sku.startsWith('PROP-') ||
-      grade === '[PROP]' ||
-      grade === '[FREEBIE]' ||
-      grade.includes('[ของแถม') ||
-      cat === 'โมเดล & ฟิกเกอร์' ||
-      cat === 'แม่เหล็กติดตู้เย็น' ||
-      cat === 'ของตกแต่งเทศกาล' ||
-      cat === 'Accessory' ||
-      cat.includes('พร็อพ')
-  );
+    sku.startsWith('GIFT-') ||
+    grade === '[FREEBIE]' ||
+    grade.includes('[ของแถม')
+  ) {
+    return 'STONE_FREEBIE';
+  }
+
+  // 5. Sellable stones
+  return 'STONE_SALE';
+}
+
+/**
+ * Determine whether a product is a non-stone gift (models, magnets, etc.)
+ * belonging in /freebies.
+ */
+export function isNonStoneFreebie(
+  p: Pick<Product, 'sku' | 'stone_type'> &
+    Partial<Pick<Product, 'grade_origin'>> & { is_freebie?: boolean }
+): boolean {
+  return classifyProductWarehouse(p) === 'GIFT_NON_STONE';
+}
+
+/**
+ * Determine whether a product is a stone/crystal freebie
+ * belonging in /stone-freebies.
+ */
+export function isStoneFreebie(
+  p: Pick<Product, 'sku' | 'stone_type'> &
+    Partial<Pick<Product, 'grade_origin'>> & { is_freebie?: boolean }
+): boolean {
+  return classifyProductWarehouse(p) === 'STONE_FREEBIE';
 }
 
 /**
@@ -544,15 +627,7 @@ export function isNonStoneFreebie(
 export function isPackagingItem(
   p: Pick<Product, 'sku' | 'stone_type'>
 ): boolean {
-  const sku = (p.sku || '').toUpperCase();
-  const cat = p.stone_type || '';
-  return Boolean(
-    sku.startsWith('PKG-') ||
-      cat === 'กล่องพัสดุ' ||
-      cat === 'ถุงซิปล็อค' ||
-      cat === 'ถุงซีล & ถุงฝากาว' ||
-      cat === 'การ์ดขอบคุณ'
-  );
+  return classifyProductWarehouse(p) === 'PACKAGING';
 }
 
 /**
@@ -562,26 +637,18 @@ export function isPackagingItem(
 export function isStandItem(
   p: Pick<Product, 'sku' | 'stone_type'>
 ): boolean {
-  const sku = (p.sku || '').toUpperCase();
-  const cat = p.stone_type || '';
-  return Boolean(
-    sku.startsWith('STN-') ||
-      cat === 'ขาตั้งอะคริลิค' ||
-      cat === 'ฐานแก้วลูกแก้ว' ||
-      cat === 'ฐานอะคริลิคลูกแก้ว' ||
-      cat === 'แท่นวางมินิมอล' ||
-      cat === 'พร็อพแท่นวาง'
-  );
+  return classifyProductWarehouse(p) === 'STAND';
 }
 
 /**
- * Determine whether a product is a natural crystal / stone item
+ * Determine whether a product is a sellable natural crystal / stone item
  * belonging in the Stone Warehouse (/products).
  */
 export function isStoneProduct(
-  p: Pick<Product, 'sku' | 'stone_type' | 'grade_origin'>
+  p: Pick<Product, 'sku' | 'stone_type'> &
+    Partial<Pick<Product, 'grade_origin'>> & { is_freebie?: boolean }
 ): boolean {
-  return !isNonStoneFreebie(p) && !isPackagingItem(p) && !isStandItem(p);
+  return classifyProductWarehouse(p) === 'STONE_SALE';
 }
 
 /**

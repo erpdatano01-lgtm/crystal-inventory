@@ -96,10 +96,17 @@ export default function Navbar() {
           isSubItem: true,
         },
         {
+          href: '/stone-freebies',
+          label: 'คลังหินของแถม',
+          mobileLabel: 'หินของแถม',
+          sublabel: 'หินกลิ้ง, หินดิบ & หินแถมลูกค้า',
+          icon: Gem,
+        },
+        {
           href: '/freebies',
           label: 'คลังของแถม',
           mobileLabel: 'ของแถม',
-          sublabel: 'สต็อกโมเดล & แม่เหล็กของแจก',
+          sublabel: 'โมเดลแมว, แม่เหล็ก & ของแจก',
           icon: Gift,
         },
         {

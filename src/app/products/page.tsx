@@ -10,6 +10,7 @@ import {
   updateProductStatus,
   deleteProduct,
   isNonStoneFreebie,
+  isStoneFreebie,
   isStoneProduct,
 } from '@/lib/inventoryService';
 import {
@@ -215,7 +216,7 @@ export default function ProductsPage() {
       }
       showToast(
         action === 'CONVERT_TO_FREEBIE'
-          ? `🎁 ย้าย ${data.product?.sku || damagedModalProduct.sku} ไปคลังของแถมแล้ว!`
+          ? `🎁 ย้าย ${data.product?.sku || damagedModalProduct.sku} ไปคลังหินของแถมแล้ว!`
           : `💔 บันทึก ${damagedModalProduct.sku} เป็นแตกเสียหาย (DAMAGED) แล้ว`
       );
       setDamagedModalProduct(null);
@@ -320,6 +321,11 @@ export default function ProductsPage() {
   // Separate stone products vs non-stone freebies & packaging cleanly
   const stoneProducts = useMemo(
     () => products.filter((p) => isStoneProduct(p)),
+    [products]
+  );
+
+  const stoneFreebiesCount = useMemo(
+    () => products.filter((p) => isStoneFreebie(p)).length,
     [products]
   );
 
@@ -542,13 +548,22 @@ export default function ProductsPage() {
               </span>
             </div>
 
-            <Link
-              href="/freebies"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95 ml-auto sm:ml-0"
-            >
-              <Gift className="w-3.5 h-3.5" />
-              <span>ไปยังคลังของแถม ({nonStoneFreebiesCount}) →</span>
-            </Link>
+            <div className="flex items-center gap-2 ml-auto sm:ml-0">
+              <Link
+                href="/stone-freebies"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs transition active:scale-95"
+              >
+                <Gift className="w-3.5 h-3.5" />
+                <span>หินของแถม ({stoneFreebiesCount}) →</span>
+              </Link>
+              <Link
+                href="/freebies"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95"
+              >
+                <Gift className="w-3.5 h-3.5" />
+                <span>ไปยังคลังของแถม ({nonStoneFreebiesCount}) →</span>
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -1911,7 +1926,7 @@ export default function ProductsPage() {
                     onClick={() => {
                       if (
                         confirm(
-                          `ยืนยันเปลี่ยน "${damagedModalProduct.sku}" เป็นของแถม (GIFT-${damagedModalProduct.sku})?\n\nราคาขายจะถูกตั้งเป็น ฿0 และย้ายเข้าคลังของแถม`
+                          `ยืนยันเปลี่ยน "${damagedModalProduct.sku}" เป็นของแถม (GIFT-${damagedModalProduct.sku})?\n\nราคาขายจะถูกตั้งเป็น ฿0 และย้ายเข้าคลังหินของแถม`
                         )
                       ) {
                         handleSubmitDamagedAction('CONVERT_TO_FREEBIE');
@@ -1920,7 +1935,7 @@ export default function ProductsPage() {
                     className="w-full p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left transition disabled:opacity-50"
                   >
                     <p className="font-bold text-sm text-emerald-800">
-                      🎁 2. เปลี่ยนเป็นของแถม (ย้ายไปคลังของแถม)
+                      🎁 2. เปลี่ยนเป็นของแถม (ย้ายไปคลังหินของแถม)
                     </p>
                     <p className="text-[11px] text-emerald-700 mt-0.5">
                       เปลี่ยนรหัสเป็น GIFT-..., ตั้งราคาขาย ฿0, ถอดออกจากชุดขาย เพื่อใช้แถมลูกค้า
