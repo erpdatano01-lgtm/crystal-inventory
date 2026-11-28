@@ -179,37 +179,30 @@ export default function Navbar() {
       {/* ========================================================= */}
       {/* 1. DESKTOP LEFT SIDEBAR (md:fixed md:w-64)                */}
       {/* ========================================================= */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-64 bg-white border-r border-slate-200 z-40 select-none">
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-64 bg-white border-r border-zinc-200 z-40 select-none">
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-100">
+        <div className="px-5 py-5 border-b border-zinc-100">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-amber-400 p-0.5 shadow-md shadow-purple-500/20 group-hover:scale-105 transition shrink-0">
-              <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-                <Gem className="w-6 h-6 text-purple-600" />
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center shrink-0">
+              <Gem className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-base font-black tracking-tight text-slate-900 truncate">
-                  Vivida Crystal
-                </h1>
-                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 shrink-0">
-                  Pro
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 truncate">
-                ระบบคลังหิน & บัญชี
+              <h1 className="text-sm font-semibold tracking-tight text-zinc-900 truncate">
+                Vivida Crystal
+              </h1>
+              <p className="text-[11px] text-zinc-400 truncate">
+                คลังหิน &amp; บัญชี
               </p>
             </div>
           </Link>
         </div>
 
         {/* Navigation Links (Grouped Sections) */}
-        <nav className="flex-1 px-3 py-3 space-y-3 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
           {navSections.map((section, sIdx) => (
             <div key={sIdx} className="space-y-1">
               {section.title && (
-                <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                <div className="px-3 pb-1 text-[10px] font-medium tracking-wider text-zinc-400 uppercase">
                   {section.title}
                 </div>
               )}
@@ -221,54 +214,45 @@ export default function Navbar() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition group ${
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-[13px] transition group ${
                         link.isSubItem ? 'ml-4 pl-2.5' : ''
                       } ${
                         isActive
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20 font-bold'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                          ? 'bg-zinc-900 text-white font-medium'
+                          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-normal'
                       }`}
                     >
                       {link.isSubItem && (
                         <CornerDownRight
                           className={`w-3.5 h-3.5 shrink-0 -mr-0.5 ${
                             isActive
-                              ? 'text-purple-200'
-                              : 'text-slate-400 group-hover:text-purple-500'
+                              ? 'text-zinc-400'
+                              : 'text-zinc-400 group-hover:text-zinc-700'
                           }`}
                         />
                       )}
-                      <div
-                        className={`p-1.5 rounded-xl transition shrink-0 ${
+                      <Icon
+                        className={`w-4 h-4 shrink-0 ${
                           isActive
-                            ? 'bg-white/20 text-white'
-                            : 'text-slate-400 group-hover:text-purple-600 group-hover:bg-purple-50'
+                            ? 'text-white'
+                            : 'text-zinc-400 group-hover:text-zinc-700'
                         }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </div>
+                      />
                       <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="truncate leading-tight">{link.label}</span>
                           {link.badge && (
                             <span
-                              className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                              className={`text-[9px] font-medium px-1.5 py-0.2 rounded shrink-0 ${
                                 isActive
-                                  ? 'bg-white/20 text-white'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  ? 'bg-white/15 text-white'
+                                  : 'bg-zinc-100 text-zinc-600'
                               }`}
                             >
                               {link.badge}
                             </span>
                           )}
                         </div>
-                        <span
-                          className={`text-[10px] font-normal leading-tight truncate ${
-                            isActive ? 'text-purple-200' : 'text-slate-400'
-                          }`}
-                        >
-                          {link.sublabel}
-                        </span>
                       </div>
                     </Link>
                   );
@@ -279,46 +263,37 @@ export default function Navbar() {
         </nav>
 
         {/* Sidebar Footer Utilities */}
-        <div className="p-4 border-t border-slate-100 space-y-2.5 bg-slate-50/50">
+        <div className="p-4 border-t border-zinc-100 space-y-2">
           {/* Google Sheets Sync Button */}
           <button
             type="button"
             onClick={() => setShowSheetsModal(true)}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200/90 hover:bg-emerald-100 font-semibold text-xs transition active:scale-95 shadow-xs"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium text-xs transition"
             title="เชื่อมต่อ Google Sheets ดึงข้อมูลสด"
           >
             <div className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Google Sheets Sync</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <span>Google Sheets</span>
             </div>
-            <span className="text-[10px] bg-emerald-200/60 text-emerald-900 px-1.5 py-0.5 rounded font-mono font-bold">
-              LIVE
-            </span>
+            <span className="text-[10px] text-zinc-400 font-mono">SYNC</span>
           </button>
 
           {/* Cloud Status Badge */}
           {mounted && (
             <div
               suppressHydrationWarning
-              className={`flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-medium border ${
-                isCloudConnected
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-amber-50 text-amber-800 border-amber-200'
-              }`}
+              className="flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] text-zinc-500 border border-zinc-100 bg-zinc-50/70"
             >
               <div className="flex items-center gap-1.5 truncate">
                 <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    isCloudConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isCloudConnected ? 'bg-emerald-500' : 'bg-amber-500'
                   }`}
                 />
                 <span className="truncate">
-                  {isCloudConnected ? 'Supabase & R2 Online' : 'โหมดจำลอง (Local)'}
+                  {isCloudConnected ? 'Cloud Online' : 'Local Mode'}
                 </span>
               </div>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                {isCloudConnected ? 'Cloud' : 'Demo'}
-              </span>
             </div>
           )}
 
@@ -328,30 +303,21 @@ export default function Navbar() {
               await fetch('/api/auth/passcode', { method: 'DELETE' });
               window.location.href = '/login';
             }}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/80 transition"
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-medium text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 border border-zinc-200/80 transition"
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>ล็อคหน้าเว็บ (ออกจากระบบ)</span>
+            <span>ล็อคหน้าเว็บ</span>
           </button>
-
-          <div className="text-center pt-1">
-            <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-500" />
-              Vivida Crystal ERP
-            </span>
-          </div>
         </div>
       </aside>
 
       {/* ========================================================= */}
       {/* 2. MOBILE TOP BAR (md:hidden)                             */}
       {/* ========================================================= */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/95 backdrop-blur border-b border-slate-200 z-40 px-4 flex items-center justify-between">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/95 backdrop-blur border-b border-zinc-200 z-40 px-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-amber-400 p-0.5 shadow-sm">
-            <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
-              <Gem className="w-4 h-4 text-purple-600" />
-            </div>
+          <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
+            <Gem className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-1">

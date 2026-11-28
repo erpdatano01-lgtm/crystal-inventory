@@ -194,98 +194,79 @@ export default function StandsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
+    <div className="min-h-screen bg-[#fafafa] flex flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16 md:pl-64 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0">
       <Navbar />
 
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 flex-1">
-        {/* Header Card (Matches Stone Warehouse) */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+      <main className="max-w-6xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6 flex-1">
+        {/* Minimal Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-zinc-200">
           <div>
-            <div className="flex items-center gap-2">
-              <Layers className="w-6 h-6 text-indigo-600" />
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                คลังขาตั้ง &amp; ฐานวางหิน (Stand Inventory)
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              พบ {filteredList.length} รายการ • คงเหลือ {totalUnits.toLocaleString()} ชิ้น • มูลค่าต้นทุนสุทธิรวม ฿
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              คลังขาตั้ง &amp; ฐานวางหิน
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1 tabular-nums">
+              {filteredList.length} รายการ · คงเหลือ {totalUnits.toLocaleString()} ชิ้น · มูลค่าทุน ฿
               {Math.round(totalCostValue).toLocaleString()}
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
-            <Link
-              href="/products"
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
-            >
-              <span>💎 สลับไปคลังหินขาย</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 text-xs sm:text-sm font-medium transition shrink-0"
+          >
+            <span>คลังหินขาย</span>
+            <ArrowRight className="w-3.5 h-3.5 text-zinc-500" />
+          </Link>
         </div>
 
         {/* Search, Filter & Layout bar */}
-        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-indigo-50/60 border border-indigo-200/60 rounded-2xl w-full">
-            <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-indigo-900">
-              <span className="p-1 rounded-lg bg-indigo-200 text-indigo-800">🪵</span>
-              <span>
-                ขาตั้ง &amp; ฐานวางหินทั้งหมด ({standList.length} รายการ • {totalUnits} ชิ้น)
-              </span>
-            </div>
-            <span className="text-[11px] font-semibold text-indigo-700 px-3">
-              รหัสหมวด STN-* • ต้นทุนสุทธิจากใบเสร็จ Shopee
-            </span>
-          </div>
-
+        <div className="space-y-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="ค้นหา SKU (เช่น STN-GLS-04), ชื่อขาตั้ง, หรือร้านค้า..."
+                placeholder="ค้นหา SKU, ชื่อขาตั้ง หรือร้านค้า..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+                className="w-full pl-10 pr-9 py-2.5 text-sm bg-white border border-zinc-200 rounded-xl outline-none focus:border-zinc-900 transition"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-center">
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-lg transition ${
-                    viewMode === 'grid'
-                      ? 'bg-white text-indigo-700 shadow-sm font-semibold'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                  title="การ์ดรูปภาพ (Grid)"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded-lg transition ${
-                    viewMode === 'table'
-                      ? 'bg-white text-indigo-700 shadow-sm font-semibold'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                  title="ตาราง (Table)"
-                >
-                  <List className="w-4 h-4" />
-                </button>
-              </div>
+            <div className="flex items-center bg-white p-1 rounded-xl border border-zinc-200 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition ${
+                  viewMode === 'grid'
+                    ? 'bg-zinc-900 text-white'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+                title="การ์ดรูปภาพ"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-lg transition ${
+                  viewMode === 'table'
+                    ? 'bg-zinc-900 text-white'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+                title="ตาราง"
+              >
+                <List className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -293,10 +274,10 @@ export default function StandsPage() {
             <button
               type="button"
               onClick={() => setSelectedCategory('ALL')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl shrink-0 transition ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg shrink-0 transition border ${
                 selectedCategory === 'ALL'
-                  ? 'bg-indigo-700 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-zinc-900 text-white border-zinc-900'
+                  : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
               }`}
             >
               ทั้งหมด ({standList.length})
@@ -306,10 +287,10 @@ export default function StandsPage() {
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl shrink-0 transition ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg shrink-0 transition border ${
                   selectedCategory === cat
-                    ? 'bg-indigo-700 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-zinc-900 text-white border-zinc-900'
+                    : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
                 }`}
               >
                 {cat} ({standList.filter((p) => p.stone_type === cat).length})
@@ -320,15 +301,15 @@ export default function StandsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-400 text-sm">
+          <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center text-zinc-400 text-sm">
             กำลังโหลดข้อมูล...
           </div>
         ) : filteredList.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm bg-white rounded-3xl border border-slate-200">
+          <div className="p-12 text-center text-zinc-400 text-sm bg-white rounded-2xl border border-zinc-200">
             ไม่พบรายการขาตั้งที่ตรงกับเงื่อนไข
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {filteredList.map((item) => {
               const qty = Number(item.qty_on_hand) || 0;
               const isOut = qty === 0 || item.status === 'SOLD';
@@ -336,40 +317,32 @@ export default function StandsPage() {
               return (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between group ${
-                    isOut ? 'opacity-75' : ''
+                  className={`bg-white rounded-2xl overflow-hidden border border-zinc-200 transition flex flex-col justify-between ${
+                    isOut ? 'opacity-65' : 'hover:border-zinc-300'
                   }`}
                 >
-                  <div className="relative aspect-square bg-slate-100 overflow-hidden">
+                  <div className="relative aspect-square bg-zinc-100 overflow-hidden">
                     {item.r2_thumbnail_url ? (
                       <img
                         src={item.r2_thumbnail_url}
                         alt={item.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-slate-100">
-                        <Layers className="w-12 h-12 text-indigo-300" />
+                      <div className="w-full h-full flex items-center justify-center bg-zinc-50">
+                        <Layers className="w-10 h-10 text-zinc-300" />
                       </div>
                     )}
 
-                    <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
-                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-black/75 text-white backdrop-blur">
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-900/80 text-white">
                         {item.sku}
                       </span>
-                      <span
-                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full border backdrop-blur ${
-                          isOut
-                            ? 'bg-slate-100/95 text-slate-600 border-slate-300'
-                            : 'bg-indigo-100/95 text-indigo-800 border-indigo-300'
-                        }`}
-                      >
-                        {isOut ? 'หมดแล้ว' : 'พร้อมใช้งาน'}
-                      </span>
-                    </div>
-
-                    <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 bg-white/90 backdrop-blur rounded-md text-[10px] font-bold text-slate-800 shadow-sm">
-                      {qty} ชิ้น
+                      {isOut && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/90 text-zinc-700">
+                          หมด
+                        </span>
+                      )}
                     </div>
 
                     {receiptUrl && (
@@ -377,73 +350,64 @@ export default function StandsPage() {
                         href={receiptUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="absolute bottom-2.5 right-2.5 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-md transition"
+                        className="absolute bottom-2.5 right-2.5 px-2 py-1 bg-white/90 hover:bg-white text-zinc-800 rounded-lg text-[10px] font-medium flex items-center gap-1 border border-zinc-200/80 transition"
                         title="ดูรูปใบเสร็จ Shopee"
                       >
                         <span>ใบเสร็จ</span>
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-2.5 h-2.5" />
                       </a>
                     )}
                   </div>
 
                   <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                     <div>
-                      <div className="text-[11px] text-indigo-700 font-bold mb-0.5">
+                      <div className="text-[11px] text-zinc-400 mb-0.5">
                         {item.stone_type}
                       </div>
-                      <h3 className="font-bold text-sm text-slate-900 line-clamp-1 group-hover:text-indigo-700 transition">
+                      <h3 className="font-medium text-sm text-zinc-900 line-clamp-1">
                         {item.name}
                       </h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                        {item.grade_origin || '-'}
-                      </p>
                     </div>
 
-                    <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">ทุนสุทธิ/ชิ้น</span>
-                        <span className="font-black text-emerald-700">
-                          ฿{formatUnitCost(Number(item.cost_price) || 0)}
-                        </span>
-                      </div>
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-100">
+                      <span className="text-zinc-500">
+                        ทุน <strong className="font-semibold text-zinc-900 tabular-nums">฿{formatUnitCost(Number(item.cost_price) || 0)}</strong>
+                      </span>
                       {Number(item.selling_price) > 0 && (
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-400">ราคาขาย</span>
-                          <span className="font-bold text-purple-700">
-                            ฿{Number(item.selling_price).toLocaleString()}
-                          </span>
-                        </div>
+                        <span className="text-zinc-600 tabular-nums">
+                          ขาย ฿{Number(item.selling_price).toLocaleString()}
+                        </span>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-1">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
                           disabled={updatingId === item.id || qty <= 0}
                           onClick={() => handleQuickQtyChange(item, -1)}
-                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 disabled:opacity-30"
+                          className="w-7 h-7 rounded-lg bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-700 disabled:opacity-30"
                         >
-                          <Minus className="w-3.5 h-3.5" />
+                          <Minus className="w-3 h-3" />
                         </button>
-                        <span className="min-w-[2rem] text-center font-mono font-black text-xs text-slate-900">
+                        <span className="min-w-[1.75rem] text-center font-mono font-medium text-xs text-zinc-900 tabular-nums">
                           {qty}
                         </span>
                         <button
                           type="button"
                           disabled={updatingId === item.id}
                           onClick={() => handleQuickQtyChange(item, 1)}
-                          className="w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-800 disabled:opacity-30"
+                          className="w-7 h-7 rounded-lg bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-700 disabled:opacity-30"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          <Plus className="w-3 h-3" />
                         </button>
                       </div>
                       <button
                         type="button"
                         onClick={() => openEdit(item)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 text-xs font-medium flex items-center gap-1 transition"
                       >
-                        <Pencil className="w-3 h-3" />
+                        <Pencil className="w-3 h-3 text-zinc-400" />
                         <span>แก้ไข</span>
                       </button>
                     </div>
@@ -453,28 +417,28 @@ export default function StandsPage() {
             })}
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                  <tr className="bg-zinc-50 border-b border-zinc-200 text-[11px] font-medium text-zinc-500">
                     <th className="py-3 px-4">รูป / SKU</th>
                     <th className="py-3 px-4">ชื่อขาตั้ง &amp; ฐานวาง</th>
                     <th className="py-3 px-4">หมวดหมู่</th>
-                    <th className="py-3 px-4 text-right">ทุนสุทธิ/ชิ้น</th>
+                    <th className="py-3 px-4 text-right">ทุน/ชิ้น</th>
                     <th className="py-3 px-4 text-center">คงเหลือ</th>
                     <th className="py-3 px-4 text-right">จัดการ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
+                <tbody className="divide-y divide-zinc-100 text-xs">
                   {filteredList.map((item) => {
                     const qty = Number(item.qty_on_hand) || 0;
                     const receiptUrl = STAND_RECEIPT_URLS[item.sku] || item.r2_thumbnail_url;
                     return (
-                      <tr key={item.id} className="hover:bg-slate-50/70">
+                      <tr key={item.id} className="hover:bg-zinc-50/70">
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
+                            <div className="w-10 h-10 rounded-xl bg-zinc-100 overflow-hidden shrink-0 flex items-center justify-center border border-zinc-200">
                               {item.r2_thumbnail_url ? (
                                 <img
                                   src={item.r2_thumbnail_url}
@@ -482,21 +446,21 @@ export default function StandsPage() {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <Layers className="w-4 h-4 text-indigo-400" />
+                                <Layers className="w-4 h-4 text-zinc-400" />
                               )}
                             </div>
-                            <span className="font-mono font-bold text-indigo-700">
+                            <span className="font-mono font-medium text-zinc-800">
                               {item.sku}
                             </span>
                           </div>
                         </td>
-                        <td className="py-2.5 px-4 font-semibold text-slate-900">
+                        <td className="py-2.5 px-4 font-medium text-zinc-900">
                           {item.name}
                         </td>
-                        <td className="py-2.5 px-4 text-slate-600">
+                        <td className="py-2.5 px-4 text-zinc-500">
                           {item.stone_type || '-'}
                         </td>
-                        <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
+                        <td className="py-2.5 px-4 text-right font-medium text-zinc-900 tabular-nums">
                           ฿{formatUnitCost(Number(item.cost_price) || 0)}
                         </td>
                         <td className="py-2.5 px-4 text-center">
@@ -505,16 +469,16 @@ export default function StandsPage() {
                               type="button"
                               disabled={updatingId === item.id || qty <= 0}
                               onClick={() => handleQuickQtyChange(item, -1)}
-                              className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold disabled:opacity-40"
+                              className="w-6 h-6 rounded bg-zinc-100 hover:bg-zinc-200 font-medium disabled:opacity-40"
                             >
                               -
                             </button>
-                            <span className="min-w-[1.75rem] font-black">{qty}</span>
+                            <span className="min-w-[1.75rem] font-medium tabular-nums">{qty}</span>
                             <button
                               type="button"
                               disabled={updatingId === item.id}
                               onClick={() => handleQuickQtyChange(item, 1)}
-                              className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold disabled:opacity-40"
+                              className="w-6 h-6 rounded bg-zinc-100 hover:bg-zinc-200 font-medium disabled:opacity-40"
                             >
                               +
                             </button>
@@ -526,7 +490,7 @@ export default function StandsPage() {
                               href={receiptUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-[11px] hover:bg-indigo-100"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-zinc-700 font-medium text-[11px] hover:bg-zinc-50"
                             >
                               ใบเสร็จ
                             </a>
@@ -534,7 +498,7 @@ export default function StandsPage() {
                           <button
                             type="button"
                             onClick={() => openEdit(item)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
+                            className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium text-[11px]"
                           >
                             แก้ไข
                           </button>

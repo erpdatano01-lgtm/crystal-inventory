@@ -452,22 +452,19 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 flex-1">
-        {/* Header with Title and Customer View Mode Toggle */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+      <main className="max-w-6xl w-full mx-auto px-5 sm:px-8 lg:px-10 py-8 space-y-6 flex-1">
+        {/* Minimal Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-5 border-b border-zinc-200">
           <div>
-            <div className="flex items-center gap-2">
-              <PackageCheck className="w-6 h-6 text-purple-600" />
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                คลังหิน &amp; ค้นหาหน้าร้าน (Crystal Inventory)
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              พบ {filteredProducts.length} ชิ้น • รองรับการแชร์คลิปวิดีโอ และโหมดเปิดหน้าจอให้ลูกค้าดู
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              คลังหิน
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1 tabular-nums">
+              พบ {filteredProducts.length} ชิ้น (ทั้งหมด {stoneProducts.length} ชิ้น)
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-end flex-wrap">
             {/* Discreet Hide/Show Cost Toggle */}
             <button
               onClick={() => {
@@ -476,21 +473,17 @@ export default function ProductsPage() {
                 setHideCostPreference(next);
                 showToast(next ? '🔒 ซ่อนราคาทุนแล้ว' : '👁️ แสดงราคาทุนแล้ว');
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition border ${
-                isCustomerView
-                  ? 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                  : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
-              }`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition border bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
               title={isCustomerView ? 'คลิกเพื่อแสดงราคาทุน' : 'คลิกเพื่อซ่อนราคาทุน'}
             >
               {isCustomerView ? (
                 <>
-                  <EyeOff className="w-4 h-4 text-slate-500" />
+                  <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
                   <span>ซ่อนทุน</span>
                 </>
               ) : (
                 <>
-                  <Eye className="w-4 h-4 text-purple-600" />
+                  <Eye className="w-3.5 h-3.5 text-zinc-700" />
                   <span>แสดงทุน</span>
                 </>
               )}
@@ -499,103 +492,87 @@ export default function ProductsPage() {
             {/* Barcode Label Print Button */}
             <button
               onClick={() => openBarcodeModal()}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 font-semibold text-xs sm:text-sm transition active:scale-95 shadow-xs"
-              title="พิมพ์สติกเกอร์บาร์โค้ดติดหิน (กำหนดขนาดเป็น cm ได้)"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium text-xs transition"
+              title="พิมพ์สติกเกอร์บาร์โค้ดติดหิน"
             >
-              <Printer className="w-4 h-4 text-amber-700" />
+              <Printer className="w-3.5 h-3.5 text-zinc-400" />
               <span>ปริ้นบาร์โค้ด</span>
             </button>
 
             {/* Google Sheets Live Feed Button */}
             <button
               onClick={() => setShowSheetsModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs sm:text-sm transition active:scale-95 shadow-xs"
-              title="ดึงข้อมูลสต็อกไปแสดงผลบน Google Sheets อัตโนมัติ"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium text-xs transition"
+              title="ดึงข้อมูลสต็อกไปแสดงผลบน Google Sheets"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Google Sheets</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Sheets</span>
             </button>
 
             {/* Link to Add Freebie directly */}
             <Link
               href="/products/new?mode=freebie"
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 active:scale-95 transition"
-              title="ลงทะเบียนของแถม (หินแถม, ถุงผ้า, ฐานไม้, สติกเกอร์)"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 font-medium text-xs transition"
             >
-              <Gift className="w-4 h-4" />
+              <Gift className="w-3.5 h-3.5 text-zinc-400" />
               <span>+ ลงของแถม</span>
             </Link>
 
-            {/* Link to Add Product */}
+            {/* Link to Add Product (Single Primary Accent) */}
             <Link
               href="/products/new"
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/20 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs transition"
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>+ รับหินเข้าสต็อก</span>
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ รับหินเข้า</span>
             </Link>
           </div>
         </div>
 
         {/* Search, Filter & Layout bar */}
-        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-          {/* Stone Inventory Header Bar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2 bg-purple-50/60 border border-purple-200/60 rounded-2xl w-full">
-            <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold text-purple-900">
-              <span className="p-1 rounded-lg bg-purple-200 text-purple-800">💎</span>
-              <span>
-                คลังหินสำหรับขายทั้งหมด ({stoneProducts.length} ชิ้น)
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 ml-auto sm:ml-0">
-              <Link
-                href="/stone-freebies"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs transition active:scale-95"
-              >
-                <Gift className="w-3.5 h-3.5" />
-                <span>หินของแถม ({stoneFreebiesCount}) →</span>
-              </Link>
-              <Link
-                href="/freebies"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs transition active:scale-95"
-              >
-                <Gift className="w-3.5 h-3.5" />
-                <span>ไปยังคลังของแถม ({nonStoneFreebiesCount}) →</span>
-              </Link>
-            </div>
-          </div>
-
+        <div className="space-y-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             {/* Search input */}
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="ค้นหาตาม SKU (เช่น CRYS-AME-001), ชื่อหิน, ชนิดแร่, หรือที่เก็บ..."
+                placeholder="ค้นหา SKU, ชื่อหิน, ชนิดแร่ หรือที่เก็บ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition"
+                className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-zinc-200 rounded-xl outline-none focus:border-zinc-900 transition"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            {/* Layout switch */}
+            {/* Quick links + Layout switch */}
             <div className="flex items-center gap-2 self-end sm:self-center">
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <Link
+                href="/stone-freebies"
+                className="px-3 py-2 rounded-xl bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium text-xs transition"
+              >
+                หินของแถม ({stoneFreebiesCount})
+              </Link>
+              <Link
+                href="/freebies"
+                className="px-3 py-2 rounded-xl bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200 font-medium text-xs transition"
+              >
+                ของแถม ({nonStoneFreebiesCount})
+              </Link>
+              <div className="flex items-center bg-white p-1 rounded-xl border border-zinc-200">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-1.5 rounded-lg transition ${
                     viewMode === 'grid'
-                      ? 'bg-white text-purple-700 shadow-sm font-semibold'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-zinc-900 text-white'
+                      : 'text-zinc-500 hover:text-zinc-800'
                   }`}
                   title="การ์ดรูปภาพ (Grid)"
                 >
@@ -605,8 +582,8 @@ export default function ProductsPage() {
                   onClick={() => setViewMode('table')}
                   className={`p-1.5 rounded-lg transition ${
                     viewMode === 'table'
-                      ? 'bg-white text-purple-700 shadow-sm font-semibold'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-zinc-900 text-white'
+                      : 'text-zinc-500 hover:text-zinc-800'
                   }`}
                   title="ตาราง (Table)"
                 >
@@ -816,7 +793,7 @@ export default function ProductsPage() {
             </div>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {filteredProducts.map((p) => {
               const statusInfo = STATUS_CONFIG[p.status] || STATUS_CONFIG.AVAILABLE;
               const thumb =
@@ -826,15 +803,15 @@ export default function ProductsPage() {
               return (
                 <div
                   key={p.id}
-                  className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between group"
+                  className="bg-white rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-300 transition flex flex-col justify-between"
                 >
                   {/* Top Image Container */}
-                  <div className="relative aspect-square bg-slate-100 overflow-hidden cursor-pointer">
+                  <div className="relative aspect-square bg-zinc-100 overflow-hidden cursor-pointer">
                     <img
                       src={thumb}
                       alt={p.name}
                       onClick={() => setActiveModalProduct(p)}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      className="w-full h-full object-cover"
                     />
 
                     {/* Top Badges */}
